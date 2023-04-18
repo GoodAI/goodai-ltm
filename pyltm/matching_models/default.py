@@ -61,7 +61,7 @@ class DefaultRerankingCrossEncoder(nn.Module, BaseQueryPassageProbModel, BaseTex
                                self.classifier.parameters())
 
     @staticmethod
-    def get_embedding(self, hidden_states: torch.Tensor, attention_mask: torch.Tensor,
+    def get_embedding(hidden_states: torch.Tensor, attention_mask: torch.Tensor,
                       att_model: nn.Module) -> torch.Tensor:
         # hidden_states: (batch_size, seq_len, emb_size,)
         x_att_mask = attention_mask[:, :, None]
