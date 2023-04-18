@@ -58,15 +58,15 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
     def retrieve_complete_sequences(self, chunk_ids: List[int], punctuation_ids: Set[int]):
         return self.chunk_queue.retrieve_complete_sequences(chunk_ids, punctuation_ids)
 
-    def get_retrieval_key_for_text(self, queries: List[str]) -> torch.Tensor:
-        return self.emb_model.encode_queries(queries, convert_to_tensor=True)
+    def get_retrieval_key_for_text(self, queries: List[str], show_progress_bar: bool = False) -> torch.Tensor:
+        return self.emb_model.encode_queries(queries, convert_to_tensor=True, show_progress_bar=show_progress_bar)
 
     def get_match_probabilities(self, query: str, passages: List[str]) -> List[float]:
         if self.matching_model is None:
             raise SystemError('No query-passage match probability model available')
         return self.matching_model.get_match_confidence(query, passages)
 
-    def add_text(self, text: str, metadata: Optional[Any]):
+    def add_text(self, text: str, metadata: Optional[Any] = None):
         token_ids = self.em_tokenizer.encode(text, add_special_tokens=False)
         removed_buckets = self.chunk_queue.add_sequence(token_ids, metadata)
         self._ensure_keys_added()

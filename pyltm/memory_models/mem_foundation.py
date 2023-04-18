@@ -2,7 +2,9 @@ import abc
 from typing import List, Union, Any, Set, Optional
 
 import faiss
+import numpy as np
 import torch
+from tqdm import tqdm
 from transformers import PreTrainedTokenizer
 
 from pyltm.helpers.collections_helper import remove_duplicates, num_visited_to_get_expected_count, \
@@ -39,7 +41,7 @@ class BaseTextMemoryFoundation(BaseTextMemory):
         pass
 
     @abc.abstractmethod
-    def get_retrieval_key_for_text(self, queries: List[str]) -> torch.Tensor:
+    def get_retrieval_key_for_text(self, queries: List[str], show_progress_bar: bool = False) -> torch.Tensor:
         pass
 
     @abc.abstractmethod
@@ -50,21 +52,12 @@ class BaseTextMemoryFoundation(BaseTextMemory):
     def get_metadata(self, chunk_id: int) -> Optional[Any]:
         pass
 
-    def retrieve(self, query: str, k: int = 1, mm_multiplier: int = 10) -> List[RetrievedMemory]:
-        rk = self.get_retrieval_key_for_text([query])
-        batch_size, num_rk = rk.size(0), rk.size(1),
-        if num_rk != 1:
-            raise ValueError('Memory does not support multiple retrieval embeddings')
-        rk_np = rk.view(batch_size * num_rk, -1).detach().cpu().numpy()
+    def _retrieve(self, query: str, flat_distances: np.ndarray, flat_indexes: np.ndarray,
+                  expected_key_db_top_k: int) -> List[RetrievedMemory]:
+        # TODO optimize matching batch
+        # distances, indexes: (batch_size, downstream_top_k)
         adjacent_chunks_ok = self.adjacent_chunks_ok
-        expected_key_db_top_k = k
-        if self.has_match_prob_model:
-            expected_key_db_top_k *= mm_multiplier
-        downstream_top_k = expected_key_db_top_k * self.num_storage_embeddings
-        if not adjacent_chunks_ok:
-            downstream_top_k *= 3
-        distances, indexes = self.vector_db.search(rk_np, k=downstream_top_k)
-        prelim_dist_indexes = list(zip(distances.flatten(), indexes.flatten()))
+        prelim_dist_indexes = list(zip(flat_distances, flat_indexes))
         prelim_dist_indexes = remove_duplicates(prelim_dist_indexes, key_fn=lambda _t: _t[1])
         if self.has_match_prob_model:
             nv = num_visited_to_get_expected_count(prelim_dist_indexes, expected_key_db_top_k, adjacent_chunks_ok,
@@ -91,4 +84,30 @@ class BaseTextMemoryFoundation(BaseTextMemory):
             metadata = self.get_metadata(chunk_id)
             result.append(RetrievedMemory(passage=r_text, distance=distance,
                                           confidence=confidence, metadata=metadata))
+        return result
+
+    def retrieve_multiple(self, queries: List[str], k: int = 1, mm_multiplier: int = 10,
+                          show_progress_bar: bool = False) -> List[List[RetrievedMemory]]:
+        rk = self.get_retrieval_key_for_text(queries, show_progress_bar=show_progress_bar)
+        batch_size, num_rk, emb_size = rk.size(0), rk.size(1), rk.size(2),
+        if num_rk != 1:
+            raise ValueError('Memory does not support multiple retrieval embeddings')
+        rk_np = rk.view(batch_size, emb_size).detach().cpu().numpy()
+        adjacent_chunks_ok = self.adjacent_chunks_ok
+        expected_key_db_top_k = k
+        if self.has_match_prob_model:
+            expected_key_db_top_k *= mm_multiplier
+        downstream_top_k = expected_key_db_top_k * self.num_storage_embeddings
+        if not adjacent_chunks_ok:
+            downstream_top_k *= 3
+        distances, indexes = self.vector_db.search(rk_np, k=downstream_top_k)
+        result = []
+        rng = range(batch_size)
+        if show_progress_bar:
+            rng = tqdm(rng, desc='Retrieval', unit='query')
+        for i in rng:
+            flat_distances = distances[i]
+            flat_indexes = indexes[i]
+            single_result = self._retrieve(queries[i], flat_distances, flat_indexes, expected_key_db_top_k)
+            result.append(single_result)
         return result
