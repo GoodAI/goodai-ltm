@@ -2,6 +2,8 @@ import codecs
 import json
 import os
 from typing import List
+
+import numpy as np
 from transformers import PreTrainedTokenizer
 
 from goodai.helpers.file_helper import download_zip
@@ -13,13 +15,17 @@ _test_file = 'qrecc_test.json'
 
 class QreccMemEvaluator(BaseMemEvaluator):
     def __init__(self, tokenizer: PreTrainedTokenizer, top_ks: List[int],
-                 max_query_tokens: int, has_query_noise: bool, use_rewrite: bool = True):
+                 max_query_tokens: int, has_query_noise: bool, use_rewrite: bool = True,
+                 max_scenarios: int = 2000):
         super().__init__(tokenizer, top_ks, max_query_tokens, has_query_noise)
         self.use_rewrite = use_rewrite
         data_dir = download_zip(_url)
         data_file = os.path.join(data_dir, _test_file)
         with codecs.open(data_file, 'r', 'utf-8') as fd:
-            self.data = json.load(fd)
+            all_data = json.load(fd)
+            rnd = np.random.RandomState(8009)
+            rnd.shuffle(all_data)
+            self.data = all_data[:max_scenarios]
 
     def get_facts_to_be_stored(self) -> List[str]:
         facts = []

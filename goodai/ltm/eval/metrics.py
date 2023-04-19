@@ -32,12 +32,9 @@ def get_correctness_score(tokenizer: PreTrainedTokenizer, predicted_answer: str,
 
 def _get_correctness_score_for_tokens_ea(tokenizer: PreTrainedTokenizer, predicted_raw_tokens: List[str],
                                          expected_answer: str):
-    expected_raw_tokens_1 = tokenizer.tokenize(' ' + expected_answer.lower(), add_special_tokens=False)
     expected_raw_tokens_2 = tokenizer.tokenize(' ' + expected_answer, add_special_tokens=False)
-    correctness_1 = _get_correctness_score_for_tokens(predicted_raw_tokens, expected_raw_tokens_1)
     correctness_2 = _get_correctness_score_for_tokens(predicted_raw_tokens, expected_raw_tokens_2)
-    correctness = max(correctness_1, correctness_2)
-    return correctness
+    return correctness_2
 
 
 def _get_correctness_score_for_tokens(predicted_raw_tokens: List[str], expected_raw_tokens: List[str]):
@@ -52,11 +49,12 @@ def _get_correctness_score_for_tokens(predicted_raw_tokens: List[str], expected_
 
 
 def _subseq_distance(s_pred: List[str], t_exp: List[str]):
-    # TODO subsequences of length at least len(t_exp)
-    pred_subseqs = [s_pred[i: j] for i in range(len(s_pred))
-                    for j in range(i + 1, len(s_pred) + 1)]
-    if len(pred_subseqs) == 0:
-        pred_subseqs = [[]]
+    min_s_len = len(t_exp)
+    i_max = len(s_pred) - min_s_len
+    if i_max <= 0:
+        pred_subseqs = [s_pred]
+    else:
+        pred_subseqs = [s_pred[i:i + min_s_len] for i in range(i_max + 1)]
     distances = [levenshtein_distance(s, t_exp) for s in pred_subseqs]
     return min(distances)
 

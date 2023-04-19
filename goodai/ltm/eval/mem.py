@@ -22,7 +22,7 @@ class QAScenario:
 class BaseMemEvaluator(ABC):
     def __init__(self, tokenizer: PreTrainedTokenizer, top_ks: List[int],
                  max_query_tokens: int, has_query_noise: bool,
-                 add_names_to_context: bool = True, correctness_threshold=80):
+                 add_names_to_context: bool = True, correctness_threshold=70):
         if len(top_ks) == 0:
             raise ValueError('At least one top-k must be provided')
         self.top_ks = top_ks
@@ -57,13 +57,15 @@ class BaseMemEvaluator(ABC):
         plain_query_token_ids = plain_query_token_ids[-self.max_query_tokens:]
         return self.tokenizer.decode(plain_query_token_ids, skip_special_tokens=True)
 
-    def get_queries_and_support(self, scenarios: List[QAScenario]) -> List[Tuple[str, List[str]]]:
-        result = []
+    def get_queries_and_support(self, scenarios: List[QAScenario]) -> Tuple[List[str], List[List[str]]]:
+        queries = []
+        supports_list: List[List[str]] = []
         for scenario in scenarios:
             query = self.get_query(scenario)
             support = scenario.supportingFacts
-            result.append((query, support))
-        return result
+            queries.append(query)
+            supports_list.append(support)
+        return queries, supports_list,
 
     def cross_max_correctness(self, retrieved_texts: List[str], supporting_facts: List[str]):
         result = []
