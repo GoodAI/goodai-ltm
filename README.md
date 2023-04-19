@@ -6,6 +6,8 @@ Intro
 
 ## Quick start
 
+    from goodai.ltm.memory_models.auto import AutoTextMemory
+
     mem = AutoTextMemory.create()
     mem.add_text("Lorem ipsum dolor sit amet, consectetur adipiscing elit\n")
     mem.add_text("Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore\n",
