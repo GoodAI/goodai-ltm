@@ -10,18 +10,18 @@ import numpy as np
 import torch
 from dotenv import load_dotenv
 
-from pyltm.data.cloud import CloudStorage
+from goodai_ltm.data.cloud import CloudStorage
 
-from pyltm.memory_models.config import TextMemoryConfig
+from goodai_ltm.memory_models.config import TextMemoryConfig
 
-from pyltm.memory_models.default import DefaultTextMemory
+from goodai_ltm.memory_models.default import DefaultTextMemory
 from transformers import AutoModel, AutoTokenizer
 
-from pyltm.embedding_models.default import DefaultEmbeddingModel
-from pyltm.embedding_models.emb_qp_prob_model import EmbeddingQueryPassageProbModel
-from pyltm.helpers.torch_helper import param_count
-from pyltm.memory_models.simple_vector_db import SimpleVectorDb
-from pyltm.training.query_passage.trainer import QPPMTrainer
+from goodai_ltm.embedding_models.default import DefaultEmbeddingModel
+from goodai_ltm.embedding_models.emb_qp_prob_model import EmbeddingQueryPassageProbModel
+from goodai_ltm.helpers.torch_helper import param_count
+from goodai_ltm.memory_models.simple_vector_db import SimpleVectorDb
+from goodai_ltm.training.query_passage.trainer import QPPMTrainer
 
 load_dotenv()
 _device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
