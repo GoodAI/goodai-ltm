@@ -50,6 +50,8 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
 
     def get_metadata(self, chunk_id: int) -> Optional[Any]:
         chunk = self.chunk_queue.get_chunk(chunk_id)
+        if chunk is None:
+            return None
         return chunk.metadata
 
     def retrieve_chunk_sequences(self, chunk_ids: List[int]):
@@ -84,7 +86,7 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
         return [tok.decode(seq, skip_special_tokens=True) for seq in chunk_list]
 
     def _ensure_keys_added(self, batch_size=50):
-        picked_buckets, token_id_matrix = self.chunk_queue.get_chunks_for_indexing()
+        picked_chunks, token_id_matrix = self.chunk_queue.get_chunks_for_indexing()
         emb_model = self.emb_model
         sk_list = []
         num_sequences = len(token_id_matrix)
@@ -102,10 +104,10 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
             sk_all = sk_all.view(num_chunks * num_sk, -1)
             sk_all_np = sk_all.cpu().numpy().astype(np.float32)
             b_indexes = []
-            for bucket in picked_buckets:
-                if bucket.is_at_capacity():
-                    bucket.set_indexed(True)
-                b_indexes.extend([bucket.index] * num_sk)
+            for chunk in picked_chunks:
+                if chunk.is_at_capacity():
+                    chunk.set_indexed(True)
+                b_indexes.extend([chunk.index] * num_sk)
             b_indexes_np = np.array(b_indexes).astype(np.int64)
             self.vector_db.add_with_ids(sk_all_np, b_indexes_np)
 

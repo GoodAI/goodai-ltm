@@ -110,7 +110,7 @@ class ChunkQueue(BaseChunkQueue, ChunkMixin):
         return chunk
 
     def get_chunk(self, chunk_id: int) -> Chunk:
-        return self.chunk_map[chunk_id]
+        return self.chunk_map.get(chunk_id)
 
     def extend_chunk(self, chunk: Chunk, token_ids: List[int], new_tokens: bool):
         if new_tokens:
@@ -170,11 +170,11 @@ class ChunkQueue(BaseChunkQueue, ChunkMixin):
         min_tokens_for_indexing = self.half_chunk_capacity
         token_id_matrix = []
         picked_buckets = []
-        for bucket in self.chunks:
-            if not bucket.is_indexed():
-                token_ids = self.get_chunk_token_ids(bucket)
-                if len(token_ids) >= min_tokens_for_indexing:
-                    picked_buckets.append(bucket)
+        for i, chunk in enumerate(self.chunks):
+            if not chunk.is_indexed():
+                token_ids = self.get_chunk_token_ids(chunk)
+                if len(token_ids) >= min_tokens_for_indexing or (i == 0 and len(token_ids) > 0):
+                    picked_buckets.append(chunk)
                     token_id_matrix.append(token_ids)
         return picked_buckets, token_id_matrix,
 

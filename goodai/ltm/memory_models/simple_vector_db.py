@@ -10,8 +10,11 @@ class SimpleVectorDb:
         self.all_ids: Optional[np.ndarray] = None
 
     def search(self, vectors: np.ndarray, k: int = 1) -> Tuple[np.ndarray, np.ndarray]:
+        batch_size = vectors.shape[0]
+        placeholder_dist = np.ones((batch_size, k)) * 1e+38
+        placeholder_ids = -np.ones((batch_size, k), dtype=np.int64)
         if self.all_vectors is None:
-            return np.array([]), np.array([], dtype=np.int64),
+            return placeholder_dist, placeholder_ids,
         # vectors: (n, emb_size,)
         # all_vectors: (m, emb_size,)
         diff_sq = (vectors[:, None, :] - self.all_vectors[None, :, :]) ** 2
@@ -19,6 +22,7 @@ class SimpleVectorDb:
         mean_diff_sq = np.mean(diff_sq, axis=2)
         # mean_diff_sq: (n, m,)
         sort_indexes = np.argsort(mean_diff_sq, axis=1)
+        # sort_indexes: (n, m,)
         select_indexes = sort_indexes[:, :k]
         flat_select_indexes = select_indexes.flatten()
         flat_result_ids = self.all_ids[flat_select_indexes]
@@ -29,7 +33,9 @@ class SimpleVectorDb:
         result_distances = mean_diff_sq[rep_range, flat_select_indexes]
         result_distances = np.reshape(result_distances, select_indexes.shape)
         result_ids = np.reshape(flat_result_ids, select_indexes.shape)
-        return result_distances, result_ids,
+        placeholder_dist[:, :result_distances.shape[1]] = result_distances
+        placeholder_ids[:, :result_ids.shape[1]] = result_ids
+        return placeholder_dist, placeholder_ids,
 
     def add_with_ids(self, vectors: np.ndarray, ids: np.ndarray):
         if vectors.shape[0] != ids.shape[0]:

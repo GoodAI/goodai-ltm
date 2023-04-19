@@ -59,7 +59,8 @@ class BaseTextMemoryFoundation(BaseTextMemory):
         adjacent_chunks_ok = self.adjacent_chunks_ok
         prelim_dist_indexes = list(zip(flat_distances, flat_indexes))
         prelim_dist_indexes = remove_duplicates(prelim_dist_indexes, key_fn=lambda _t: _t[1])
-        if self.has_match_prob_model:
+        has_pm = self.has_match_prob_model
+        if has_pm:
             nv = num_visited_to_get_expected_count(prelim_dist_indexes, expected_key_db_top_k, adjacent_chunks_ok,
                                                    key_fn=lambda _t: _t[1])
             prelim_dist_indexes = prelim_dist_indexes[:nv * 2]
@@ -82,6 +83,8 @@ class BaseTextMemoryFoundation(BaseTextMemory):
         for cs_tuple, r_text in zip(chunk_score_tuples, retrieved_texts):
             confidence, (distance, chunk_id) = cs_tuple
             metadata = self.get_metadata(chunk_id)
+            if not has_pm:
+                confidence = None
             result.append(RetrievedMemory(passage=r_text.strip(), distance=distance,
                                           confidence=confidence, metadata=metadata))
         return result
