@@ -5,7 +5,7 @@ from pathlib import Path
 from goodai.ltm.data.query_passage.auto_data_source import AutoQueryPassageDataSource
 from transformers import PreTrainedTokenizer, AutoTokenizer
 import numpy as np
-from goodai.ltm.helpers.html_helper import text_to_html
+from goodai.helpers.html_helper import text_to_html
 
 
 class TestQueryPassageDataSource(unittest.TestCase):

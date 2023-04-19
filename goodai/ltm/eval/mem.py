@@ -1,5 +1,6 @@
 import abc
 from abc import ABC
+from dataclasses import dataclass
 from typing import List, Dict, Tuple
 
 import numpy as np
@@ -11,6 +12,7 @@ from goodai.ltm.eval.metrics import get_correctness_score
 from goodai.ltm.memory import BaseTextMemory
 
 
+@dataclass
 class QAScenario:
     context: List[str]
     supportingFacts: List[str]
@@ -87,4 +89,4 @@ class BaseMemEvaluator(ABC):
                 if max(selected_cv) >= self.correctness_threshold:
                     top_k_map[top_k] = top_k_map.get(top_k, 0) + 1
         item_count = len(retrieved)
-        return {f'MR@{top_k}': v / item_count for top_k, v in top_k_map.items()}
+        return {f'ACC@{top_k}': v / item_count for top_k, v in top_k_map.items()}

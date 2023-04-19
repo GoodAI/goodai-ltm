@@ -7,9 +7,9 @@ import torch
 from tqdm import tqdm
 from transformers import PreTrainedTokenizer
 
-from goodai.ltm.helpers.collections_helper import remove_duplicates, num_visited_to_get_expected_count, \
+from goodai.helpers.collections_helper import remove_duplicates, num_visited_to_get_expected_count, \
     get_non_adjacent
-from goodai.ltm.helpers.tokenizer_helper import get_sentence_punctuation_ids
+from goodai.helpers.tokenizer_helper import get_sentence_punctuation_ids
 from goodai.ltm.memory import BaseTextMemory, RetrievedMemory
 from goodai.ltm.memory_models.simple_vector_db import SimpleVectorDb
 
@@ -104,6 +104,7 @@ class BaseTextMemoryFoundation(BaseTextMemory):
         if not adjacent_chunks_ok:
             downstream_top_k *= 3
         distances, indexes = self.vector_db.search(rk_np, k=downstream_top_k)
+        assert distances.shape[0] == indexes.shape[0] == batch_size
         result = []
         rng = range(batch_size)
         if show_progress_bar:

@@ -5,6 +5,7 @@ import numpy as np
 from transformers import PreTrainedTokenizer
 
 from goodai.ltm.data.query_passage.data_source import BaseQueryPassageDataSource
+from goodai.ltm.data.query_passage.example import QueryPassageExample
 
 
 class WikiQueryPassageDataSource(BaseQueryPassageDataSource):

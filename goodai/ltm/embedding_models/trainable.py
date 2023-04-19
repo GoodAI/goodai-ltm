@@ -7,8 +7,8 @@ from torch import nn
 from tqdm import tqdm
 from transformers import PreTrainedTokenizer
 
+from goodai.helpers.tokenizer_helper import get_pad_token_id, get_model_inputs
 from goodai.ltm.embeddings import BaseTextEmbeddingModel
-from goodai.ltm.helpers.tokenizer_helper import get_model_inputs, get_pad_token_id
 
 
 class TrainableEmbeddingModel(BaseTextEmbeddingModel, nn.Module):

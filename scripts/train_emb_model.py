@@ -10,6 +10,7 @@ import numpy as np
 import torch
 from dotenv import load_dotenv
 
+from goodai.helpers.torch_helper import param_count
 from goodai.ltm.data.cloud import CloudStorage
 
 from goodai.ltm.memory_models.config import TextMemoryConfig
@@ -19,7 +20,6 @@ from transformers import AutoModel, AutoTokenizer
 
 from goodai.ltm.embedding_models.default import DefaultEmbeddingModel
 from goodai.ltm.embedding_models.emb_qp_prob_model import EmbeddingQueryPassageProbModel
-from goodai.ltm.helpers.torch_helper import param_count
 from goodai.ltm.memory_models.simple_vector_db import SimpleVectorDb
 from goodai.ltm.training.query_passage.trainer import QPPMTrainer
 
