@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages, find_namespace_packages
 
-packages = find_namespace_packages(include=['goodai_ltm', 'goodai_ltm.*'])
+packages = find_namespace_packages(include=['ltm', 'ltm.*'])
 
 setup(name='goodai-ltm',
       version='0.0.1',

@@ -2,6 +2,8 @@ Intro
 
 ## Installation
 
+    pip install goodai-ltm
+
 ## Quick start
 
 ## Loading an embedding model

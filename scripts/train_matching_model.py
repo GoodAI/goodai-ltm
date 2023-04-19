@@ -10,19 +10,13 @@ import numpy as np
 import torch
 from dotenv import load_dotenv
 
-from goodai_ltm.data.cloud import CloudStorage
-from goodai_ltm.matching_models.default import DefaultRerankingCrossEncoder
+from goodai.ltm.data.cloud import CloudStorage
+from goodai.ltm.matching_models.default import DefaultRerankingCrossEncoder
 
-from goodai_ltm.memory_models.config import TextMemoryConfig
-
-from goodai_ltm.memory_models.default import DefaultTextMemory
 from transformers import AutoModel, AutoTokenizer
 
-from goodai_ltm.embedding_models.default import DefaultEmbeddingModel
-from goodai_ltm.embedding_models.emb_qp_prob_model import EmbeddingQueryPassageProbModel
-from goodai_ltm.helpers.torch_helper import param_count
-from goodai_ltm.memory_models.simple_vector_db import SimpleVectorDb
-from goodai_ltm.training.query_passage.trainer import QPPMTrainer
+from goodai.ltm.helpers.torch_helper import param_count
+from goodai.ltm.training.query_passage.trainer import QPPMTrainer
 
 load_dotenv()
 _device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
