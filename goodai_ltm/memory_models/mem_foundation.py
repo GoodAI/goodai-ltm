@@ -53,7 +53,7 @@ class BaseTextMemoryFoundation(BaseTextMemory):
         pass
 
     def _retrieve(self, query: str, flat_distances: np.ndarray, flat_indexes: np.ndarray,
-                  expected_key_db_top_k: int) -> List[RetrievedMemory]:
+                  expected_key_db_top_k: int, k: int) -> List[RetrievedMemory]:
         # TODO optimize matching batch
         # distances, indexes: (batch_size, downstream_top_k)
         adjacent_chunks_ok = self.adjacent_chunks_ok
@@ -82,7 +82,7 @@ class BaseTextMemoryFoundation(BaseTextMemory):
         for cs_tuple, r_text in zip(chunk_score_tuples, retrieved_texts):
             confidence, (distance, chunk_id) = cs_tuple
             metadata = self.get_metadata(chunk_id)
-            result.append(RetrievedMemory(passage=r_text, distance=distance,
+            result.append(RetrievedMemory(passage=r_text.strip(), distance=distance,
                                           confidence=confidence, metadata=metadata))
         return result
 
@@ -108,6 +108,6 @@ class BaseTextMemoryFoundation(BaseTextMemory):
         for i in rng:
             flat_distances = distances[i]
             flat_indexes = indexes[i]
-            single_result = self._retrieve(queries[i], flat_distances, flat_indexes, expected_key_db_top_k)
+            single_result = self._retrieve(queries[i], flat_distances, flat_indexes, expected_key_db_top_k, k)
             result.append(single_result)
         return result

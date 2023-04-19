@@ -20,8 +20,3 @@ class BaseTextMatchingModel(ABC):
                 show_progress_bar: bool = False) -> List[float]:
         pass
 
-
-class AutoTextMatchingModel:
-    def from_pretrained(self, name: str) -> BaseTextMatchingModel:
-        # TODO
-        pass
