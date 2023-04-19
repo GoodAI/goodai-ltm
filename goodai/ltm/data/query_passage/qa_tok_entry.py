@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import List, Optional, Tuple
 from transformers import PreTrainedTokenizer
 
-from goodai.ltm.helpers.tokenizer_helper import get_token_index
+from goodai.helpers.tokenizer_helper import get_token_index
 
 
 @dataclass

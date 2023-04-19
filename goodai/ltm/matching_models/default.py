@@ -7,8 +7,8 @@ from tqdm import tqdm
 from transformers import AutoModel, AutoTokenizer, PreTrainedTokenizer
 from typing import List, Optional, Tuple
 
+from goodai.helpers.tokenizer_helper import get_attention_after_token, get_model_inputs
 from goodai.ltm.embedding_models.contrast_classifier import ContrastClassifier
-from goodai.ltm.helpers.tokenizer_helper import get_attention_after_token, get_model_inputs
 from goodai.ltm.matching import BaseTextMatchingModel
 from goodai.ltm.matching_models.prob_model import BaseQueryPassageProbModel
 

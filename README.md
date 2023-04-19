@@ -42,9 +42,9 @@ Recommended:
 
     tmm = AutoTextMatchingModel.from_pretrained('default')
 
-Huggingface reranking cross-encoders:
+Huggingface reranking cross-encoders from the sentence-transformers library:
 
-    tmm = AutoTextMatchingModel.from_pretrained('ce:cross-encoder/mmarco-mMiniLMv2-L12-H384-v1')
+    tmm = AutoTextMatchingModel.from_pretrained('st:cross-encoder/mmarco-mMiniLMv2-L12-H384-v1')
 
 ## Query-passage matching model usage
 

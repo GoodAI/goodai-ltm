@@ -6,8 +6,9 @@ import torch.nn.functional as F
 from torch import nn
 from transformers import PreTrainedModel, PreTrainedTokenizer, PretrainedConfig
 from transformers.modeling_outputs import BaseModelOutput
+
+from goodai.helpers.tokenizer_helper import get_attention_after_token
 from goodai.ltm.embedding_models.trainable import TrainableEmbeddingModel
-from goodai.ltm.helpers.tokenizer_helper import get_attention_after_token
 
 
 class DefaultEmbeddingModel(TrainableEmbeddingModel):

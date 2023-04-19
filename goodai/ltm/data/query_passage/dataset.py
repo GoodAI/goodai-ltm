@@ -1,10 +1,10 @@
 import torch
+
+from goodai.helpers.tokenizer_helper import get_model_inputs
 from goodai.ltm.data.query_passage.data_source import BaseQueryPassageDataSource
 from torch.utils.data import Dataset
 from typing import List, Tuple
 from transformers import PreTrainedTokenizer
-
-from goodai.ltm.helpers.tokenizer_helper import get_model_inputs
 
 
 class QueryPassageDataset(Dataset):

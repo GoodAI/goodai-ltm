@@ -3,13 +3,14 @@ from typing import List, Dict, Tuple, Iterable
 
 import numpy as np
 from datasets import load_dataset, DatasetDict, Dataset
+
+from goodai.helpers.tokenizer_helper import get_sentence_punctuation_ids
 from goodai.ltm.data.query_passage.example import QueryPassageExample
 from transformers import PreTrainedTokenizer
 
 from goodai.ltm.data.names import NameSource
 from goodai.ltm.data.query_passage.data_source import BaseQueryPassageDataSource
 from goodai.ltm.data.query_passage.qa_tok_entry import QATokenizedEntry
-from goodai.ltm.helpers.tokenizer_helper import get_sentence_punctuation_ids
 
 
 class QAQueryPassageDataSource(BaseQueryPassageDataSource):

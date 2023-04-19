@@ -5,8 +5,8 @@ import torch
 from faiss import Index
 from transformers import PreTrainedTokenizer
 
+from goodai.helpers.tokenizer_helper import get_pad_token_id, get_sentence_punctuation_ids
 from goodai.ltm.embeddings import BaseTextEmbeddingModel
-from goodai.ltm.helpers.tokenizer_helper import get_sentence_punctuation_ids, get_pad_token_id
 from goodai.ltm.matching import BaseTextMatchingModel
 from goodai.ltm.memory_models.chunk_queue import ChunkQueue, BaseChunkQueue
 from goodai.ltm.memory_models.config import TextMemoryConfig

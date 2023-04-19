@@ -3,7 +3,7 @@ from typing import List
 
 import numpy as np
 
-from goodai.ltm.helpers.json_helper import load_json
+from goodai.helpers.json_helper import load_json
 
 _instance_attr = '__instance'
 _names_dir = os.path.join(os.path.dirname(__file__))

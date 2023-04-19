@@ -24,7 +24,3 @@ def download_zip(url):
         print(f'File {url} already downloaded.')
     return temp_dir
 
-
-if __name__ == '__main__':
-    _dir = download_zip('https://github.com/apple/ml-qrecc/blob/main/dataset/qrecc_data.zip?raw=true')
-    print(_dir)
