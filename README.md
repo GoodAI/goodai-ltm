@@ -6,6 +6,14 @@ Intro
 
 ## Quick start
 
+    mem = AutoTextMemory.create()
+    mem.add_text("Lorem ipsum dolor sit amet, consectetur adipiscing elit\n")
+    mem.add_text("Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore\n",
+                 metadata={'timestamp': '2023-04-19', 'type': 'generic'})
+    r_memories = mem.retrieve(query='dolorem eum fugiat quo voluptas nulla pariatur?', k=3)
+    for r_mem in r_memories:
+        print(r_mem)
+
 ## Loading an embedding model
 
 Recommended:
