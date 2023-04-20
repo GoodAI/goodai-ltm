@@ -1,5 +1,15 @@
 Intro
 
+## Features
+
+GoodAI-LTM brings together all the components necessary for equipping agents with text-based long term memory. This includes text embedding models, match ranking, vector databases, chunking, storage and retrieval. The package is especially adapted to provide a dialog-centric memory stream for social agents.
+
+* **Embedding models**: Use OpenAI, Hugging Face Sentence Transformers, or our own locally trainable embeddings. The trainable embeddings allow multiple embeddings for a query or passage, which can capture different aspects of the text for more accurate retrieval.
+
+* **Query-passage match ranking**: In addition to similarity-based retrieval, we support models for estimating query-passage matching after retrieval. 
+
+* **Vector databases**: We currently provide a light-weight local vector database as well as support for FAISS.
+
 ## Installation
 
     pip install goodai-ltm
