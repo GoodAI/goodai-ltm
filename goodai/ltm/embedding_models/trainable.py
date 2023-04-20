@@ -97,6 +97,7 @@ class TrainableEmbeddingModel(BaseTextEmbeddingModel, nn.Module):
             input_ids_list = [t.encode(s, add_special_tokens=False) for s in b_sentences]
             model_inputs = get_model_inputs(input_ids_list, self.pad_token_id,
                                             return_token_lengths=return_token_lengths,
+                                            tokenizer=self.tokenizer,
                                             device=device)
             keys = enc_fn(**model_inputs)
             keys_list.append(keys)
