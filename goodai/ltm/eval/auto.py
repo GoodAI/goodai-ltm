@@ -3,7 +3,7 @@ from typing import List
 from transformers import PreTrainedTokenizer
 
 from goodai.ltm.eval.qrecc import QreccMemEvaluator
-from goodai.ltm.eval.strategyqa import StrategyQAMemEvaluator
+from goodai.ltm.eval.strategy_qa import StrategyQAMemEvaluator
 
 
 class AutoMemEvaluator:
