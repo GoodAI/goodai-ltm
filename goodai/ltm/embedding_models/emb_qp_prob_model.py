@@ -19,9 +19,9 @@ class EmbeddingQueryPassageProbModel(nn.Module, BaseQueryPassageProbModel):
     def forward(self, query_input_ids: torch.Tensor, query_attention_mask: torch.Tensor,
                 query_token_lengths: torch.Tensor,
                 passage_input_ids: torch.Tensor, passage_attention_mask: torch.Tensor) -> torch.Tensor:
-        rk = self.emb_model.get_retrieval_key(query_input_ids, token_lengths=query_token_lengths,
+        rk = self.emb_model.get_retrieval_emb(query_input_ids, token_lengths=query_token_lengths,
                                               attention_mask=query_attention_mask)
-        sk = self.emb_model.get_storage_key(passage_input_ids, passage_attention_mask)
+        sk = self.emb_model.get_storage_emb(passage_input_ids, passage_attention_mask)
         return self.classifier(rk, sk)
 
     def get_lm_parameters(self):

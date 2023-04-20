@@ -72,13 +72,13 @@ class DefaultEmbeddingModel(TrainableEmbeddingModel):
         slf_att_logits = torch.clamp(slf_att_logits, min=-100, max=+80)
         slf_att_weights = torch.softmax(slf_att_logits, dim=1)
         # slf_att_weights: (batch_size, seq_len, total_keys,)
-        dot_product = token_embeddings[:, :, None, :] * slf_att_weights[:, :, :, None]
-        # dot_product: (batch_size, seq_len, total_keys, emb_size,)
+        emb_product = token_embeddings[:, :, None, :] * slf_att_weights[:, :, :, None]
+        # emb_product: (batch_size, seq_len, total_keys, emb_size,)
         if is_retrieve:
-            key_dot_product = dot_product[:, :, self.num_storage_emb:, :]
+            relevant_product = emb_product[:, :, self.num_storage_emb:, :]
         else:
-            key_dot_product = dot_product[:, :, :self.num_storage_emb, :]
-        raw_key_mean = torch.sum(key_dot_product, dim=1)
+            relevant_product = emb_product[:, :, :self.num_storage_emb, :]
+        raw_key_mean = torch.sum(relevant_product, dim=1)
         # raw_key_mean: (batch_size, num_keys, emb_size,)
         return F.normalize(raw_key_mean, dim=2)
 
@@ -88,17 +88,17 @@ class DefaultEmbeddingModel(TrainableEmbeddingModel):
     def get_added_parameters(self):
         return itertools.chain(self.out_model.parameters())
 
-    def get_storage_key(self, input_ids: torch.Tensor, attention_mask: torch.Tensor = None) -> torch.Tensor:
+    def get_storage_emb(self, input_ids: torch.Tensor, attention_mask: torch.Tensor = None) -> torch.Tensor:
         return self(input_ids=input_ids, token_lengths=None, attention_mask=attention_mask, is_retrieve=False)
 
-    def get_retrieval_key(self, input_ids: torch.Tensor, token_lengths: torch.Tensor,
+    def get_retrieval_emb(self, input_ids: torch.Tensor, token_lengths: torch.Tensor,
                           attention_mask: torch.Tensor = None) -> torch.Tensor:
         return self(input_ids=input_ids, token_lengths=token_lengths, attention_mask=attention_mask,
                     is_retrieve=True)
 
-    def get_keys(self, input_ids: torch.Tensor, attention_mask: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        sk = self.get_storage_key(input_ids, attention_mask)
-        rk = self.get_retrieval_key(input_ids, attention_mask)
+    def get_emb(self, input_ids: torch.Tensor, attention_mask: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        sk = self.get_storage_emb(input_ids, attention_mask)
+        rk = self.get_retrieval_emb(input_ids, attention_mask)
         return sk, rk,
 
     def get_embedding_dim(self) -> int:
