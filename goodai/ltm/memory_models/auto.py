@@ -9,6 +9,10 @@ from goodai.ltm.memory_models.simple_vector_db import SimpleVectorDb
 
 
 class AutoTextMemory:
+    """
+    Factory class for text memory.
+    """
+
     @staticmethod
     def create(**kwargs) -> BaseTextMemory:
         new_kwargs = dict(kwargs)

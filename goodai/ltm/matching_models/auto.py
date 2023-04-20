@@ -3,6 +3,10 @@ from goodai.ltm.matching_models.st_ce import SentenceTransformerTextMatchingMode
 
 
 class AutoTextMatchingModel:
+    """
+    Factory class for text matching models.
+    """
+
     @staticmethod
     def from_pretrained(name: str) -> BaseTextMatchingModel:
         name = name.strip()

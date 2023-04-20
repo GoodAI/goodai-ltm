@@ -7,6 +7,10 @@ from goodai.ltm.eval.strategy_qa import StrategyQAMemEvaluator
 
 
 class AutoMemEvaluator:
+    """
+    Factory class for memory evaluators.
+    """
+
     @staticmethod
     def create(name: str, tokenizer: PreTrainedTokenizer, top_ks: List[int], max_query_tokens: int,
                has_query_noise: bool):

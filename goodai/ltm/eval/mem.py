@@ -20,6 +20,10 @@ class QAScenario:
 
 
 class BaseMemEvaluator(ABC):
+    """
+    Abstract base class for text memory model evaluators.
+    """
+
     def __init__(self, tokenizer: PreTrainedTokenizer, top_ks: List[int],
                  max_query_tokens: int, has_query_noise: bool,
                  add_names_to_context: bool = True, correctness_threshold=70):

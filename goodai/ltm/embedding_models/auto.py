@@ -4,6 +4,10 @@ from goodai.ltm.embeddings import BaseTextEmbeddingModel
 
 
 class AutoTextEmbeddingModel:
+    """
+    Factory class for text embedding models.
+    """
+
     @staticmethod
     def from_pretrained(name: str) -> BaseTextEmbeddingModel:
         name = name.strip()

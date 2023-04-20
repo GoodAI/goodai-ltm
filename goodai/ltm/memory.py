@@ -27,6 +27,10 @@ class RetrievedMemory:
 
 
 class BaseTextMemory(ABC):
+    """
+    Abstract base class for text memories.
+    """
+
     @abstractmethod
     def add_text(self, text: str, metadata: Optional[Any] = None):
         pass

@@ -3,6 +3,12 @@ from typing import List, Tuple
 
 
 class BaseTextMatchingModel(ABC):
+    """
+    Abstract base class for text matching models.
+
+    A matching model measures the match between queries and passages.
+    """
+
     def get_match_confidence(self, query: str, passages: List[str], batch_size: int = 32,
                              show_progress_bar: bool = False) -> List[float]:
         """

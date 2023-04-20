@@ -8,6 +8,10 @@ from transformers import PreTrainedTokenizer
 
 
 class AutoQueryPassageDataSource:
+    """
+    Factory class for training and evaluation data sources for query-passage matching.
+    """
+
     def __init__(self):
         pass
 
