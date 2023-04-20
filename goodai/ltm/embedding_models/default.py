@@ -12,6 +12,10 @@ from goodai.ltm.embedding_models.trainable import TrainableEmbeddingModel
 
 
 class DefaultEmbeddingModel(TrainableEmbeddingModel):
+    """
+    Default implementation of trainable text embeddings.
+    """
+
     def __init__(self, lang_model: PreTrainedModel, tokenizer: PreTrainedTokenizer,
                  num_retrieval_emb: int, num_storage_emb: int,
                  num_end_chars_lb_ignore=18):

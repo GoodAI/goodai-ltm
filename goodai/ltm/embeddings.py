@@ -9,7 +9,7 @@ class BaseTextEmbeddingModel(ABC):
     """
     Abstract base class for text embedding models.
 
-    Text embedding models allow different embeddings for queries (retrieval embeddings) and passages
+    The interface allows different embeddings for queries (retrieval embeddings) and passages
     (storage embeddings) as well as multiple retrieval and storage embeddings for a query or passage.
     """
 
