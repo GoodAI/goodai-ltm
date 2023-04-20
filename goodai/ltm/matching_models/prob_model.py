@@ -5,6 +5,10 @@ from torch import nn
 
 
 class BaseQueryPassageProbModel(ABC):
+    """
+    Abstract base class for query-passage probability models.
+    """
+
     @abstractmethod
     def forward(self, query_input_ids: torch.Tensor, query_attention_mask: torch.Tensor,
                 query_token_lengths: torch.Tensor,

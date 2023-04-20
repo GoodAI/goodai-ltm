@@ -11,6 +11,12 @@ _openai_lock = threading.Lock()
 
 
 class SentenceTransformerEmbeddingModel(BaseTextEmbeddingModel):
+    """
+    Text embedding model based on Hugging Face Sentence Transformers.
+
+    https://huggingface.co/sentence-transformers
+    """
+
     def __init__(self, model_name: str):
         self.st = SentenceTransformer(model_name)
 

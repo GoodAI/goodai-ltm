@@ -4,6 +4,10 @@ import numpy as np
 
 
 class SimpleVectorDb:
+    """
+    Simple vector database implementation.
+    """
+
     def __init__(self):
         super().__init__()
         self.all_vectors: Optional[np.ndarray] = None

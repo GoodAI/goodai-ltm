@@ -13,6 +13,12 @@ _openai_lock = threading.Lock()
 
 
 class OpenAIEmbeddingModel(BaseTextEmbeddingModel):
+    """
+    Text embedding model based on OpenAI text embeddings.
+
+    https://platform.openai.com/docs/guides/embeddings
+    """
+
     def __init__(self, api_key: str = None, model_name: str = 'text-embedding-ada-002', emb_dim: int = 1536):
         self.api_key = api_key
         self.emb_dim = emb_dim

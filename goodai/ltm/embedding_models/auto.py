@@ -4,8 +4,22 @@ from goodai.ltm.embeddings import BaseTextEmbeddingModel
 
 
 class AutoTextEmbeddingModel:
+    """
+    Factory class for text embedding models.
+    """
+
     @staticmethod
     def from_pretrained(name: str) -> BaseTextEmbeddingModel:
+        """
+        Makes a pretrained embedding model from a descriptor (name).
+
+        The name has the format <model_type>:<model_name>, for example "st:sentence-transformers/all-distilroberta-v1",
+        where model_type is 'st' for Hugging Face Sentence Transformers or 'openai' for Open AI text embeddings.
+
+        :param name: Name in the format <model_type>:<model_name>
+        :return: The embedding model
+        """
+
         name = name.strip()
         colon_idx = name.find(':')
         if colon_idx == -1:

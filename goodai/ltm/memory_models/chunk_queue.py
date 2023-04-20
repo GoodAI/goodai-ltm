@@ -6,6 +6,10 @@ from goodai.ltm.memory_models.chunk_mixin import ChunkMixin
 
 
 class BaseChunkQueue(ABC):
+    """
+    Abstract base class for text memory chunk queues.
+    """
+
     def __init__(self):
         super().__init__()
 

@@ -12,6 +12,12 @@ from goodai.ltm.embeddings import BaseTextEmbeddingModel
 
 
 class TrainableEmbeddingModel(BaseTextEmbeddingModel, nn.Module):
+    """
+    Abstract base class for locally trainable text embeddings.
+
+    Trainable embedding models support multiple retrieval and storage embeddings for a query or passage.
+    """
+
     def __init__(self, tokenizer: PreTrainedTokenizer):
         super(BaseTextEmbeddingModel, self).__init__()
         super(nn.Module, self).__init__()

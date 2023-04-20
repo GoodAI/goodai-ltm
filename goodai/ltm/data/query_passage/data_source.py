@@ -4,6 +4,10 @@ from goodai.ltm.data.query_passage.example import QueryPassageExample
 
 
 class BaseQueryPassageDataSource(ABC):
+    """
+    Abstract interface for data sources for training and evaluation of query-passage matching models.
+    """
+
     def __init__(self):
         pass
 
