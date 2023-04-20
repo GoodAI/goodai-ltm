@@ -26,7 +26,8 @@ if __name__ == '__main__':
     top_ks = [3, 10]
     vector_db = SimpleVectorDb()
     tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/all-distilroberta-v1')
-    datasets = ['qrecc']
+    # datasets = ['qrecc']
+    datasets = ['strategyqa']
     # datasets = ['qrecc', 'strategyqa']
     eval_specs: List[EvalSpec] = [
         EvalSpec('all-distilroberta-v1', 'st:sentence-transformers/all-distilroberta-v1', None,

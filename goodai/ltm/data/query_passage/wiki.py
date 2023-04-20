@@ -105,7 +105,7 @@ class WikiQueryPassageDataSource(BaseQueryPassageDataSource):
         passage_ids = neg_par_token_ids[passage_start:passage_end]
         return passage_ids
 
-    def sample_items(self, count: int) -> List[QueryPassageExample]:
+    def sample_items(self, count: int, approx_positive_fraction: float = 0.5) -> List[QueryPassageExample]:
         r = self.random
         result = []
         for i in range(count):
@@ -115,7 +115,7 @@ class WikiQueryPassageDataSource(BaseQueryPassageDataSource):
             num_query_tokens = r.randint(self.min_query_tokens, self.max_query_tokens + 1)
             num_gap_tokens = r.randint(0, self.gap_leeway + 1)
             num_passage_tokens = r.randint(self.min_passage_tokens, self.max_passage_tokens + 1)
-            is_match = r.choice([True, False])
+            is_match = self.random.uniform() <= approx_positive_fraction
             if is_match:
                 total_tokens = num_query_tokens + num_gap_tokens + num_passage_tokens
             else:

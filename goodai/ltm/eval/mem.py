@@ -54,12 +54,17 @@ class BaseMemEvaluator(ABC):
         q_name = names[c_len % 2]
         a_name = names[(c_len + 1) % 2]
         query = f'{q_name}: {scenario.question}\n{a_name}:'
+        truncate_q_ids_at = self.max_query_tokens
         if self.has_query_noise:
+            no_noise_ids = self.tokenizer.encode(query, add_special_tokens=False)
+            len_nni = len(no_noise_ids)
+            if len_nni < self.max_query_tokens:
+                truncate_q_ids_at = self.rnd2.randint(max(1, len_nni), self.max_query_tokens + 1)
             context_as_text = '\n'.join(names_context[-3:])
             query = context_as_text + '\n' + query
-        plain_query_token_ids = self.tokenizer.encode(query, add_special_tokens=False)
-        plain_query_token_ids = plain_query_token_ids[-self.max_query_tokens:]
-        return self.tokenizer.decode(plain_query_token_ids, skip_special_tokens=True)
+        query_token_ids = self.tokenizer.encode(query, add_special_tokens=False)
+        query_token_ids = query_token_ids[-truncate_q_ids_at:]
+        return self.tokenizer.decode(query_token_ids, skip_special_tokens=True)
 
     def get_queries_and_support(self, scenarios: List[QAScenario]) -> Tuple[List[str], List[List[str]]]:
         queries = []
