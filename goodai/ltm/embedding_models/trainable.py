@@ -85,6 +85,7 @@ class TrainableEmbeddingModel(BaseTextEmbeddingModel, nn.Module):
                           show_progress_bar: bool = False,
                           convert_to_tensor: bool = False,
                           return_token_lengths: bool = False,
+                          detach_tensors: bool = True,
                           device: Union[str, torch.device] = None):
         device = device if device else self.get_device()
         t = self.tokenizer
@@ -100,6 +101,8 @@ class TrainableEmbeddingModel(BaseTextEmbeddingModel, nn.Module):
                                             tokenizer=self.tokenizer,
                                             device=device)
             keys = enc_fn(**model_inputs)
+            if detach_tensors or not convert_to_tensor:
+                keys = keys.detach()
             keys_list.append(keys)
         result = torch.cat(keys_list)
         if convert_to_tensor:
@@ -108,19 +111,21 @@ class TrainableEmbeddingModel(BaseTextEmbeddingModel, nn.Module):
             return result.detach().cpu().numpy()
 
     def encode_queries(self, queries: List[str], batch_size: int = 64, show_progress_bar: bool = False,
-                       convert_to_tensor: bool = False,
+                       convert_to_tensor: bool = False, detach_tensors: bool = True,
                        device: Union[str, torch.device] = None) -> Union[np.ndarray, torch.Tensor]:
         return self.encode_in_batches(self.get_retrieval_emb, queries, batch_size=batch_size,
                                       show_progress_bar=show_progress_bar,
                                       convert_to_tensor=convert_to_tensor,
+                                      detach_tensors=detach_tensors,
                                       return_token_lengths=True,
                                       device=device)
 
     def encode_corpus(self, passages: List[str], batch_size: int = 64, show_progress_bar: bool = False,
-                      convert_to_tensor: bool = False,
+                      convert_to_tensor: bool = False, detach_tensors: bool = True,
                       device: Union[str, torch.device] = None) -> Union[np.ndarray, torch.Tensor]:
         return self.encode_in_batches(self.get_storage_emb, passages, batch_size=batch_size,
                                       show_progress_bar=show_progress_bar,
                                       convert_to_tensor=convert_to_tensor,
+                                      detach_tensors=detach_tensors,
                                       return_token_lengths=False,
                                       device=device)
