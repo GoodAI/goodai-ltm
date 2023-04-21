@@ -29,14 +29,14 @@ class TrainableEmbeddingModel(BaseTextEmbeddingModel, nn.Module):
         return self.dummy.device
 
     @abstractmethod
-    def get_storage_key(self, input_ids: torch.Tensor, attention_mask: torch.Tensor = None) -> torch.Tensor:
+    def get_storage_emb(self, input_ids: torch.Tensor, attention_mask: torch.Tensor = None) -> torch.Tensor:
         """
         Returns an embedding of shape (batch_size, num_keys, emb_size,)
         """
         pass
 
     @abstractmethod
-    def get_retrieval_key(self, input_ids: torch.Tensor, token_lengths: torch.Tensor,
+    def get_retrieval_emb(self, input_ids: torch.Tensor, token_lengths: torch.Tensor,
                           attention_mask: torch.Tensor = None) -> torch.Tensor:
         """
         Returns an embedding of shape (batch_size, emb_size,)
@@ -44,7 +44,7 @@ class TrainableEmbeddingModel(BaseTextEmbeddingModel, nn.Module):
         pass
 
     @abstractmethod
-    def get_keys(self, input_ids: torch.Tensor, attention_mask: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def get_emb(self, input_ids: torch.Tensor, attention_mask: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Returns storage and retrieval embeddings.
         """
@@ -64,18 +64,18 @@ class TrainableEmbeddingModel(BaseTextEmbeddingModel, nn.Module):
         """
         pass
 
-    def get_storage_key_for_ids(self, input_ids: List[List[int]]):
+    def get_storage_emb_for_ids(self, input_ids: List[List[int]]):
         device = self.get_device()
         pad_token_id = self.pad_token_id
         m_inputs = get_model_inputs(input_ids, pad_id=pad_token_id, device=device)
-        return self.get_storage_key(**m_inputs)
+        return self.get_storage_emb(**m_inputs)
 
-    def get_retrieval_key_for_ids(self, input_ids: List[List[int]]):
+    def get_retrieval_emb_for_ids(self, input_ids: List[List[int]]):
         device = self.get_device()
         pad_token_id = self.pad_token_id
         m_inputs = get_model_inputs(input_ids, pad_id=pad_token_id, device=device, return_token_lengths=True,
                                     tokenizer=self.tokenizer)
-        return self.get_retrieval_key(**m_inputs)
+        return self.get_retrieval_emb(**m_inputs)
 
     def _get_token_ids(self, texts: List[str]) -> List[List[int]]:
         tok = self.tokenizer
@@ -85,6 +85,7 @@ class TrainableEmbeddingModel(BaseTextEmbeddingModel, nn.Module):
                           show_progress_bar: bool = False,
                           convert_to_tensor: bool = False,
                           return_token_lengths: bool = False,
+                          detach_tensors: bool = True,
                           device: Union[str, torch.device] = None):
         device = device if device else self.get_device()
         t = self.tokenizer
@@ -97,8 +98,11 @@ class TrainableEmbeddingModel(BaseTextEmbeddingModel, nn.Module):
             input_ids_list = [t.encode(s, add_special_tokens=False) for s in b_sentences]
             model_inputs = get_model_inputs(input_ids_list, self.pad_token_id,
                                             return_token_lengths=return_token_lengths,
+                                            tokenizer=self.tokenizer,
                                             device=device)
             keys = enc_fn(**model_inputs)
+            if detach_tensors or not convert_to_tensor:
+                keys = keys.detach()
             keys_list.append(keys)
         result = torch.cat(keys_list)
         if convert_to_tensor:
@@ -107,19 +111,21 @@ class TrainableEmbeddingModel(BaseTextEmbeddingModel, nn.Module):
             return result.detach().cpu().numpy()
 
     def encode_queries(self, queries: List[str], batch_size: int = 64, show_progress_bar: bool = False,
-                       convert_to_tensor: bool = False,
+                       convert_to_tensor: bool = False, detach_tensors: bool = True,
                        device: Union[str, torch.device] = None) -> Union[np.ndarray, torch.Tensor]:
-        return self.encode_in_batches(self.get_retrieval_key, queries, batch_size=batch_size,
+        return self.encode_in_batches(self.get_retrieval_emb, queries, batch_size=batch_size,
                                       show_progress_bar=show_progress_bar,
                                       convert_to_tensor=convert_to_tensor,
+                                      detach_tensors=detach_tensors,
                                       return_token_lengths=True,
                                       device=device)
 
     def encode_corpus(self, passages: List[str], batch_size: int = 64, show_progress_bar: bool = False,
-                      convert_to_tensor: bool = False,
+                      convert_to_tensor: bool = False, detach_tensors: bool = True,
                       device: Union[str, torch.device] = None) -> Union[np.ndarray, torch.Tensor]:
-        return self.encode_in_batches(self.get_retrieval_key, passages, batch_size=batch_size,
+        return self.encode_in_batches(self.get_storage_emb, passages, batch_size=batch_size,
                                       show_progress_bar=show_progress_bar,
                                       convert_to_tensor=convert_to_tensor,
+                                      detach_tensors=detach_tensors,
                                       return_token_lengths=False,
                                       device=device)

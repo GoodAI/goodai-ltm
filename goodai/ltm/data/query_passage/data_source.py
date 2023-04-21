@@ -12,5 +12,5 @@ class BaseQueryPassageDataSource(ABC):
         pass
 
     @abstractmethod
-    def sample_items(self, count: int) -> List[QueryPassageExample]:
+    def sample_items(self, count: int, approx_positive_fraction: float = 0.5) -> List[QueryPassageExample]:
         pass

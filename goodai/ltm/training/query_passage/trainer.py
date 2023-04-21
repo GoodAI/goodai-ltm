@@ -22,8 +22,11 @@ class QPPMTrainer:
     def __init__(self, random: np.random.RandomState, tokenizer: PreTrainedTokenizer,
                  num_epochs: int, switch_ds_every: int, num_ds_examples: int, batch_size: int,
                  max_query_tokens: int, min_passage_tokens: int, max_passage_tokens: int,
-                 track_validation: bool, lm_lr: float, extras_lr: float, device: torch.device):
+                 track_validation: bool, lm_lr: float, extras_lr: float, device: torch.device,
+                 num_warmup_steps: int = 0, weight_decay: float = 1e-3):
         super().__init__()
+        self.weight_decay = weight_decay
+        self.num_warmup_steps = num_warmup_steps
         self.extras_lr = extras_lr
         self.lm_lr = lm_lr
         self.max_passage_tokens = max_passage_tokens
@@ -110,7 +113,9 @@ class QPPMTrainer:
                 {'params': extra_parameters, 'lr': self.extras_lr},
             ]
             s_opt = ScheduledOptimizer(parameters, lr=self.lm_lr,
-                                       num_training_steps=num_training_steps)
+                                       num_training_steps=num_training_steps,
+                                       num_warmup_steps=self.num_warmup_steps,
+                                       weight_decay=self.weight_decay)
             sum_bp_time = 0
             time1 = timer()
             for epoch in range(0, self.num_epochs, self.switch_ds_every):

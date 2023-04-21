@@ -5,6 +5,16 @@ from typing import List
 @dataclass
 class QueryPassageExample:
     queryIds: List[int]
-    passageIds: List[int]
-    match: bool
+    """
+    Query token IDs
+    """
 
+    passageIds: List[int]
+    """
+    Passage token IDs
+    """
+
+    match: bool
+    """
+    Whether the query and the passage are a good match
+    """

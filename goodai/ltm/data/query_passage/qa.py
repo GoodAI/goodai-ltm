@@ -192,7 +192,7 @@ class QAQueryPassageDataSource(BaseQueryPassageDataSource):
             return None
         return result
 
-    def sample_item(self, use_different_p=0.5) -> QueryPassageExample:
+    def sample_item(self, is_match: bool, use_different_p=0.5) -> QueryPassageExample:
         r = self.random
         n = len(self.qa_examples)
         for attempt in range(100):
@@ -202,7 +202,6 @@ class QAQueryPassageDataSource(BaseQueryPassageDataSource):
                 logging.warning(f'Did not find location of answer excerpt in example with id {pos_tok_entry.e_id}')
                 continue
             query_token_ids, nqn = self.get_query_token_ids(pos_tok_entry)
-            is_match = r.choice([True, False])
             if is_match:
                 passage_tok_entry = pos_tok_entry
                 non_answer = False
@@ -223,5 +222,7 @@ class QAQueryPassageDataSource(BaseQueryPassageDataSource):
 
         raise SystemError('Unable to find suitable qa_example!')
 
-    def sample_items(self, count: int) -> List[QueryPassageExample]:
-        return [self.sample_item() for _ in range(count)]
+    def sample_items(self, count: int, approx_positive_fraction: float = 0.5) -> List[QueryPassageExample]:
+        rnd_samples = self.random.uniform(size=count)
+        is_match = rnd_samples <= approx_positive_fraction
+        return [self.sample_item(is_match[i]) for i, _ in enumerate(range(count))]

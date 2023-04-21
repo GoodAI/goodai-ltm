@@ -13,7 +13,17 @@ class SimpleVectorDb:
         self.all_vectors: Optional[np.ndarray] = None
         self.all_ids: Optional[np.ndarray] = None
 
-    def search(self, vectors: np.ndarray, k: int = 1) -> Tuple[np.ndarray, np.ndarray]:
+    def search(self, vectors: np.ndarray, k: int = 1, max_batch_size=256) -> Tuple[np.ndarray, np.ndarray]:
+        dist_list = []
+        idx_list = []
+        for b0 in range(0, vectors.shape[0], max_batch_size):
+            b_vectors = vectors[b0:b0 + max_batch_size]
+            b_dist, b_idx = self._search_direct(b_vectors, k=k)
+            dist_list.append(b_dist)
+            idx_list.append(b_idx)
+        return np.concatenate(dist_list), np.concatenate(idx_list),
+
+    def _search_direct(self, vectors: np.ndarray, k: int = 1) -> Tuple[np.ndarray, np.ndarray]:
         batch_size = vectors.shape[0]
         placeholder_dist = np.ones((batch_size, k)) * 1e+38
         placeholder_ids = -np.ones((batch_size, k), dtype=np.int64)

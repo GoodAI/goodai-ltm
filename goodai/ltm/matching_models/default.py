@@ -147,7 +147,7 @@ class DefaultRerankingCrossEncoder(nn.Module, BaseQueryPassageProbModel, BaseTex
                 query_ids = query_ids[-max_query_tokens:]
             passage_ids = tokenizer.encode(passage, add_special_tokens=False)
             if len(passage_ids) > max_passage_tokens:
-                passage_ids = query_ids[-max_passage_tokens:]
+                passage_ids = passage_ids[-max_passage_tokens:]
             passage_ids_list.append(passage_ids)
             query_ids_list.append(query_ids)
         # Convert input_ids_list to tensor input_ids and attention_mask by adding padding
