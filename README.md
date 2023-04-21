@@ -1,4 +1,4 @@
-## Intro
+## GoodAI-LTM
 Long-term memory is  increasingly recognized as an essential component in applications powered by large language models 
 (LLMs). 
 
@@ -97,3 +97,4 @@ Specify which models to use:
 We will continue to improve GoodAI-LTM. Possible next steps include
 * Retrieval weighted by recency and importance
 * Embeddings for source code retrieval
+* Storage and retrieval methods without embeddings
