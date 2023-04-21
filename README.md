@@ -91,3 +91,9 @@ Specify which models to use:
 ## Standard benchmarks
 
 ## Our evaluations
+
+## Future plans
+
+We will continue to improve GoodAI-LTM. Possible next steps include
+* Retrieval weighted by recency and importance
+* Embeddings for source code retrieval
