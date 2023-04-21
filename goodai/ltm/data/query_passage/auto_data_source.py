@@ -6,6 +6,9 @@ from goodai.ltm.data.query_passage.qa import QAQueryPassageDataSource
 from goodai.ltm.data.query_passage.data_source import BaseQueryPassageDataSource
 from transformers import PreTrainedTokenizer
 
+from goodai.ltm.data.query_passage.sharc import SharcQueryPassageDataSource
+from goodai.ltm.data.query_passage.wiki import WikiQueryPassageDataSource
+
 
 class AutoQueryPassageDataSource:
     """
@@ -36,5 +39,9 @@ class AutoQueryPassageDataSource:
         )
         if name in ['coqa', 'squad_v2', 'adversarial_qa']:
             return QAQueryPassageDataSource.create_data_sources(ds_name=name, **common_params)
+        elif name == 'sharc':
+            return SharcQueryPassageDataSource.create_data_sources(ds_name=name, **common_params)
+        elif name == 'wiki':
+            return WikiQueryPassageDataSource.create_data_sources(train_fraction=0.8, **common_params)
         else:
             raise ValueError(f'Unknown: {name}')

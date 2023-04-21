@@ -2,6 +2,7 @@ import re
 from typing import List, Optional, Any, Dict, Tuple
 
 import numpy as np
+from datasets import load_dataset
 from transformers import PreTrainedTokenizer
 
 from goodai.ltm.data.query_passage.data_source import BaseQueryPassageDataSource
@@ -32,11 +33,13 @@ class WikiQueryPassageDataSource(BaseQueryPassageDataSource):
 
     @classmethod
     def create_data_sources(cls, train_fraction: float, random: np.random.RandomState, tokenizer: PreTrainedTokenizer,
-                            max_query_tokens: int, min_passage_tokens: int, max_passage_tokens: int,) ->\
+                            max_query_tokens: int, min_passage_tokens: int, max_passage_tokens: int,
+                            min_article_len: int = 512) ->\
             Tuple['WikiQueryPassageDataSource', 'WikiQueryPassageDataSource']:
-        # TODO access to sampled wikipedia data
-        wd = WikiData.get_instance()
-        articles = list(wd.get_articles())
+        ds = load_dataset('wikipedia', '20220301.simple')
+        ds_data = ds['train']
+        articles = list(ds_data)
+        articles = [a for a in articles if len(a['text']) >= min_article_len]
         random.shuffle(articles)
         train_len = round(len(articles) * train_fraction)
         train_articles = articles[:train_len]
@@ -66,7 +69,7 @@ class WikiQueryPassageDataSource(BaseQueryPassageDataSource):
     def init_current_article(self):
         pos_art_token_ids: List[List[int]] = []
         neg_art_token_ids: List[List[int]] = []
-        for attempt in range(20):
+        for attempt in range(100):
             pos_index = self.random.randint(0, len(self.articles))
             pos_art_token_ids = self.get_tokenization(pos_index)
             if len(pos_art_token_ids) == 0:
@@ -84,7 +87,7 @@ class WikiQueryPassageDataSource(BaseQueryPassageDataSource):
         self.pos_article_token_ids = pos_art_token_ids
         self.current_par_idx = 0
 
-    def _get_neg_passage_ids(self, num_passage_tokens: int, p_use_different_art: float = 0.5):
+    def _get_neg_passage_ids(self, num_passage_tokens: int, p_use_different_art: float = 0.9):
         r = self.random
         use_different = r.uniform() < p_use_different_art
         if not use_different:

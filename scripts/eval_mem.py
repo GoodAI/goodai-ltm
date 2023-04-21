@@ -30,7 +30,9 @@ if __name__ == '__main__':
     tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/all-distilroberta-v1')
     datasets = ['qrecc', 'strategyqa']
     eval_specs: List[EvalSpec] = [
-        EvalSpec('all-distilroberta-v1', 'st:sentence-transformers/all-distilroberta-v1', None,
+        # EvalSpec('all-distilroberta-v1', 'st:sentence-transformers/all-distilroberta-v1', None,
+        #          maxQueryTokens=40, hasQueryNoise=True),
+        EvalSpec('p4-distilroberta', 'p4-distilroberta', None,
                  maxQueryTokens=40, hasQueryNoise=True),
     ]
     ds_top_ks = [f'{ds_name}@{top_k}' for ds_name in datasets for top_k in top_ks]

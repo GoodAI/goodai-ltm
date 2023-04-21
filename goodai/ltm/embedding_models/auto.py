@@ -1,6 +1,17 @@
+import pickle
+from typing import Union
+
+import torch
+
+from goodai.helpers.file_helper import open_url_as_file
 from goodai.ltm.embedding_models.openai_emb import OpenAIEmbeddingModel
 from goodai.ltm.embedding_models.st_emb import SentenceTransformerEmbeddingModel
+from goodai.ltm.embedding_models.trainable import TrainableEmbeddingModel
 from goodai.ltm.embeddings import BaseTextEmbeddingModel
+
+_pretrained_map = {
+    'p4-distilroberta': 'https://github.com/GoodAI/goodai-ltm/releases/download/first-release/goodai-ltm-emb-model-p4-1002'
+}
 
 
 class AutoTextEmbeddingModel:
@@ -9,7 +20,7 @@ class AutoTextEmbeddingModel:
     """
 
     @staticmethod
-    def from_pretrained(name: str) -> BaseTextEmbeddingModel:
+    def from_pretrained(name: str, device: Union[str, torch.device] = None) -> BaseTextEmbeddingModel:
         """
         Makes a pretrained embedding model from a descriptor (name).
 
@@ -17,17 +28,29 @@ class AutoTextEmbeddingModel:
         where model_type is 'st' for Hugging Face Sentence Transformers or 'openai' for Open AI text embeddings.
 
         :param name: Name in the format <model_type>:<model_name>
+        :param device: The Pytorch device for the model, if applicable
         :return: The embedding model
         """
 
+        if device is None:
+            device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
         name = name.strip()
         colon_idx = name.find(':')
         if colon_idx == -1:
-            raise ValueError(f'Model not available: {name}')
+            url = _pretrained_map.get(name)
+            if url is None:
+                raise ValueError(f'Model not found: {name}')
+            with open_url_as_file(url) as fd:
+                model_dict = pickle.load(fd)
+                model: TrainableEmbeddingModel = model_dict['model']
+                model.to(device)
+                model.zero_grad(set_to_none=True)
+                model.eval()
+                return model
         model_type = name[:colon_idx]
         model_name = name[colon_idx + 1:]
         if model_type == 'st':
-            return SentenceTransformerEmbeddingModel(model_name)
+            return SentenceTransformerEmbeddingModel(model_name, device=device)
         elif model_type == 'openai':
             return OpenAIEmbeddingModel(model_name)
         else:
