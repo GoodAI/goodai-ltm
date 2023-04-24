@@ -3,8 +3,9 @@ Long-term memory is  increasingly recognized as an essential component in applic
 (LLMs). 
 
 GoodAI-LTM brings together all the components necessary for equipping agents with text-based long term memory. 
-This includes text embedding models, match ranking, vector databases, chunking, memory and query 
-rewriting (expansion and disambiguation), storage and retrieval. 
+This includes text embedding models, reranking, vector databases, chunking, metadata such as time stamps and 
+document information, memory and query rewriting (expansion and disambiguation), storage and retrieval. 
+
 The package is especially adapted to provide a dialog-centric memory stream for social agents.
 
 * **Embedding models**: Use OpenAI, Hugging Face Sentence Transformers, or our own locally trainable embeddings. 
