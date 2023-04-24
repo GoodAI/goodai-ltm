@@ -116,13 +116,13 @@ class SharcQueryPassageDataSource(BaseQueryPassageDataSource):
             name1 = r.choice(['User', 'Player'])
         has_query_noise = self.random.uniform() < query_noise_p
         name_lead = ('\n' if has_query_noise else '') + name1 + ':'
-        name1_ids = self.tokenizer.encode(name_lead)
+        name1_ids = self.tokenizer.encode(name_lead, add_special_tokens=False)
         token_ids = name1_ids + tok_entry.questionIds
         ends_with_name = r.uniform() < ends_with_name_p
         if ends_with_name:
             if name2 is None:
                 name2 = r.choice(['AI', 'Assistant', 'Agent', 'NPC'])
-            name2_ids = self.tokenizer.encode('\n' + name2 + ':')
+            name2_ids = self.tokenizer.encode('\n' + name2 + ':', add_special_tokens=False)
             token_ids += name2_ids
         if has_query_noise and len(tok_entry.scenarioIds) > 1:
             min_token_ids = min(self.max_query_tokens, max(self.min_query_tokens, len(token_ids)))
