@@ -81,7 +81,9 @@ class TrainableEmbeddingModel(BaseTextEmbeddingModel, nn.Module):
         tok = self.tokenizer
         return [tok.encode(text, add_special_tokens=False) for text in texts]
 
-    def encode_in_batches(self, enc_fn: Callable, sentences: List[str], batch_size: int = 64,
+    def encode_in_batches(self, enc_fn: Callable, sentences: List[str],
+                          add_special_tokens: bool = True,
+                          batch_size: int = 64,
                           show_progress_bar: bool = False,
                           convert_to_tensor: bool = False,
                           return_token_lengths: bool = False,
@@ -95,7 +97,7 @@ class TrainableEmbeddingModel(BaseTextEmbeddingModel, nn.Module):
         keys_list = []
         for b0 in rng:
             b_sentences = sentences[b0:b0 + batch_size]
-            input_ids_list = [t.encode(s, add_special_tokens=False) for s in b_sentences]
+            input_ids_list = [t.encode(s, add_special_tokens=add_special_tokens) for s in b_sentences]
             model_inputs = get_model_inputs(input_ids_list, self.pad_token_id,
                                             return_token_lengths=return_token_lengths,
                                             tokenizer=self.tokenizer,
