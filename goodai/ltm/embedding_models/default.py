@@ -1,4 +1,5 @@
 import itertools
+import logging
 from typing import Optional, Tuple
 
 import torch
@@ -21,9 +22,10 @@ class DefaultEmbeddingModel(TrainableEmbeddingModel):
                  num_end_chars_lb_ignore=18, dropout=0.03):
         super(DefaultEmbeddingModel, self).__init__(tokenizer)
         lb_token_ids = tokenizer.encode('\n', add_special_tokens=False)
-        if len(lb_token_ids) != 1:
-            raise ValueError(f'Tokenizer {tokenizer.name_or_path} does not have a line break token!')
-        self.lb_token_id = lb_token_ids[0]
+        valid_lb_token_id = len(lb_token_ids) == 1
+        if not valid_lb_token_id:
+            logging.warning(f'Tokenizer "{tokenizer.name_or_path}" does not have a line-break token.')
+        self.lb_token_id = lb_token_ids[0] if valid_lb_token_id else -1
         self.num_end_chars_lb_ignore = num_end_chars_lb_ignore
         lm_config = lang_model.config
         self.lang_model = lang_model
