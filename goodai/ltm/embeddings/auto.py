@@ -4,10 +4,10 @@ from typing import Union
 import torch
 
 from goodai.helpers.file_helper import open_url_as_file
-from goodai.ltm.embedding_models.openai_emb import OpenAIEmbeddingModel
-from goodai.ltm.embedding_models.st_emb import SentenceTransformerEmbeddingModel
-from goodai.ltm.embedding_models.trainable import TrainableEmbeddingModel
-from goodai.ltm.embeddings import BaseTextEmbeddingModel
+from goodai.ltm.embeddings.openai_emb import OpenAIEmbeddingModel
+from goodai.ltm.embeddings.st_emb import SentenceTransformerEmbeddingModel
+from goodai.ltm.embeddings.trainable import TrainableEmbeddingModel
+from goodai.ltm.embeddings.base import BaseTextEmbeddingModel
 
 _pretrained_map = {
     'p2-qa-mpnet': 'https://github.com/GoodAI/goodai-ltm-artifacts/releases/download/v0.0.15/goodai-ltm-emb-model-p2-1052'

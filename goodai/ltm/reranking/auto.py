@@ -3,9 +3,9 @@ from typing import Union
 import torch
 
 from goodai.helpers.file_helper import open_url_as_file
-from goodai.ltm.matching import BaseTextMatchingModel
-from goodai.ltm.matching_models.default import DefaultRerankingCrossEncoder
-from goodai.ltm.matching_models.st_ce import SentenceTransformerTextMatchingModel
+from goodai.ltm.reranking.base import BaseTextMatchingModel
+from goodai.ltm.reranking.default import DefaultRerankingCrossEncoder
+from goodai.ltm.reranking.st_ce import SentenceTransformerTextMatchingModel
 
 _pretrained_map = {
     # TODO

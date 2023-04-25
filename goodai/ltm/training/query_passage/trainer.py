@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader, Dataset
 from transformers import PreTrainedTokenizer
 from timeit import default_timer as timer
 
-from goodai.ltm.matching_models.prob_model import BaseQueryPassageProbModel
+from goodai.ltm.reranking.prob_model import BaseQueryPassageProbModel
 from goodai.ltm.training.sched_opt import ScheduledOptimizer
 
 

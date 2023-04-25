@@ -1,6 +1,6 @@
 import unittest
 
-from goodai.ltm.memory_models.chunk_queue import ChunkQueue
+from goodai.ltm.mem.chunk_queue import ChunkQueue
 
 
 class TestChunkQueue(unittest.TestCase):

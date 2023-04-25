@@ -10,8 +10,8 @@ from transformers import PreTrainedTokenizer
 from goodai.helpers.collections_helper import remove_duplicates, num_visited_to_get_expected_count, \
     get_non_adjacent
 from goodai.helpers.tokenizer_helper import get_sentence_punctuation_ids
-from goodai.ltm.memory import BaseTextMemory, RetrievedMemory
-from goodai.ltm.memory_models.simple_vector_db import SimpleVectorDb
+from goodai.ltm.mem.base import BaseTextMemory, RetrievedMemory
+from goodai.ltm.mem.simple_vector_db import SimpleVectorDb
 
 _vector_db_type = Union[faiss.Index, SimpleVectorDb]
 

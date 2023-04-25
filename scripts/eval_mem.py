@@ -4,13 +4,13 @@ from typing import Optional, List
 import torch
 from transformers import AutoTokenizer, AutoModel
 
-from goodai.ltm.embedding_models.auto import AutoTextEmbeddingModel
-from goodai.ltm.embedding_models.default import DefaultEmbeddingModel
+from goodai.ltm.embeddings.auto import AutoTextEmbeddingModel
+from goodai.ltm.embeddings.default import DefaultEmbeddingModel
 from goodai.ltm.eval.auto import AutoMemEvaluator
-from goodai.ltm.matching_models.auto import AutoTextMatchingModel
-from goodai.ltm.memory_models.config import TextMemoryConfig
-from goodai.ltm.memory_models.default import DefaultTextMemory
-from goodai.ltm.memory_models.simple_vector_db import SimpleVectorDb
+from goodai.ltm.reranking.auto import AutoTextMatchingModel
+from goodai.ltm.mem.config import TextMemoryConfig
+from goodai.ltm.mem.default import DefaultTextMemory
+from goodai.ltm.mem.simple_vector_db import SimpleVectorDb
 
 
 @dataclass

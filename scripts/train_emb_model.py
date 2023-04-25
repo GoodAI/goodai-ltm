@@ -13,14 +13,14 @@ from dotenv import load_dotenv
 from goodai.helpers.torch_helper import param_count
 from goodai.ltm.data.cloud import CloudStorage
 
-from goodai.ltm.memory_models.config import TextMemoryConfig
+from goodai.ltm.mem.config import TextMemoryConfig
 
-from goodai.ltm.memory_models.default import DefaultTextMemory
+from goodai.ltm.mem.default import DefaultTextMemory
 from transformers import AutoModel, AutoTokenizer
 
-from goodai.ltm.embedding_models.default import DefaultEmbeddingModel
-from goodai.ltm.embedding_models.emb_qp_prob_model import EmbeddingQueryPassageProbModel
-from goodai.ltm.memory_models.simple_vector_db import SimpleVectorDb
+from goodai.ltm.embeddings.default import DefaultEmbeddingModel
+from goodai.ltm.embeddings.emb_qp_prob_model import EmbeddingQueryPassageProbModel
+from goodai.ltm.mem.simple_vector_db import SimpleVectorDb
 from goodai.ltm.training.query_passage.trainer import QPPMTrainer
 
 load_dotenv()

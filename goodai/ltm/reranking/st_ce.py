@@ -2,7 +2,7 @@ from typing import List, Tuple
 
 from sentence_transformers import CrossEncoder
 
-from goodai.ltm.matching import BaseTextMatchingModel
+from goodai.ltm.reranking.base import BaseTextMatchingModel
 
 
 class SentenceTransformerTextMatchingModel(BaseTextMatchingModel):

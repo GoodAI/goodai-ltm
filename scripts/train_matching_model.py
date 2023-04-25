@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 from goodai.helpers.torch_helper import param_count
 from goodai.ltm.data.cloud import CloudStorage
-from goodai.ltm.matching_models.default import DefaultRerankingCrossEncoder
+from goodai.ltm.reranking.default import DefaultRerankingCrossEncoder
 
 from transformers import AutoModel, AutoTokenizer
 
