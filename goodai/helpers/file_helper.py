@@ -1,7 +1,6 @@
 import hashlib
 import os
 import tempfile
-import urllib.request
 import zipfile
 import urllib.request
 from urllib.parse import urlparse
@@ -39,7 +38,7 @@ def open_url_as_file(url):
     url_parts = urlparse(url)
     url_hash = hashlib.md5(url.encode('utf-8')).hexdigest()
     file_name = os.path.join(_cache_dir, url_hash + '_' + os.path.basename(url_parts.path))
-    progress_fn = os.path.join(file_name, '-in-progress')
+    progress_fn = file_name + '-in-progress'
 
     if not os.path.exists(file_name) or os.path.exists(progress_fn):
         with urllib.request.urlopen(url) as url_file:

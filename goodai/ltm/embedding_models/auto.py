@@ -10,7 +10,7 @@ from goodai.ltm.embedding_models.trainable import TrainableEmbeddingModel
 from goodai.ltm.embeddings import BaseTextEmbeddingModel
 
 _pretrained_map = {
-    'p4-distilroberta': 'https://github.com/GoodAI/goodai-ltm/releases/download/first-release/goodai-ltm-emb-model-p4-1002'
+    'p2-qa-mpnet': 'https://github.com/GoodAI/goodai-ltm-artifacts/releases/download/v0.0.15/goodai-ltm-emb-model-p2-1052'
 }
 
 
@@ -42,7 +42,7 @@ class AutoTextEmbeddingModel:
                 raise ValueError(f'Model not found: {name}')
             with open_url_as_file(url) as fd:
                 model_dict = pickle.load(fd)
-                model: TrainableEmbeddingModel = model_dict['model']
+                model: TrainableEmbeddingModel = model_dict['emb_model']
                 model.to(device)
                 model.zero_grad(set_to_none=True)
                 model.eval()
