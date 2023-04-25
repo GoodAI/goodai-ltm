@@ -17,8 +17,8 @@ class SentenceTransformerEmbeddingModel(BaseTextEmbeddingModel):
     https://huggingface.co/sentence-transformers
     """
 
-    def __init__(self, model_name: str):
-        self.st = SentenceTransformer(model_name)
+    def __init__(self, model_name: str, device: Union[torch.device, str] = None):
+        self.st = SentenceTransformer(model_name, device=device)
 
     def get_embedding_dim(self) -> int:
         return self.st.get_sentence_embedding_dimension()

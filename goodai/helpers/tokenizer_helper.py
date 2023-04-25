@@ -57,13 +57,13 @@ def get_token_index(token_ids: List[int], token_offsets: List[Tuple[int, int]], 
 def get_model_inputs(input_ids_list: List[List[int]], pad_id: int, device: torch.device,
                      min_seq_len: Optional[int] = None, prefix: str = '',
                      tokenizer: PreTrainedTokenizer = None, return_token_lengths: bool = False):
-    # Note: padding on the left
+    # Note: padding on the right
     max_seq_len = max(len(seq) for seq in input_ids_list)
     if min_seq_len is None:
         min_seq_len = max_seq_len
     else:
         min_seq_len = max(max_seq_len, min_seq_len)
-    input_ids_list = [[pad_id] * (min_seq_len - len(ids)) + ids for ids in input_ids_list]
+    input_ids_list = [ids + [pad_id] * (min_seq_len - len(ids)) for ids in input_ids_list]
     input_ids = torch.as_tensor(input_ids_list, dtype=torch.int64, device=device)
     attention_mask = (input_ids != pad_id).float()
     result = {

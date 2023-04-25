@@ -13,7 +13,8 @@ class QueryPassageDataset(Dataset):
         data_sources: List[Tuple[BaseQueryPassageDataSource, float]],
         tokenizer: PreTrainedTokenizer,
         num_examples: int,
-        device: torch.device
+        device: torch.device,
+        add_special_tokens: bool = True
     ):
         super().__init__()
         weight_sum = sum(w for _, w in data_sources)
@@ -25,6 +26,8 @@ class QueryPassageDataset(Dataset):
         pad_id = tokenizer.pad_token_id
         if pad_id is None:
             raise SystemError('Tokenizer has no PAD token.')
+        bos_id = tokenizer.bos_token_id
+        eos_id = tokenizer.eos_token_id
 
         label_list = []
         query_list = []
@@ -38,6 +41,14 @@ class QueryPassageDataset(Dataset):
                 query_list.append(item.queryIds)
                 passage_list.append(item.passageIds)
                 label_list.append([1.0] if item.match else [0.0])
+
+        if add_special_tokens:
+            if bos_id is not None:
+                query_list = [[bos_id] + seq for seq in query_list]
+                passage_list = [[bos_id] + seq for seq in passage_list]
+            if eos_id is not None:
+                query_list = [seq + [eos_id] for seq in query_list]
+                passage_list = [seq + [eos_id] for seq in passage_list]
 
         query_inputs = get_model_inputs(query_list, pad_id, device, return_token_lengths=True, tokenizer=tokenizer)
         passage_inputs = get_model_inputs(passage_list, pad_id, device)
