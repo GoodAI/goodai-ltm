@@ -1,11 +1,11 @@
 import torch
 from transformers import AutoTokenizer
 
-from goodai.ltm.embedding_models.auto import AutoTextEmbeddingModel
-from goodai.ltm.memory import BaseTextMemory
-from goodai.ltm.memory_models.config import TextMemoryConfig
-from goodai.ltm.memory_models.default import DefaultTextMemory
-from goodai.ltm.memory_models.simple_vector_db import SimpleVectorDb
+from goodai.ltm.embeddings.auto import AutoTextEmbeddingModel
+from goodai.ltm.mem.base import BaseTextMemory
+from goodai.ltm.mem.config import TextMemoryConfig
+from goodai.ltm.mem.default import DefaultTextMemory
+from goodai.ltm.mem.simple_vector_db import SimpleVectorDb
 
 
 class AutoTextMemory:

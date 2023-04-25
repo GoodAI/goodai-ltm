@@ -6,12 +6,12 @@ from faiss import Index
 from transformers import PreTrainedTokenizer
 
 from goodai.helpers.tokenizer_helper import get_pad_token_id, get_sentence_punctuation_ids
-from goodai.ltm.embeddings import BaseTextEmbeddingModel
-from goodai.ltm.matching import BaseTextMatchingModel
-from goodai.ltm.memory_models.chunk_queue import ChunkQueue, BaseChunkQueue
-from goodai.ltm.memory_models.config import TextMemoryConfig
-from goodai.ltm.memory_models.mem_foundation import BaseTextMemoryFoundation
-from goodai.ltm.memory_models.simple_vector_db import SimpleVectorDb
+from goodai.ltm.embeddings.base import BaseTextEmbeddingModel
+from goodai.ltm.reranking.base import BaseTextMatchingModel
+from goodai.ltm.mem.chunk_queue import ChunkQueue, BaseChunkQueue
+from goodai.ltm.mem.config import TextMemoryConfig
+from goodai.ltm.mem.mem_foundation import BaseTextMemoryFoundation
+from goodai.ltm.mem.simple_vector_db import SimpleVectorDb
 
 _vector_db_type = Union[Index, SimpleVectorDb]
 

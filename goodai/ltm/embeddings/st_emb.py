@@ -1,31 +1,27 @@
 import threading
 
 import numpy as np
-import openai
 import torch
 from typing import List, Union
 
-from tqdm import tqdm
-
-from goodai.ltm.embeddings import BaseTextEmbeddingModel
+from sentence_transformers import SentenceTransformer
+from goodai.ltm.embeddings.base import BaseTextEmbeddingModel
 
 _openai_lock = threading.Lock()
 
 
-class OpenAIEmbeddingModel(BaseTextEmbeddingModel):
+class SentenceTransformerEmbeddingModel(BaseTextEmbeddingModel):
     """
-    Text embedding model based on OpenAI text embeddings.
+    Text embedding model based on Hugging Face Sentence Transformers.
 
-    https://platform.openai.com/docs/guides/embeddings
+    https://huggingface.co/sentence-transformers
     """
 
-    def __init__(self, api_key: str = None, model_name: str = 'text-embedding-ada-002', emb_dim: int = 1536):
-        self.api_key = api_key
-        self.emb_dim = emb_dim
-        self.model_name = model_name
+    def __init__(self, model_name: str, device: Union[torch.device, str] = None):
+        self.st = SentenceTransformer(model_name, device=device)
 
     def get_embedding_dim(self) -> int:
-        return self.emb_dim
+        return self.st.get_sentence_embedding_dimension()
 
     def get_num_retrieval_embeddings(self) -> int:
         return 1
@@ -36,22 +32,10 @@ class OpenAIEmbeddingModel(BaseTextEmbeddingModel):
     def encode(self, sentences: List[str], batch_size: int = 64, show_progress_bar: bool = False,
                convert_to_tensor: bool = False,
                device: Union[str, torch.device] = None) -> Union[np.ndarray, torch.Tensor]:
-        with _openai_lock:
-            openai.api_key = self.api_key
-            rng = range(0, len(sentences), batch_size)
-            if show_progress_bar:
-                rng = tqdm(rng, desc='Embeddings', unit='batch')
-            all_emb_vectors = []
-            for b0 in rng:
-                b_queries = sentences[b0:b0 + batch_size]
-                response = openai.Embedding.create(input=b_queries, model=self.model_name)
-                data_array = response['data']
-                emb_vectors = [entry['embedding'] for entry in data_array]
-                all_emb_vectors.extend(emb_vectors)
-        if convert_to_tensor:
-            return torch.as_tensor(emb_vectors, dtype=torch.float, device=device).unsqueeze(1)
-        else:
-            return np.array(all_emb_vectors)[:, None, :]
+        emb = self.st.encode(sentences, batch_size=batch_size, show_progress_bar=show_progress_bar,
+                             convert_to_tensor=convert_to_tensor, convert_to_numpy=not convert_to_tensor,
+                             device=device, normalize_embeddings=True)
+        return emb[:, None, :]
 
     def encode_queries(self, queries: List[str], batch_size: int = 64, show_progress_bar: bool = False,
                        convert_to_tensor: bool = False,

@@ -8,9 +8,9 @@ from transformers import AutoModel, AutoTokenizer, PreTrainedTokenizer
 from typing import List, Optional, Tuple
 
 from goodai.helpers.tokenizer_helper import get_attention_after_token, get_model_inputs
-from goodai.ltm.embedding_models.contrast_classifier import ContrastClassifier
-from goodai.ltm.matching import BaseTextMatchingModel
-from goodai.ltm.matching_models.prob_model import BaseQueryPassageProbModel
+from goodai.ltm.embeddings.contrast_classifier import ContrastClassifier
+from goodai.ltm.reranking.base import BaseTextMatchingModel
+from goodai.ltm.reranking.prob_model import BaseQueryPassageProbModel
 
 
 class DefaultRerankingCrossEncoder(nn.Module, BaseQueryPassageProbModel, BaseTextMatchingModel):

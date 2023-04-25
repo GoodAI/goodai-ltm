@@ -1,8 +1,8 @@
 from abc import abstractmethod, ABC
 from typing import List, Tuple, Set, Dict, Optional, Any
 
-from goodai.ltm.memory_models.chunk import Chunk
-from goodai.ltm.memory_models.chunk_mixin import ChunkMixin
+from goodai.ltm.mem.chunk import Chunk
+from goodai.ltm.mem.chunk_mixin import ChunkMixin
 
 
 class BaseChunkQueue(ABC):

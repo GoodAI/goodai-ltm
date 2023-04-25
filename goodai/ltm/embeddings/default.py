@@ -9,7 +9,7 @@ from transformers import PreTrainedModel, PreTrainedTokenizer, PretrainedConfig
 from transformers.modeling_outputs import BaseModelOutput
 
 from goodai.helpers.tokenizer_helper import get_attention_after_token
-from goodai.ltm.embedding_models.trainable import TrainableEmbeddingModel
+from goodai.ltm.embeddings.trainable import TrainableEmbeddingModel
 
 
 class DefaultEmbeddingModel(TrainableEmbeddingModel):

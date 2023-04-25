@@ -1,4 +1,4 @@
-from goodai.ltm.memory_models.auto import AutoTextMemory
+from goodai.ltm.mem.auto import AutoTextMemory
 import wikipedia
 import mwparserfromhell
 

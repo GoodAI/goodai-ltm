@@ -4,9 +4,9 @@ import math
 import torch
 from torch import nn
 
-from goodai.ltm.embedding_models.contrast_classifier import ContrastClassifier
-from goodai.ltm.embedding_models.trainable import TrainableEmbeddingModel
-from goodai.ltm.matching_models.prob_model import BaseQueryPassageProbModel
+from goodai.ltm.embeddings.contrast_classifier import ContrastClassifier
+from goodai.ltm.embeddings.trainable import TrainableEmbeddingModel
+from goodai.ltm.reranking.prob_model import BaseQueryPassageProbModel
 
 
 class EmbeddingQueryPassageProbModel(nn.Module, BaseQueryPassageProbModel):

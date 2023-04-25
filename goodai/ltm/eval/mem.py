@@ -9,7 +9,7 @@ from transformers import PreTrainedTokenizer
 
 from goodai.ltm.data.names import NameSource
 from goodai.ltm.eval.metrics import get_correctness_score
-from goodai.ltm.memory import BaseTextMemory
+from goodai.ltm.mem.base import BaseTextMemory
 
 
 @dataclass
