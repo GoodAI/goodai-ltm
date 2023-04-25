@@ -17,9 +17,10 @@ from goodai.ltm.memory_models.simple_vector_db import SimpleVectorDb
 class EvalSpec:
     id: str
     embModelName: str
-    matchingModelName: Optional[str]
-    maxQueryTokens: int
-    hasQueryNoise: bool
+    matchingModelName: Optional[str] = None
+    maxQueryTokens: int = 40
+    hasQueryNoise: bool = True
+    chunkCapacity: int = 24
 
 
 if __name__ == '__main__':
@@ -34,16 +35,16 @@ if __name__ == '__main__':
         #          maxQueryTokens=40, hasQueryNoise=True),
         # EvalSpec('p4-distilroberta', 'p4-distilroberta', None,
         #          maxQueryTokens=40, hasQueryNoise=True),
-        # EvalSpec('st/multi-qa-mpnet-base-cos-v1', 'st:sentence-transformers/multi-qa-mpnet-base-cos-v1', None,
-        #          maxQueryTokens=40, hasQueryNoise=True),
+        EvalSpec('st/multi-qa-mpnet-base-cos-v1', 'st:sentence-transformers/multi-qa-mpnet-base-cos-v1',
+                 chunkCapacity=20),
         # EvalSpec('st/sentence-t5-large', 'st:sentence-transformers/sentence-t5-large', None,
         #          maxQueryTokens=40, hasQueryNoise=True),
         # EvalSpec('st/multi-qa-MiniLM-L6-cos-v1', 'st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1', None,
         #          maxQueryTokens=40, hasQueryNoise=True),
         # EvalSpec('st/all-mpnet-base-v2', 'st:sentence-transformers/all-mpnet-base-v2', None,
         #          maxQueryTokens=40, hasQueryNoise=True),
-        EvalSpec('st/all-roberta-large-v1', 'st:sentence-transformers/all-roberta-large-v1', None,
-                 maxQueryTokens=40, hasQueryNoise=True),
+        # EvalSpec('st/all-roberta-large-v1', 'st:sentence-transformers/all-roberta-large-v1', None,
+        #          maxQueryTokens=40, hasQueryNoise=True),
 
     ]
     ds_top_ks = [f'{ds_name}@{top_k}' for ds_name in datasets for top_k in top_ks]
@@ -58,6 +59,7 @@ if __name__ == '__main__':
         mmn = spec.matchingModelName
         matching_model = None if mmn is None else AutoTextMatchingModel.from_pretrained(mmn)
         config = TextMemoryConfig()
+        config.chunk_capacity = spec.chunkCapacity
         mem = DefaultTextMemory(vector_db, tokenizer, emb_model, matching_model,
                                 device=device, config=config)
         table_out += spec.id + ' | '
