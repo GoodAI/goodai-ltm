@@ -8,6 +8,7 @@ from transformers import PreTrainedTokenizer
 
 from goodai.ltm.data.query_passage.sharc import SharcQueryPassageDataSource
 from goodai.ltm.data.query_passage.wiki import WikiQueryPassageDataSource
+from goodai.ltm.data.query_passage.wikianswers import WikiAnswersQueryPassageDataSource
 
 
 class AutoQueryPassageDataSource:
@@ -43,5 +44,7 @@ class AutoQueryPassageDataSource:
             return SharcQueryPassageDataSource.create_data_sources(ds_name=name, **common_params)
         elif name == 'wiki':
             return WikiQueryPassageDataSource.create_data_sources(train_fraction=0.8, **common_params)
+        elif name == 'wikianswers':
+            return WikiAnswersQueryPassageDataSource.create_data_sources(train_fraction=0.8, **common_params)
         else:
             raise ValueError(f'Unknown: {name}')

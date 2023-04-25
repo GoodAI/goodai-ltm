@@ -1,3 +1,4 @@
+import codecs
 import hashlib
 import os
 import tempfile
@@ -29,7 +30,17 @@ def download_zip(url):
     return temp_dir
 
 
-def open_url_as_file(url):
+def open_url_as_file(url, mode='rb'):
+    file_name = url_as_file(url)
+    return open(file_name, mode=mode)
+
+
+def codecs_open_url_as_file(url, mode='r', encoding='utf-8'):
+    file_name = url_as_file(url)
+    return codecs.open(file_name, mode=mode, encoding=encoding)
+
+
+def url_as_file(url) -> str:
     # Create the cache directory if it does not exist
     if not os.path.exists(_cache_dir):
         os.makedirs(_cache_dir)
@@ -56,4 +67,4 @@ def open_url_as_file(url):
                     local_file.write(chunk)
                     progress_bar.update(len(chunk))
             os.remove(progress_fn)
-    return open(file_name, 'rb')
+    return file_name

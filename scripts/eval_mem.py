@@ -29,14 +29,14 @@ if __name__ == '__main__':
     top_ks = [1, 3, 10]
     vector_db = SimpleVectorDb()
     tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/all-distilroberta-v1')
-    datasets = ['qrecc', 'strategyqa']
+    datasets = ['msmarco']  # ['qrecc', 'strategyqa']
     eval_specs: List[EvalSpec] = [
         # EvalSpec('st/all-distilroberta-v1', 'st:sentence-transformers/all-distilroberta-v1', None,
         #          maxQueryTokens=40, hasQueryNoise=True),
         # EvalSpec('p4-distilroberta', 'p4-distilroberta', None,
         #          maxQueryTokens=40, hasQueryNoise=True),
         EvalSpec('st/multi-qa-mpnet-base-cos-v1', 'st:sentence-transformers/multi-qa-mpnet-base-cos-v1',
-                 chunkCapacity=20),
+                 chunkCapacity=24),
         # EvalSpec('st/sentence-t5-large', 'st:sentence-transformers/sentence-t5-large', None,
         #          maxQueryTokens=40, hasQueryNoise=True),
         # EvalSpec('st/multi-qa-MiniLM-L6-cos-v1', 'st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1', None,
