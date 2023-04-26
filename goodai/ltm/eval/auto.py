@@ -3,6 +3,7 @@ from typing import List, Optional
 from transformers import PreTrainedTokenizer
 
 from goodai.ltm.eval.msmarco import MsMarcoMemEvaluator
+from goodai.ltm.eval.qp_ds import QPDSMemEvaluator
 from goodai.ltm.eval.qrecc import QreccMemEvaluator
 from goodai.ltm.eval.strategy_qa import StrategyQAMemEvaluator
 
@@ -26,5 +27,8 @@ class AutoMemEvaluator:
         elif name == 'msmarco':
             return MsMarcoMemEvaluator(tokenizer, top_ks, max_query_tokens, has_query_noise,
                                        max_scenarios=max_scenarios)
+        elif name in ['qp_squad_v2', 'qp_coqa', 'qp_wiki', 'qp_wikianswers']:
+            return QPDSMemEvaluator(name[3:], tokenizer, top_ks, max_query_tokens, has_query_noise,
+                                    max_scenarios=max_scenarios)
         else:
             raise ValueError(f'Dataset name "{name}" not recognized')

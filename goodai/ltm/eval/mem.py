@@ -47,13 +47,17 @@ class BaseMemEvaluator(ABC):
         pass
 
     def get_query(self, scenario: QAScenario) -> str:
-        name1, name2 = tuple(NameSource.get_instance().sample_first_names(self.rnd1, count=2))
-        names = [name1, name2]
-        names_context = [f'{names[i % 2]}: {ctx}' for i, ctx in enumerate(scenario.context)]
-        c_len = len(names_context)
-        q_name = names[c_len % 2]
-        a_name = names[(c_len + 1) % 2]
-        query = f'{q_name}: {scenario.question}\n{a_name}:'
+        if self.add_names_to_context:
+            name1, name2 = tuple(NameSource.get_instance().sample_first_names(self.rnd1, count=2))
+            names = [name1, name2]
+            names_context = [f'{names[i % 2]}: {ctx}' for i, ctx in enumerate(scenario.context)]
+            c_len = len(names_context)
+            q_name = names[c_len % 2]
+            a_name = names[(c_len + 1) % 2]
+            query = f'{q_name}: {scenario.question}\n{a_name}:'
+        else:
+            names_context = scenario.context
+            query = scenario.question
         truncate_q_ids_at = self.max_query_tokens
         if self.has_query_noise:
             no_noise_ids = self.tokenizer.encode(query, add_special_tokens=False)
