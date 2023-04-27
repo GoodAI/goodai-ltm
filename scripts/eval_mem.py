@@ -1,11 +1,8 @@
 from dataclasses import dataclass
 from typing import Optional, List
-
 import torch
-from transformers import AutoTokenizer, AutoModel
-
+from transformers import AutoTokenizer
 from goodai.ltm.embeddings.auto import AutoTextEmbeddingModel
-from goodai.ltm.embeddings.default import DefaultEmbeddingModel
 from goodai.ltm.eval.auto import AutoMemEvaluator
 from goodai.ltm.reranking.auto import AutoTextMatchingModel
 from goodai.ltm.mem.config import TextMemoryConfig
@@ -30,7 +27,8 @@ if __name__ == '__main__':
     tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/all-distilroberta-v1')
     # datasets = ["qp_squad_v2"]  # "['msmarco']  # ['qrecc', 'strategyqa']
     # datasets = ['msmarco']
-    datasets = ['qrecc', 'strategyqa', 'msmarco']
+    datasets = ['qrecc']
+    # datasets = ['qrecc', 'strategyqa', 'msmarco']
     eval_specs: List[EvalSpec] = [
         # EvalSpec('st/all-distilroberta-v1', 'st:sentence-transformers/all-distilroberta-v1', None,
         #          maxQueryTokens=40, hasQueryNoise=True),
@@ -38,6 +36,11 @@ if __name__ == '__main__':
         #          maxQueryTokens=40, hasQueryNoise=True),
         EvalSpec('st/multi-qa-mpnet-base-cos-v1', 'st:sentence-transformers/multi-qa-mpnet-base-cos-v1',
                  chunkCapacity=24),
+
+        # EvalSpec('st/stsb-distilroberta-base', 'st:sentence-transformers/multi-qa-mpnet-base-cos-v1',
+        #          matchingModelName='st:cross-encoder/stsb-distilroberta-base',
+        #          chunkCapacity=24),
+
         # EvalSpec('st/sentence-t5-large', 'st:sentence-transformers/sentence-t5-large', None,
         #          maxQueryTokens=40, hasQueryNoise=True),
         # EvalSpec('st/multi-qa-MiniLM-L6-cos-v1', 'st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1', None,

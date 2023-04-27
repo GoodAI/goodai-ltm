@@ -1,5 +1,5 @@
 import abc
-from typing import List, Union, Any, Set, Optional
+from typing import List, Union, Any, Set, Optional, Tuple
 
 import faiss
 import numpy as np
@@ -44,37 +44,15 @@ class BaseTextMemoryFoundation(BaseTextMemory):
     def get_retrieval_key_for_text(self, queries: List[str], show_progress_bar: bool = False) -> torch.Tensor:
         pass
 
-    @abc.abstractmethod
-    def get_match_probabilities(self, query: str, passages: List[str]) -> List[float]:
+    def predict_match(self, sentences: List[Tuple[str, str]], show_progress_bar: bool = False) -> List[float]:
         pass
 
     @abc.abstractmethod
     def get_metadata(self, chunk_id: int) -> Optional[Any]:
         pass
 
-    def _retrieve(self, query: str, rewrite: bool, flat_distances: np.ndarray, flat_indexes: np.ndarray,
-                  expected_key_db_top_k: int, k: int) -> List[RetrievedMemory]:
-        # TODO optimize matching batch
-        # distances, indexes: (batch_size, downstream_top_k)
-        adjacent_chunks_ok = self.adjacent_chunks_ok
-        prelim_dist_indexes = list(zip(flat_distances, flat_indexes))
-        prelim_dist_indexes = remove_duplicates(prelim_dist_indexes, key_fn=lambda _t: _t[1])
+    def _retrieve_for_scored_tuples(self, chunk_score_tuples: List[Tuple[float, tuple]], k: int) -> List[RetrievedMemory]:
         has_pm = self.has_match_prob_model
-        if has_pm:
-            nv = num_visited_to_get_expected_count(prelim_dist_indexes, expected_key_db_top_k, adjacent_chunks_ok,
-                                                   key_fn=lambda _t: _t[1])
-            prelim_dist_indexes = prelim_dist_indexes[:nv * 2]
-            prelim_chunk_indexes = [ci for _, ci in prelim_dist_indexes]
-            chunk_sequences: List[List[int]] = self.retrieve_chunk_sequences(prelim_chunk_indexes)
-            chunk_texts = self.em_tokenizer.batch_decode(chunk_sequences, skip_special_tokens=True)
-            chunk_prob = self.get_match_probabilities(query, chunk_texts)
-            chunk_score_tuples = list(zip(chunk_prob, prelim_dist_indexes))
-            chunk_score_tuples.sort(key=lambda _t: _t[0], reverse=True)
-        else:
-            pseudo_scores = list(range(len(prelim_dist_indexes), 0, -1))
-            chunk_score_tuples = list(zip(pseudo_scores, prelim_dist_indexes))
-        if not adjacent_chunks_ok:
-            chunk_score_tuples = get_non_adjacent(chunk_score_tuples, key_fn=lambda _t: _t[1][1])
         chunk_score_tuples = chunk_score_tuples[:k]
         final_indexes = [ci for _, (_, ci) in chunk_score_tuples]
         sequences = self.retrieve_complete_sequences(final_indexes, self.punctuation_ids)
@@ -88,6 +66,69 @@ class BaseTextMemoryFoundation(BaseTextMemory):
             result.append(RetrievedMemory(passage=r_text.strip(), distance=distance,
                                           confidence=confidence, metadata=metadata))
         return result
+
+    def _multi_retrieve_for_tuples(self, queries: List[str], prelim_dist_indexes: List[List[Tuple[float, int]]],
+                                   expected_key_db_top_k: int, k: int,
+                                   show_progress_bar: bool = False) -> List[List[RetrievedMemory]]:
+        adjacent_chunks_ok = self.adjacent_chunks_ok
+        has_pm = self.has_match_prob_model
+        if has_pm:
+            m_sentences = []
+            m_indexes = []
+            prelim_dist_indexes_list = []
+            for i, (query, row_tuples) in enumerate(zip(queries, prelim_dist_indexes)):
+                nv = num_visited_to_get_expected_count(row_tuples, expected_key_db_top_k, adjacent_chunks_ok,
+                                                       key_fn=lambda _t: _t[1])
+                row_tuples = row_tuples[:nv * 2]
+                prelim_dist_indexes_list.append(row_tuples)
+                prelim_chunk_indexes = [ci for _, ci in row_tuples]
+                chunk_sequences: List[List[int]] = self.retrieve_chunk_sequences(prelim_chunk_indexes)
+                chunk_texts = self.em_tokenizer.batch_decode(chunk_sequences, skip_special_tokens=True)
+                for ct in chunk_texts:
+                    m_sentences.append((query, ct,))
+                    m_indexes.append(i)
+            match_probs = self.predict_match(m_sentences, show_progress_bar=show_progress_bar)
+            chunk_probs_list = [[] for _ in range(len(queries))]
+            for m_index, match_prob in zip(m_indexes, match_probs):
+                chunk_probs_list[m_index].append(match_prob)
+            chunk_score_tuples_list = []
+            for chunk_probs, row_tuples in zip(chunk_probs_list, prelim_dist_indexes_list):
+                chunk_score_tuples = list(zip(chunk_probs, row_tuples))
+                chunk_score_tuples.sort(key=lambda _t: _t[0], reverse=True)
+                chunk_score_tuples_list.append(chunk_score_tuples)
+        else:
+            chunk_score_tuples_list = []
+            for row_tuples in prelim_dist_indexes:
+                pseudo_scores = list(range(len(row_tuples), 0, -1))
+                chunk_score_tuples = list(zip(pseudo_scores, row_tuples))
+                chunk_score_tuples_list.append(chunk_score_tuples)
+        if not adjacent_chunks_ok:
+            new_cstl = []
+            for cst_entry in chunk_score_tuples_list:
+                new_cst_entry = get_non_adjacent(cst_entry, key_fn=lambda _t: _t[1][1])
+                new_cstl.append(new_cst_entry)
+            chunk_score_tuples_list = new_cstl
+        result = []
+        for cst_entry in chunk_score_tuples_list:
+            result.append(self._retrieve_for_scored_tuples(cst_entry, k=k))
+        return result
+
+    def _multi_retrieve(self, queries: List[str], distances: np.ndarray, indexes: np.ndarray,
+                        expected_key_db_top_k: int, k: int,
+                        show_progress_bar: bool = False) -> List[List[RetrievedMemory]]:
+        # len(queries) == batch_size
+        # distances, indexes: (batch_size, downstream_top_k)
+        prelim_dist_indexes = []
+        batch_size = len(queries)
+        assert batch_size == distances.shape[0] == indexes.shape[0]
+        for i in range(batch_size):
+            row_d = distances[i]
+            row_i = indexes[i]
+            row_tuples = list(zip(row_d, row_i))
+            row_tuples = remove_duplicates(row_tuples, key_fn=lambda _t: _t[1])
+            prelim_dist_indexes.append(row_tuples)
+        return self._multi_retrieve_for_tuples(queries, prelim_dist_indexes, expected_key_db_top_k, k,
+                                               show_progress_bar=show_progress_bar)
 
     def retrieve_multiple(self, queries: List[str], k: int = 1, rewrite: bool = False, mm_multiplier: int = 10,
                           show_progress_bar: bool = False) -> List[List[RetrievedMemory]]:
@@ -105,13 +146,5 @@ class BaseTextMemoryFoundation(BaseTextMemory):
             downstream_top_k *= 3
         distances, indexes = self.vector_db.search(rk_np, k=downstream_top_k)
         assert distances.shape[0] == indexes.shape[0] == batch_size
-        result = []
-        rng = range(batch_size)
-        if show_progress_bar:
-            rng = tqdm(rng, desc='Retrieval', unit='query')
-        for i in rng:
-            flat_distances = distances[i]
-            flat_indexes = indexes[i]
-            single_result = self._retrieve(queries[i], rewrite, flat_distances, flat_indexes, expected_key_db_top_k, k)
-            result.append(single_result)
-        return result
+        return self._multi_retrieve(queries, distances, indexes, expected_key_db_top_k, k,
+                                    show_progress_bar=show_progress_bar)
