@@ -192,7 +192,6 @@ decoded.
 In addition to the steps above, it is also possible to rewrite queries and memories and to perform passage 
 reranking after retrieval. 
 
-## Flow charts
 The diagrams below illustrate what happens during storage and retrieval (sans optional query and memory rewriting).
 
 ![Storage](diagram-all-50.png)
