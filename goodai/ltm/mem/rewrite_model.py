@@ -1,3 +1,4 @@
+import json
 import os
 import string
 from abc import abstractmethod, ABC
@@ -145,11 +146,11 @@ class OpenAIRewriteModel(BaseRewriteModel):
 
     def rewrite_query(self, query: str) -> str:
         prompt = self.make_query_prompt(query)
-        return self.completion(prompt)
+        return self.post_process_query(self.completion(prompt))
 
     def rewrite_memory(self, passage: str, context: str) -> str:
         prompt = self.make_memory_prompt(passage, context)
-        return self.completion(prompt)
+        return self.post_process_memory(self.completion(prompt))
 
     def completion(self, prompt):
         openai.api_key = self.api_key
@@ -162,6 +163,12 @@ class OpenAIRewriteModel(BaseRewriteModel):
 
     def make_memory_prompt(self, passage, context):
         return string.Template(self.memory_prompt_template).substitute(passage=passage, context=context)
+
+    def post_process_query(self, query: str):
+        return json.loads(query)["processed"]
+
+    def post_process_memory(self, memory: str):
+        return "\n".join(json.loads(memory)["processed"].values())
 
 
 class OpenAIChatRewriteModel(OpenAIRewriteModel):
@@ -184,11 +191,11 @@ class OpenAIChatRewriteModel(OpenAIRewriteModel):
 
     def rewrite_query(self, query: str) -> str:
         prompt = self.make_query_prompt(query)
-        return self.chat_completion(prompt, self.query_rewrite_system_message)
+        return self.post_process_query(self.chat_completion(prompt, self.query_rewrite_system_message))
 
     def rewrite_memory(self, passage: str, context: str) -> str:
         prompt = self.make_memory_prompt(passage, context)
-        return self.chat_completion(prompt, self.memory_rewrite_system_message)
+        return self.post_process_memory(self.chat_completion(prompt, self.memory_rewrite_system_message))
 
     def chat_completion(self, prompt, system_message):
         messages = [

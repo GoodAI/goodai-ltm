@@ -32,16 +32,17 @@ class BaseTextMemory(ABC):
     """
 
     @abstractmethod
-    def add_text(self, text: str, metadata: Optional[Any] = None):
+    def add_text(self, text: str, metadata: Optional[Any] = None, rewrite: bool = False,
+                 rewrite_context: Optional[str] = None):
         pass
 
     @abstractmethod
-    def retrieve_multiple(self, queries: List[str], k: int, show_progress_bar: bool = False,
+    def retrieve_multiple(self, queries: List[str], k: int, rewrite: bool = False, show_progress_bar: bool = False,
                           **kwargs) -> List[List[RetrievedMemory]]:
         pass
 
-    def retrieve(self, query: str, k: int, **kwargs) -> List[RetrievedMemory]:
-        multi_result = self.retrieve_multiple([query], k=k, **kwargs)
+    def retrieve(self, query: str, k: int, rewrite: bool = False, **kwargs) -> List[RetrievedMemory]:
+        multi_result = self.retrieve_multiple([query], k=k, rewrite=rewrite, **kwargs)
         return multi_result[0]
 
     @abstractmethod

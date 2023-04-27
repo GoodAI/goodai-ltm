@@ -7,6 +7,8 @@ from transformers import PreTrainedTokenizer
 
 from goodai.helpers.tokenizer_helper import get_pad_token_id, get_sentence_punctuation_ids
 from goodai.ltm.embeddings.base import BaseTextEmbeddingModel
+from goodai.ltm.mem.base import RetrievedMemory
+from goodai.ltm.mem.rewrite_model import BaseRewriteModel
 from goodai.ltm.reranking.base import BaseTextMatchingModel
 from goodai.ltm.mem.chunk_queue import ChunkQueue, BaseChunkQueue
 from goodai.ltm.mem.config import TextMemoryConfig
@@ -20,7 +22,10 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
     def __init__(self, vector_db: _vector_db_type, tokenizer: PreTrainedTokenizer,
                  emb_model: BaseTextEmbeddingModel, matching_model: Optional[BaseTextMatchingModel],
                  device: torch.device, config: TextMemoryConfig,
-                 chunk_queue_fn: Callable[[], BaseChunkQueue] = None):
+                 chunk_queue_fn: Callable[[], BaseChunkQueue] = None,
+                 query_rewrite_model: Optional[BaseRewriteModel] = None,
+                 memory_rewrite_model: Optional[BaseRewriteModel] = None
+                 ):
         if chunk_queue_fn is None:
             def chunk_queue_fn():
                 return ChunkQueue(config.queue_capacity, config.chunk_capacity)
@@ -36,6 +41,9 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
         self.chunk_queue: BaseChunkQueue = chunk_queue_fn()
         self.vector_db = vector_db
         has_matching_model = self.matching_model is not None
+        self.query_rewrite_model = query_rewrite_model
+        self.memory_rewrite_model = memory_rewrite_model
+
         super().__init__(vector_db, self.em_tokenizer, has_matching_model,
                          self.emb_model.get_num_storage_embeddings(), device, config.adjacent_chunks_ok)
 
@@ -54,6 +62,14 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
             return None
         return chunk.metadata
 
+    def _retrieve(self, query: str, rewrite: bool, flat_distances: np.ndarray, flat_indexes: np.ndarray,
+                  expected_key_db_top_k: int, k: int) -> List[RetrievedMemory]:
+        if rewrite and not self.query_rewrite_model:
+            raise ValueError("For query rewriting, a rewriting model must be provided")
+        if rewrite and self.query_rewrite_model:
+            query = self.query_rewrite_model.rewrite_query(query)
+        return super()._retrieve(query, rewrite, flat_distances, flat_indexes, expected_key_db_top_k, k)
+
     def retrieve_chunk_sequences(self, chunk_ids: List[int]):
         return self.chunk_queue.retrieve_chunk_sequences(chunk_ids)
 
@@ -68,7 +84,13 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
             raise SystemError('No query-passage match probability model available')
         return self.matching_model.get_match_confidence(query, passages)
 
-    def add_text(self, text: str, metadata: Optional[Any] = None):
+    def add_text(self, text: str, metadata: Optional[Any] = None, rewrite: bool = False,
+                 rewrite_context: Optional[str] = None):
+        if rewrite and not self.memory_rewrite_model:
+            raise ValueError("For memory rewriting, a rewriting model must be provided")
+        if rewrite and self.memory_rewrite_model:
+            text = self.memory_rewrite_model.rewrite_memory(text, rewrite_context)
+
         token_ids = self.em_tokenizer.encode(text, add_special_tokens=False)
         removed_buckets = self.chunk_queue.add_sequence(token_ids, metadata)
         self._ensure_keys_added()
