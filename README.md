@@ -140,11 +140,9 @@ the following properties:
 * `confidence`: If a query-passage matching model is available, this is the probability assigned by the model.
 * `metadata`: Metadata associated with the retrieved text, if any.
 
-## Detailed examples
+## Detailed example
 
-For a more detailed view of how the memory works, let us revisit the storage and retrieval of text passages.
-
-### Storage
+For a slightly more detailed view of how the memory works, let us revisit the storage and retrieval of text passages.
 
     text_example = """\
     Jake Morales: Hey Archie, what do you think about teaming up with me and Isaac Coax? 
@@ -188,16 +186,14 @@ The embeddings, and the corresponding chunk indexes, are added to the vector dat
 The passages are now represented in memory as pairs of vectors and chunk indexes in the vector database and as 
 sequences of tokens in the chunk queue. From the token sequences, the text can be recovered.
 
-### Retrieval
+During retrieval, the stored embeddings closest to the query embedding are found and the corresponding texts 
+decoded.
 
-Using the memory instantiated above, we can now retrieve passages relevant to a query.
-
-    r_memories = mem.retrieve(query='What does Jake suggest?', k=3)
-
-
+In addition to the steps above, it is also possible to rewrite queries and memories and to perform passage 
+reranking after retrieval. 
 
 ## Flow charts
-The diagrams below illustrate what happens during storage and retrieval.
+The diagrams below illustrate what happens during storage and retrieval (sans optional query and memory rewriting).
 
 ![Storage](diagram-all-50.png)
 
