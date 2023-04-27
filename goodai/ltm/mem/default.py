@@ -62,13 +62,13 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
             return None
         return chunk.metadata
 
-    def _retrieve(self, query: str, rewrite: bool, flat_distances: np.ndarray, flat_indexes: np.ndarray,
-                  expected_key_db_top_k: int, k: int) -> List[RetrievedMemory]:
+    def retrieve_multiple(self, queries: List[str], k: int = 1, rewrite: bool = False, mm_multiplier: int = 10,
+                          show_progress_bar: bool = False) -> List[List[RetrievedMemory]]:
         if rewrite and not self.query_rewrite_model:
             raise ValueError("For query rewriting, a rewriting model must be provided")
         if rewrite and self.query_rewrite_model:
-            query = self.query_rewrite_model.rewrite_query(query)
-        return super()._retrieve(query, rewrite, flat_distances, flat_indexes, expected_key_db_top_k, k)
+            queries = [self.query_rewrite_model.rewrite_query(q) for q in queries]
+        return super().retrieve_multiple(queries, k, rewrite, mm_multiplier, show_progress_bar)
 
     def retrieve_chunk_sequences(self, chunk_ids: List[int]):
         return self.chunk_queue.retrieve_chunk_sequences(chunk_ids)
