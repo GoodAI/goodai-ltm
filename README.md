@@ -4,7 +4,7 @@ Long-term memory (LTM) is  increasingly recognized as an essential component in 
 
 Among the benefits of LTM is the possibility of continual learning. This is the ability to accumulate knowledge over time,
 possibly over the agent's entire lifetime. As their knowledge builds incrementally, agents can leverage learned skills
-to acquire increasingly complex abilities. Continual learning helps make robust against distributional drift, more capable 
+to acquire increasingly complex abilities. Continual learning helps make agents robust against distributional drift, more capable 
 of continuous adaptation, and more human-like.
 
 GoodAI-LTM brings together all the components necessary for equipping agents with text-based long term memory. 
@@ -231,4 +231,5 @@ We will continue to improve GoodAI-LTM. Possible next steps include
 * Retrieval weighted by recency and importance
 * Embeddings for source code retrieval
 * Storage and retrieval methods without embeddings
+* Improvements to the currently experimental query and memory rewriting feature and its default prompts
 * Iterating on improvements to our datasets and models
