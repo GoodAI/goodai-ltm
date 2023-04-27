@@ -1,4 +1,5 @@
 import abc
+import logging
 from abc import ABC
 from dataclasses import dataclass
 from typing import List, Dict, Tuple
@@ -47,13 +48,17 @@ class BaseMemEvaluator(ABC):
         pass
 
     def get_query(self, scenario: QAScenario) -> str:
-        name1, name2 = tuple(NameSource.get_instance().sample_first_names(self.rnd1, count=2))
-        names = [name1, name2]
-        names_context = [f'{names[i % 2]}: {ctx}' for i, ctx in enumerate(scenario.context)]
-        c_len = len(names_context)
-        q_name = names[c_len % 2]
-        a_name = names[(c_len + 1) % 2]
-        query = f'{q_name}: {scenario.question}\n{a_name}:'
+        if self.add_names_to_context:
+            name1, name2 = tuple(NameSource.get_instance().sample_first_names(self.rnd1, count=2))
+            names = [name1, name2]
+            names_context = [f'{names[i % 2]}: {ctx}' for i, ctx in enumerate(scenario.context)]
+            c_len = len(names_context)
+            q_name = names[c_len % 2]
+            a_name = names[(c_len + 1) % 2]
+            query = f'{q_name}: {scenario.question}\n{a_name}:'
+        else:
+            names_context = scenario.context
+            query = scenario.question
         truncate_q_ids_at = self.max_query_tokens
         if self.has_query_noise:
             no_noise_ids = self.tokenizer.encode(query, add_special_tokens=False)
@@ -92,8 +97,11 @@ class BaseMemEvaluator(ABC):
         k = max(self.top_ks)
         retrieved = memory.retrieve_multiple(queries, k=k, show_progress_bar=True)
         top_k_map: Dict[int, int] = dict()
-        for s_retrieved, s_supports in tqdm(zip(retrieved, supports), desc='Comparison', unit='scenario'):
+        for q, s_retrieved, s_supports in tqdm(zip(queries, retrieved, supports), desc='Comparison', unit='scenario'):
             s_retrieved_texts = [r.passage for r in s_retrieved]
+            if len(s_retrieved_texts) == 0:
+                logging.warning(f'No memories retrieved with query "{q}"')
+                continue
             correctness_values = self.cross_max_correctness(s_retrieved_texts, s_supports)
             for top_k in self.top_ks:
                 selected_cv = correctness_values[:top_k]

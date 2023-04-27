@@ -41,54 +41,7 @@ retrieving source code.
     for r_mem in r_memories:
         print(r_mem)
 
-## Loading an embedding model
-
-An embedding model is loaded as follows:
-
-    from goodai.ltm.embeddings.auto import AutoTextEmbeddingModel
-
-    em = AutoTextEmbeddingModel.from_pretrained(model_name)
-
-The `model_name` can be one of the following:
-
-* A SentenceTransformer (Huggingface), starting with "st:", for example, "st:sentence-transformers/multi-qa-mpnet-base-cos-v1".
-* An OpenAI embedding model name, starting with "openai:", for example, "openai:text-embedding-ada-002".
-* One of our fine-tuned models:
-
-Name | Base model                                       | Params
----- |--------------------------------------------------| ---
-example1 | sentence-transformers/multi-qa-mpnet-base-cos-v1 | 80m
-example2 | sentence-transformers/all-distrilroberta-v1      | 120m
-
-## Embedding model usage
-
-To get embeddings for a list of queries, call 
-the `encode_queries` method, as follows:
-
-    r_emb = em.encode_queries(['hello?'])
-
-This returns a numpy array. To get a Pytorch tensor,
-add the `convert_to_tensor` parameter:
-
-    r_emb = em.encode_queries(['hello?'], convert_to_tensor=True)
-
-To get embeddings for a list of passages, call 
-the `encode_corpus` method, as follows:
-
-    s_emb = em.encode_corpus(['it was...', 'the best of...'])
-
-A peculiarity of our embedding model is that queries
-and passages can have more than one embedding.
-Embedding tensors have 3 axes: The batch size, the number of
-embeddings, and the number embedding dimensions. Typically,
-the number of embeddings per query/passage will be 1, except for the 
-passage embeddings in some of our fine-tuned models.
-
-## Loading a query-passage matching model
-
-## Query-passage matching model usage
-
-## Loading a text memory instance:
+## Loading a text memory instance
 
 A default memory instance can be created as follows:
 
@@ -98,19 +51,21 @@ A default memory instance can be created as follows:
 
 You can also configure the memory by passing parameters to the `create` method.
 In the following example, the memory uses a "gpt2" tokenizer
-for chunking, and it uses a FAISS index for embeddings
-instead of a simple vector database.
+for chunking, a T5 model for embeddings, and a 
+FAISS index for embedding storage instead of a simple vector 
+database.
 
     tok = AutoTokenizer.from_pretrained('gpt2')
     config = TextMemoryConfig()
     config.chunk_capacity = 30  # tokens
     config.queue_capacity = 10000  # chunks
+    em = AutoTextEmbeddingModel.from_pretrained('st:sentence-transformers/sentence-t5-base')
     vector_size = em.get_embedding_dim()
     faiss_index = faiss.IndexIDMap(faiss.IndexFlatL2(vector_size))
     mem = AutoTextMemory.create(emb_model=em,
-        matching_model=None, tokenizer=tok,
-        vector_db=faiss_index, config=config,
-        device=torch.device('cuda:0'))
+                                matching_model=None, tokenizer=tok,
+                                vector_db=faiss_index, config=config,
+                                device=torch.device('cuda:0'))
 
 ## Text memory usage
 
@@ -196,8 +151,74 @@ The diagrams below illustrate what happens during storage and retrieval (sans op
 
 ![Storage](diagram-all-50.png)
 
+## Loading an embedding model
 
-## Architecture
+An embedding model is loaded as follows:
+
+    from goodai.ltm.embeddings.auto import AutoTextEmbeddingModel
+
+    em = AutoTextEmbeddingModel.from_pretrained(model_name)
+
+The `model_name` can be one of the following:
+
+* A SentenceTransformer (Huggingface), starting with "st:", for example, "st:sentence-transformers/multi-qa-mpnet-base-cos-v1".
+* An OpenAI embedding model name, starting with "openai:", for example, "openai:text-embedding-ada-002".
+* One of our fine-tuned models:
+
+Name | Base model                                       | Params
+---- |--------------------------------------------------| ---
+example1 | sentence-transformers/multi-qa-mpnet-base-cos-v1 | 80m
+example2 | sentence-transformers/all-distrilroberta-v1      | 120m
+
+## Embedding model usage
+
+To get embeddings for a list of queries, call 
+the `encode_queries` method, as follows:
+
+    r_emb = em.encode_queries(['hello?'])
+
+This returns a numpy array. To get a Pytorch tensor,
+add the `convert_to_tensor` parameter:
+
+    r_emb = em.encode_queries(['hello?'], convert_to_tensor=True)
+
+To get embeddings for a list of passages, call 
+the `encode_corpus` method, as follows:
+
+    s_emb = em.encode_corpus(['it was...', 'the best of...'])
+
+A peculiarity of our embedding model is that queries
+and passages can have more than one embedding.
+Embedding tensors have 3 axes: The batch size, the number of
+embeddings, and the number embedding dimensions. Typically,
+the number of embeddings per query/passage will be 1, except for the 
+passage embeddings in some of our fine-tuned models.
+
+## Loading a query-passage matching model
+
+A query-passage matching/reranking model can be loaded as follows:
+
+    model = AutoTextMatchingModel.from_pretrained(model_name)
+
+The `model_name` can be one of the following:
+
+* A "st:" prefix followed by the name of a Huggingface cross-encoder compatible with the SentenceTransformers library, like "st:cross-encoder/stsb-distilroberta-base"
+* 
+
+
+## Query-passage matching model usage
+
+The `predict` method of the model takes a list of
+query-passage tuples and returns a list of floats
+representing match probabilities. Example:
+
+    model = AutoTextMatchingModel.from_pretrained('st:cross-encoder/stsb-distilroberta-base')
+    sentences = [
+        ('Mike: What is your favorite color?', 'Steve: My favorite color is purple.'),
+        ('Name the inner planets.', 'It was the best of times, it was the worst of times.'),
+    ]
+    prob = model.predict(sentences)
+    print(prob)
 
 ## Use in GoodAI's AI game
 
@@ -212,12 +233,22 @@ experience during game play.
 We're interested in retrieval of relatively short 
 passages (one to a few sentences) using conversational
 queries that may be found in a chat. To this end we've developed
-an evaluation using datasets (TODO). Results are shown
-in the following table.
+an evaluation based on datasets [QReCC](https://github.com/apple/ml-qrecc),
+[StrategyQA](https://allenai.org/data/strategyqa), and
+[MS MARCO](https://microsoft.github.io/msmarco/). 
+Results in the following table show top-1, top-3 and top-10
+retrieval accuracy for each dataset.
 
-Model | ds@1 | ds@3 | ds@10
------ | ---- | ---- | -----
-example | 00.00 | 00.00 | 00.00
+<font size=2>
+
+Model | qrecc@1 | qrecc@3 | qrecc@10 | strategyqa@1 | strategyqa@3 | strategyqa@10 | msmarco@1 | msmarco@3 | msmarco@10
+----- | ------- | ------- | -------- | ------------ | ------------ | ------------- | --------- | --------- | ----------
+st/multi-qa-mpnet-base-cos-v1 | 56.66 | 74.95 | 82.42 | 57.70 | 79.75 | 91.25 | 64.71 | 75.00 | 82.85 | 
+
+</font>
+
+## Evaluation of query-passage matching models
+
 
 
 ## Future plans

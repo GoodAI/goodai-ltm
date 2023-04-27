@@ -1,5 +1,5 @@
 import gc
-from typing import List, Union, Any, Callable, Set, Optional
+from typing import List, Union, Any, Callable, Set, Optional, Tuple
 import numpy as np
 import torch
 from faiss import Index
@@ -79,10 +79,8 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
     def get_retrieval_key_for_text(self, queries: List[str], show_progress_bar: bool = False) -> torch.Tensor:
         return self.emb_model.encode_queries(queries, convert_to_tensor=True, show_progress_bar=show_progress_bar)
 
-    def get_match_probabilities(self, query: str, passages: List[str]) -> List[float]:
-        if self.matching_model is None:
-            raise SystemError('No query-passage match probability model available')
-        return self.matching_model.get_match_confidence(query, passages)
+    def predict_match(self, sentences: List[Tuple[str, str]], show_progress_bar: bool = False) -> List[float]:
+        return self.matching_model.predict(sentences, show_progress_bar=show_progress_bar)
 
     def add_text(self, text: str, metadata: Optional[Any] = None, rewrite: bool = False,
                  rewrite_context: Optional[str] = None):

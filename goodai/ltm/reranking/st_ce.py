@@ -12,5 +12,5 @@ class SentenceTransformerTextMatchingModel(BaseTextMatchingModel):
     def predict(self, sentences: List[Tuple[str, str]], batch_size: int = 32,
                 show_progress_bar: bool = False) -> List[float]:
         results = self.ce.predict(sentences, batch_size=batch_size, show_progress_bar=show_progress_bar,
-                                  convert_to_tensor=False, convert_to_numpy=False)
-        return results
+                                  convert_to_tensor=True, convert_to_numpy=False)
+        return results.tolist()
