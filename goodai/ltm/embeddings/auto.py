@@ -16,6 +16,8 @@ _pretrained_map = {
     'p3-distilroberta': f'{_models_base}/goodai-ltm-emb-model-p3-1062',
     'p3-reserved-01': f'{_models_base}/goodai-ltm-emb-model-p3-1064',
     'p3-reserved-02': f'{_models_base}/goodai-ltm-emb-model-p3-1067',
+    'p1-reserved-03': f'{_models_base}/goodai-ltm-emb-model-p1-1068',
+    'p1-reserved-04': f'{_models_base}/goodai-ltm-emb-model-p1-1069',
 }
 
 

@@ -1,5 +1,6 @@
 import codecs
 import hashlib
+import logging
 import os
 import tempfile
 import zipfile
@@ -48,10 +49,12 @@ def url_as_file(url) -> str:
     # Convert the URL to a valid file name
     url_parts = urlparse(url)
     url_hash = hashlib.md5(url.encode('utf-8')).hexdigest()
-    file_name = os.path.join(_cache_dir, url_hash + '_' + os.path.basename(url_parts.path))
+    base_name = os.path.basename(url_parts.path)
+    file_name = os.path.join(_cache_dir, url_hash + '_' + base_name)
     progress_fn = file_name + '-in-progress'
 
     if not os.path.exists(file_name) or os.path.exists(progress_fn):
+        logging.info(f'Downloading {url}')
         with urllib.request.urlopen(url) as url_file:
             with open(progress_fn, 'w') as fd:
                 fd.write('.')
@@ -67,4 +70,6 @@ def url_as_file(url) -> str:
                     local_file.write(chunk)
                     progress_bar.update(len(chunk))
             os.remove(progress_fn)
+    else:
+        logging.info(f'Found cached version of {url}')
     return file_name
