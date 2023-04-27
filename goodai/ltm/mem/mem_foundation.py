@@ -52,7 +52,7 @@ class BaseTextMemoryFoundation(BaseTextMemory):
     def get_metadata(self, chunk_id: int) -> Optional[Any]:
         pass
 
-    def _retrieve(self, query: str, flat_distances: np.ndarray, flat_indexes: np.ndarray,
+    def _retrieve(self, query: str, rewrite: bool, flat_distances: np.ndarray, flat_indexes: np.ndarray,
                   expected_key_db_top_k: int, k: int) -> List[RetrievedMemory]:
         # TODO optimize matching batch
         # distances, indexes: (batch_size, downstream_top_k)
@@ -89,7 +89,7 @@ class BaseTextMemoryFoundation(BaseTextMemory):
                                           confidence=confidence, metadata=metadata))
         return result
 
-    def retrieve_multiple(self, queries: List[str], k: int = 1, mm_multiplier: int = 10,
+    def retrieve_multiple(self, queries: List[str], k: int = 1, rewrite: bool = False, mm_multiplier: int = 10,
                           show_progress_bar: bool = False) -> List[List[RetrievedMemory]]:
         rk = self.get_retrieval_key_for_text(queries, show_progress_bar=show_progress_bar)
         batch_size, num_rk, emb_size = rk.size(0), rk.size(1), rk.size(2),
@@ -112,6 +112,6 @@ class BaseTextMemoryFoundation(BaseTextMemory):
         for i in rng:
             flat_distances = distances[i]
             flat_indexes = indexes[i]
-            single_result = self._retrieve(queries[i], flat_distances, flat_indexes, expected_key_db_top_k, k)
+            single_result = self._retrieve(queries[i], rewrite, flat_distances, flat_indexes, expected_key_db_top_k, k)
             result.append(single_result)
         return result
