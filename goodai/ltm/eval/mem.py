@@ -1,4 +1,5 @@
 import abc
+import logging
 from abc import ABC
 from dataclasses import dataclass
 from typing import List, Dict, Tuple
@@ -96,8 +97,11 @@ class BaseMemEvaluator(ABC):
         k = max(self.top_ks)
         retrieved = memory.retrieve_multiple(queries, k=k, show_progress_bar=True)
         top_k_map: Dict[int, int] = dict()
-        for s_retrieved, s_supports in tqdm(zip(retrieved, supports), desc='Comparison', unit='scenario'):
+        for q, s_retrieved, s_supports in tqdm(zip(queries, retrieved, supports), desc='Comparison', unit='scenario'):
             s_retrieved_texts = [r.passage for r in s_retrieved]
+            if len(s_retrieved_texts) == 0:
+                logging.warning(f'No memories retrieved with query "{q}"')
+                continue
             correctness_values = self.cross_max_correctness(s_retrieved_texts, s_supports)
             for top_k in self.top_ks:
                 selected_cv = correctness_values[:top_k]
