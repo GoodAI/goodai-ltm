@@ -1,6 +1,11 @@
 ## GoodAI-LTM
-Long-term memory is  increasingly recognized as an essential component in applications powered by large language models 
+Long-term memory (LTM) is  increasingly recognized as an essential component in applications powered by large language models 
 (LLMs). 
+
+Among the benefits of LTM is the possibility of continual learning. This is the ability to accumulate knowledge over time,
+possibly over the agent's entire lifetime. As their knowledge builds incrementally, agents can leverage learned skills
+to acquire increasingly complex abilities. Continual learning helps make agents robust against distributional drift, more capable 
+of continuous adaptation, and more human-like.
 
 GoodAI-LTM brings together all the components necessary for equipping agents with text-based long term memory. 
 This includes text embedding models, reranking, vector databases, chunking, metadata such as time stamps and 
@@ -135,7 +140,72 @@ the following properties:
 * `confidence`: If a query-passage matching model is available, this is the probability assigned by the model.
 * `metadata`: Metadata associated with the retrieved text, if any.
 
+## Detailed example
+
+For a slightly more detailed view of how the memory works, let us revisit the storage and retrieval of text passages.
+
+    text_example = """\
+    Jake Morales: Hey Archie, what do you think about teaming up with me and Isaac Coax? 
+    We could come up with a plan that would distract Lucas Fern.
+    Archie: That would be great. Thanks for helping me out."""
+
+To store this text, we create an instance of the default memory class and add the text to it.
+
+    mem = AutoTextMemory.create()
+    mem.add_text(text_example)
+    
+The text is encoded by the tokenizer as token ids.
+
+    [39568, 17989, 35, 11468, 25261, 6, 99, 109, 47, 206, 59, 165, 154, 62, 19, 162, 8, 
+     12370, 944, 3631, 116, 166, 115, 283, 62, 19, 10, 563, 14, 74, 21943, 7895, 21572, 4, 50118, 8138, 
+     17309, 35, 280, 74, 28, 372, 4, 4557, 13, 1903, 162, 66, 4]
+
+The tokenized text is split into overlapping chunks that are recorded in a chunk queue. The chunk queue holds the complete token 
+sequence and for each chunk, the indexes of the starting and ending token. 
+
+	0 = {Chunk} <goodai.ltm.mem.chunk.Chunk object at 0x7fb2716e5a00>
+	 capacity = {int} 24
+	 from_token_seq_id = {int} 0
+	 index = {int} 0
+	 indexed = {bool} False
+	 metadata = {NoneType} None
+	 to_token_seq_id = {int} 24
+	1 = {Chunk} <goodai.ltm.mem.chunk.Chunk object at 0x7fb2704194c0>
+	 capacity = {int} 24
+	 from_token_seq_id = {int} 12
+	 index = {int} 1
+	 indexed = {bool} False
+	 metadata = {NoneType} None
+	 to_token_seq_id = {int} 36
+	 
+	 ...
+
+The embedding model converts each chunk into a high-dimensional vector, e.g., a unit vector of dimension 768. 
+The embeddings, and the corresponding chunk indexes, are added to the vector database.
+
+The passages are now represented in memory as pairs of vectors and chunk indexes in the vector database and as 
+sequences of tokens in the chunk queue. From the token sequences, the text can be recovered.
+
+During retrieval, the stored embeddings closest to the query embedding are found and the corresponding texts 
+decoded.
+
+In addition to the steps above, it is also possible to rewrite queries and memories and to perform passage 
+reranking after retrieval. 
+
+The diagrams below illustrate what happens during storage and retrieval (sans optional query and memory rewriting).
+
+![Storage](diagram-all-50.png)
+
+
 ## Architecture
+
+## Use in GoodAI's AI game
+
+An early application of GoodAI-LTM is in GoodAI's forthcoming AI game. LLMs are used to shape NPC behavior and to 
+generate dialog. Long-term memory is used to provide characters with backstories and allows them to accumulate 
+experience during game play. 
+
+![AI-game](game-screenshot-25.png)
 
 ## Evaluation of embedding models
 
@@ -156,4 +226,5 @@ We will continue to improve GoodAI-LTM. Possible next steps include
 * Retrieval weighted by recency and importance
 * Embeddings for source code retrieval
 * Storage and retrieval methods without embeddings
+* Improvements to the currently experimental query and memory rewriting feature and its default prompts
 * Iterating on improvements to our datasets and models
