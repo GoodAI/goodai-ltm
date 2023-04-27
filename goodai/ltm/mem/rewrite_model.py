@@ -85,10 +85,37 @@ class BaseRewriteModel(ABC):
 
     @abstractmethod
     def rewrite_query(self, query: str) -> str:
+        """
+        Rewrite a query to disambiguate it and make it more self-contained.
+
+        For example, the input
+
+            John: People differ in their appreciation of ice cream.
+            Mary: Do you like it?
+
+        can be rewritten as
+
+            Does John like ice cream?
+
+        :param query: Query preceded by some context
+        :return: Rewritten query
+        """
+
         pass
 
     @abstractmethod
     def rewrite_memory(self, passage: str, context: str) -> str:
+        """
+        Rewrite a passage to disambiguate it and make it more self-contained.
+
+        For example, the passage "Mary: I like it!" together with the context
+        "People differ in their appreciation of ice cream." can be rewritten as "Mary likes ice cream".
+
+        :param passage: The memory to be rewritten
+        :param context: Context that helps disambiguate the memory
+        :return: Rewritten memory
+        """
+
         pass
 
 
