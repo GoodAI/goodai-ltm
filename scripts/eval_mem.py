@@ -23,23 +23,23 @@ class EvalSpec:
 if __name__ == '__main__':
     device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
     torch.manual_seed(1001)
-    top_ks = [1, 3, 10]
+    top_ks = [3, 10]
     tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/all-distilroberta-v1')
     # datasets = ["qp_squad_v2"]  # "['msmarco']  # ['qrecc', 'strategyqa']
     # datasets = ['msmarco']
-    datasets = ['qrecc']
-    # datasets = ['qrecc', 'strategyqa', 'msmarco']
+    # datasets = ['qrecc']
+    datasets = ['qrecc', 'strategyqa', 'msmarco']
     eval_specs: List[EvalSpec] = [
         # EvalSpec('st/all-distilroberta-v1', 'st:sentence-transformers/all-distilroberta-v1', None,
         #          maxQueryTokens=40, hasQueryNoise=True),
         # EvalSpec('p4-distilroberta', 'p4-distilroberta', None,
         #          maxQueryTokens=40, hasQueryNoise=True),
-        EvalSpec('st/multi-qa-mpnet-base-cos-v1', 'st:sentence-transformers/multi-qa-mpnet-base-cos-v1',
-                 chunkCapacity=24),
-
-        # EvalSpec('st/stsb-distilroberta-base', 'st:sentence-transformers/multi-qa-mpnet-base-cos-v1',
-        #          matchingModelName='st:cross-encoder/stsb-distilroberta-base',
+        # EvalSpec('st/multi-qa-mpnet-base-cos-v1', 'st:sentence-transformers/multi-qa-mpnet-base-cos-v1',
         #          chunkCapacity=24),
+
+        EvalSpec('st/stsb-distilroberta-base', 'st:sentence-transformers/multi-qa-mpnet-base-cos-v1',
+                 matchingModelName='st:cross-encoder/stsb-distilroberta-base',
+                 chunkCapacity=24),
 
         # EvalSpec('st/sentence-t5-large', 'st:sentence-transformers/sentence-t5-large', None,
         #          maxQueryTokens=40, hasQueryNoise=True),
