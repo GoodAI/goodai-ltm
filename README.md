@@ -240,9 +240,11 @@ Results in the following table show top-1, top-3 and top-10
 retrieval accuracy for each dataset.
 
 <font size=2>
+
 Model | qrecc@1 | qrecc@3 | qrecc@10 | strategyqa@1 | strategyqa@3 | strategyqa@10 | msmarco@1 | msmarco@3 | msmarco@10
 ----- | ------- | ------- | -------- | ------------ | ------------ | ------------- | --------- | --------- | ----------
 st/multi-qa-mpnet-base-cos-v1 | 56.66 | 74.95 | 82.42 | 57.70 | 79.75 | 91.25 | 64.71 | 75.00 | 82.85 | 
+
 </font>
 
 ## Evaluation of query-passage matching models
