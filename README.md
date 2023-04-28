@@ -28,19 +28,6 @@ retrieving source code.
 
     pip install goodai-ltm
 
-
-## Quick start
-
-    from goodai.ltm.mem.auto import AutoTextMemory
-
-    mem = AutoTextMemory.create()
-    mem.add_text("Lorem ipsum dolor sit amet, consectetur adipiscing elit\n")
-    mem.add_text("Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore\n",
-                 metadata={'timestamp': '2023-04-19', 'type': 'generic'})
-    r_memories = mem.retrieve(query='dolorem eum fugiat quo voluptas nulla pariatur?', k=3)
-    for r_mem in r_memories:
-        print(r_mem)
-
 ## Loading a text memory instance
 
 A default memory instance can be created as follows:
@@ -51,20 +38,25 @@ A default memory instance can be created as follows:
 
 You can also configure the memory by passing parameters to the `create` method.
 In the following example, the memory uses a "gpt2" tokenizer
-for chunking, a T5 model for embeddings, and a 
-FAISS index for embedding storage instead of a simple vector 
-database.
+for chunking, a T5 model for embeddings, a 
+FAISS index for embedding storage instead of a simple vector
+database, and a custom chunking configuration.
 
+    import torch
+    from transformers import AutoTokenizer
+    from goodai.ltm.embeddings.auto import AutoTextEmbeddingModel
+    from goodai.ltm.mem.auto import AutoTextMemory
+    from goodai.ltm.mem.config import TextMemoryConfig
+    from goodai.ltm.mem.mem_foundation import VectorDbType
+    
     tok = AutoTokenizer.from_pretrained('gpt2')
     config = TextMemoryConfig()
     config.chunk_capacity = 30  # tokens
     config.queue_capacity = 10000  # chunks
     em = AutoTextEmbeddingModel.from_pretrained('st:sentence-transformers/sentence-t5-base')
-    vector_size = em.get_embedding_dim()
-    faiss_index = faiss.IndexIDMap(faiss.IndexFlatL2(vector_size))
     mem = AutoTextMemory.create(emb_model=em,
                                 matching_model=None, tokenizer=tok,
-                                vector_db=faiss_index, config=config,
+                                vector_db_type=VectorDbType.FAISS_FLAT_L2, config=config,
                                 device=torch.device('cuda:0'))
 
 ## Text memory usage

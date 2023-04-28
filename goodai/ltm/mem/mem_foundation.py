@@ -1,10 +1,10 @@
 import abc
+import enum
 from typing import List, Union, Any, Set, Optional, Tuple
 
 import faiss
 import numpy as np
 import torch
-from tqdm import tqdm
 from transformers import PreTrainedTokenizer
 
 from goodai.helpers.collections_helper import remove_duplicates, num_visited_to_get_expected_count, \
@@ -16,18 +16,32 @@ from goodai.ltm.mem.simple_vector_db import SimpleVectorDb
 _vector_db_type = Union[faiss.Index, SimpleVectorDb]
 
 
+class VectorDbType(enum.Enum):
+    SIMPLE = 0,
+    FAISS_FLAT_L2 = 1,
+
+
 class BaseTextMemoryFoundation(BaseTextMemory):
-    def __init__(self, vector_db: _vector_db_type, tokenizer: PreTrainedTokenizer, has_match_prob_model: bool,
-                 num_storage_embeddings: int,
+    def __init__(self, vector_db_type: VectorDbType, tokenizer: PreTrainedTokenizer, has_match_prob_model: bool,
+                 num_storage_embeddings: int, emb_dim: int,
                  device: torch.device, adjacent_chunks_ok: bool):
         super().__init__()
         self.num_storage_embeddings = num_storage_embeddings
         self.has_match_prob_model = has_match_prob_model
-        self.vector_db = vector_db
+        self.vector_db = self.create_vector_db(vector_db_type, emb_dim)
         self.adjacent_chunks_ok = adjacent_chunks_ok
         self.device = device
         self.em_tokenizer = tokenizer
         self.punctuation_ids = get_sentence_punctuation_ids(self.em_tokenizer, include_line_break=False)
+
+    @staticmethod
+    def create_vector_db(vector_db_type: VectorDbType, emb_dim: int) -> _vector_db_type:
+        if vector_db_type == VectorDbType.SIMPLE:
+            return SimpleVectorDb()
+        elif vector_db_type == VectorDbType.FAISS_FLAT_L2:
+            return faiss.IndexIDMap(faiss.IndexFlatL2(emb_dim))
+        else:
+            raise ValueError(f'Unrecognized vector DB type: {vector_db_type}')
 
     def get_tokenizer(self):
         return self.em_tokenizer

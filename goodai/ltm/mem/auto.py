@@ -1,11 +1,19 @@
+import enum
 import torch
-from transformers import AutoTokenizer
-
+from typing import Union
+from transformers import AutoTokenizer, PreTrainedTokenizer
 from goodai.ltm.embeddings.auto import AutoTextEmbeddingModel
+from goodai.ltm.embeddings.base import BaseTextEmbeddingModel
 from goodai.ltm.mem.base import BaseTextMemory
 from goodai.ltm.mem.config import TextMemoryConfig
 from goodai.ltm.mem.default import DefaultTextMemory
-from goodai.ltm.mem.simple_vector_db import SimpleVectorDb
+from goodai.ltm.mem.mem_foundation import VectorDbType
+from goodai.ltm.mem.rewrite_model import BaseRewriteModel
+from goodai.ltm.reranking.base import BaseTextMatchingModel
+
+
+class MemType(enum.Enum):
+    TRANSIENT_CHUNKED = 0
 
 
 class AutoTextMemory:
@@ -14,20 +22,24 @@ class AutoTextMemory:
     """
 
     @staticmethod
-    def create(**kwargs) -> BaseTextMemory:
-        new_kwargs = dict(kwargs)
-        if 'vector_db' not in new_kwargs:
-            new_kwargs['vector_db'] = SimpleVectorDb()
-        if 'tokenizer' not in new_kwargs:
-            new_kwargs['tokenizer'] = AutoTokenizer.from_pretrained('sentence-transformers/all-distilroberta-v1')
-        if 'emb_model' not in new_kwargs:
-            # TODO use our own
-            new_kwargs['emb_model'] = AutoTextEmbeddingModel.from_pretrained('st:sentence-transformers/all-distilroberta-v1')
-        if 'matching_model' not in new_kwargs:
-            # TODO use our own
-            new_kwargs['matching_model'] = None
-        if 'device' not in new_kwargs:
-            new_kwargs['device'] = torch.device('cpu')
-        if 'config' not in new_kwargs:
-            new_kwargs['config'] = TextMemoryConfig()
-        return DefaultTextMemory(**new_kwargs)
+    def create(mem_type: MemType = MemType.TRANSIENT_CHUNKED,
+               vector_db_type: VectorDbType = VectorDbType.SIMPLE,
+               tokenizer: PreTrainedTokenizer = None,
+               emb_model: BaseTextEmbeddingModel = None,
+               matching_model: BaseTextMatchingModel = None,
+               memory_rewrite_model: BaseRewriteModel = None,
+               device: Union[torch.device, str] = None,
+               config: TextMemoryConfig = None
+               ) -> BaseTextMemory:
+        if tokenizer is None:
+            tokenizer = AutoTokenizer.from_pretrained('distilroberta-base')
+        if device is None:
+            device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
+        if emb_model is None:
+            emb_model = AutoTextEmbeddingModel.from_pretrained('st:sentence-transformers/all-distilroberta-v1',
+                                                               device=device)
+        if config is None:
+            config = TextMemoryConfig()
+        return DefaultTextMemory(vector_db_type, tokenizer, emb_model, matching_model,
+                                 device=device, config=config,
+                                 memory_rewrite_model=memory_rewrite_model)

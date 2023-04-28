@@ -4,6 +4,7 @@ import torch
 from transformers import AutoTokenizer
 from goodai.ltm.embeddings.auto import AutoTextEmbeddingModel
 from goodai.ltm.eval.auto import AutoMemEvaluator
+from goodai.ltm.mem.mem_foundation import VectorDbType
 from goodai.ltm.reranking.auto import AutoTextMatchingModel
 from goodai.ltm.mem.config import TextMemoryConfig
 from goodai.ltm.mem.default import DefaultTextMemory
@@ -26,20 +27,20 @@ if __name__ == '__main__':
     top_ks = [3, 10]
     tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/all-distilroberta-v1')
     # datasets = ["qp_squad_v2"]  # "['msmarco']  # ['qrecc', 'strategyqa']
-    # datasets = ['msmarco']
+    datasets = ['msmarco']
     # datasets = ['qrecc']
-    datasets = ['qrecc', 'strategyqa', 'msmarco']
+    # datasets = ['qrecc', 'strategyqa', 'msmarco']
     eval_specs: List[EvalSpec] = [
         # EvalSpec('st/all-distilroberta-v1', 'st:sentence-transformers/all-distilroberta-v1', None,
         #          maxQueryTokens=40, hasQueryNoise=True),
         # EvalSpec('p4-distilroberta', 'p4-distilroberta', None,
         #          maxQueryTokens=40, hasQueryNoise=True),
-        # EvalSpec('st/multi-qa-mpnet-base-cos-v1', 'st:sentence-transformers/multi-qa-mpnet-base-cos-v1',
-        #          chunkCapacity=24),
-
-        EvalSpec('st/stsb-distilroberta-base', 'st:sentence-transformers/multi-qa-mpnet-base-cos-v1',
-                 matchingModelName='st:cross-encoder/stsb-distilroberta-base',
+        EvalSpec('st/multi-qa-mpnet-base-cos-v1', 'st:sentence-transformers/multi-qa-mpnet-base-cos-v1',
                  chunkCapacity=24),
+
+        # EvalSpec('st/stsb-distilroberta-base', 'st:sentence-transformers/multi-qa-mpnet-base-cos-v1',
+        #          matchingModelName='st:cross-encoder/stsb-distilroberta-base',
+        #          chunkCapacity=24),
 
         # EvalSpec('st/sentence-t5-large', 'st:sentence-transformers/sentence-t5-large', None,
         #          maxQueryTokens=40, hasQueryNoise=True),
@@ -68,8 +69,7 @@ if __name__ == '__main__':
         for dataset in datasets:
             print(f'Evaluation of {spec.id} on {dataset}...')
             # Each dataset-model needs its own memory object
-            vector_db = SimpleVectorDb()
-            mem = DefaultTextMemory(vector_db, tokenizer, emb_model, matching_model,
+            mem = DefaultTextMemory(VectorDbType.SIMPLE, tokenizer, emb_model, matching_model,
                                     device=device, config=config)
             evaluator = AutoMemEvaluator.create(dataset, tokenizer, top_ks, max_query_tokens, has_query_noise)
             results = evaluator.evaluate(mem)

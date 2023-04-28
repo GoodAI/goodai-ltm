@@ -12,14 +12,14 @@ from goodai.ltm.mem.rewrite_model import BaseRewriteModel
 from goodai.ltm.reranking.base import BaseTextMatchingModel
 from goodai.ltm.mem.chunk_queue import ChunkQueue, BaseChunkQueue
 from goodai.ltm.mem.config import TextMemoryConfig
-from goodai.ltm.mem.mem_foundation import BaseTextMemoryFoundation
+from goodai.ltm.mem.mem_foundation import BaseTextMemoryFoundation, VectorDbType
 from goodai.ltm.mem.simple_vector_db import SimpleVectorDb
 
 _vector_db_type = Union[Index, SimpleVectorDb]
 
 
 class DefaultTextMemory(BaseTextMemoryFoundation):
-    def __init__(self, vector_db: _vector_db_type, tokenizer: PreTrainedTokenizer,
+    def __init__(self, vector_db_type: VectorDbType, tokenizer: PreTrainedTokenizer,
                  emb_model: BaseTextEmbeddingModel, matching_model: Optional[BaseTextMatchingModel],
                  device: torch.device, config: TextMemoryConfig,
                  chunk_queue_fn: Callable[[], BaseChunkQueue] = None,
@@ -39,13 +39,13 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
         self.pad_token_id = get_pad_token_id(self.em_tokenizer)
         self.punctuation_ids = get_sentence_punctuation_ids(self.em_tokenizer, include_line_break=False)
         self.chunk_queue: BaseChunkQueue = chunk_queue_fn()
-        self.vector_db = vector_db
         has_matching_model = self.matching_model is not None
         self.query_rewrite_model = query_rewrite_model
         self.memory_rewrite_model = memory_rewrite_model
-
-        super().__init__(vector_db, self.em_tokenizer, has_matching_model,
-                         self.emb_model.get_num_storage_embeddings(), device, config.adjacent_chunks_ok)
+        super().__init__(vector_db_type, self.em_tokenizer, has_matching_model,
+                         self.emb_model.get_num_storage_embeddings(),
+                         self.emb_model.get_embedding_dim(),
+                         device, config.adjacent_chunks_ok)
 
     def get_tokenizer(self):
         return self.em_tokenizer
