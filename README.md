@@ -249,7 +249,16 @@ st/multi-qa-mpnet-base-cos-v1 | 56.66 | 74.95 | 82.42 | 57.70 | 79.75 | 91.25 | 
 
 ## Evaluation of query-passage matching models
 
+We also evaluated a memory with a fixed embedding model (st:sentence-transformers/multi-qa-mpnet-base-cos-v1)
+and different query-passage matching/reranking models.
 
+<font size=2>
+
+Model | qrecc@3 | qrecc@10 | strategyqa@3 | strategyqa@10 | msmarco@3 | msmarco@10
+----- | ------- | -------- | ------------ | ------------- | --------- | ----------
+st/stsb-distilroberta-base | 67.41 | 78.28 | 69.45 | 87.85 | 54.69 | 69.86 |
+
+</font>
 
 ## Future plans
 
