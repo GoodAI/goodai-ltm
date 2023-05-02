@@ -19,8 +19,8 @@ class DefaultEmbeddingModel(TrainableEmbeddingModel):
 
     def __init__(self, lang_model: PreTrainedModel, tokenizer: PreTrainedTokenizer,
                  num_retrieval_emb: int, num_storage_emb: int,
-                 num_end_chars_lb_ignore=18, dropout=0.03):
-        super(DefaultEmbeddingModel, self).__init__(tokenizer)
+                 num_end_chars_lb_ignore=18, inner_size=30, dropout=0.03):
+        super(AltEmbeddingModel, self).__init__(tokenizer)
         lb_token_ids = tokenizer.encode('\n', add_special_tokens=False)
         valid_lb_token_id = len(lb_token_ids) == 1
         if not valid_lb_token_id:
@@ -37,7 +37,11 @@ class DefaultEmbeddingModel(TrainableEmbeddingModel):
         out_size = num_retrieval_emb + num_storage_emb
         self.out_model = nn.Sequential(
             nn.Dropout(p=dropout),
-            nn.Linear(hidden_size, out_size),
+            nn.Linear(hidden_size, inner_size),
+            nn.ELU(),
+            nn.LayerNorm(inner_size),
+            nn.Dropout(p=dropout),
+            nn.Linear(inner_size, out_size),
         )
         self.dummy = nn.Parameter()
 
