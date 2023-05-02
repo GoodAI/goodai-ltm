@@ -217,8 +217,6 @@ class QAQueryPassageDataSource(BaseQueryPassageDataSource):
                     passage_tok_entry = pos_tok_entry
             passage_token_ids = self.get_passage_token_ids(passage_tok_entry, is_match, non_answer, nqn)
             if passage_token_ids is None:
-                if is_match:
-                    logging.warning(f'No good passage excerpt in example with id {pos_tok_entry.e_id}')
                 if is_match or non_answer:
                     pos_index = r.randint(0, n)
                 continue

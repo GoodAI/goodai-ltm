@@ -14,7 +14,8 @@ class QueryPassageDataset(Dataset):
         tokenizer: PreTrainedTokenizer,
         num_examples: int,
         device: torch.device,
-        add_special_tokens: bool = True
+        add_special_tokens: bool = True,
+        approx_positive_fraction: float = 0.5,
     ):
         super().__init__()
         weight_sum = sum(w for _, w in data_sources)
@@ -36,7 +37,7 @@ class QueryPassageDataset(Dataset):
         for i, (ds, weight) in enumerate(data_sources):
             w = weight / weight_sum
             n = round(num_examples * w)
-            items = ds.sample_items(n)
+            items = ds.sample_items(n, approx_positive_fraction=approx_positive_fraction)
             for item in items:
                 query_list.append(item.queryIds)
                 passage_list.append(item.passageIds)
