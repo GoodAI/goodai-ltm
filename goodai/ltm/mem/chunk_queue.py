@@ -53,6 +53,14 @@ class BaseChunkQueue(ABC):
     def get_chunk(self, chunk_id: int) -> Chunk:
         pass
 
+    @abstractmethod
+    def get_all_chunks(self) -> List[Chunk]:
+        pass
+
+    @abstractmethod
+    def get_chunk_token_ids(self, chunk: Chunk):
+        pass
+
 
 class ChunkQueue(BaseChunkQueue, ChunkMixin):
     def __init__(self, queue_capacity: int, chunk_capacity: int, first_token_seq_id: int = 0):
@@ -82,6 +90,9 @@ class ChunkQueue(BaseChunkQueue, ChunkMixin):
                 self.token_ids = self.token_ids[num_removed:]
                 self.first_token_seq_id = new_first_token_seq_id
         return chunk
+
+    def get_all_chunks(self) -> List[Chunk]:
+        return list(self.chunks)
 
     def check_overflow(self) -> List[Chunk]:
         removed_chunks = []

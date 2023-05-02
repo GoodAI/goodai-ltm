@@ -1,9 +1,9 @@
 from setuptools import setup, find_namespace_packages
 
-import goodai
-
 packages = find_namespace_packages(include=['goodai.*'])
-version = goodai.__version__
+exec(open('goodai/ltm/version.py').read())
+version = globals()['__version__']
+print(f'Version: {version}')
 
 
 setup(name='goodai-ltm',

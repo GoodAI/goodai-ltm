@@ -69,10 +69,10 @@ Text may consist of phrases, sentences or documents.
 Internally, the memory will chunk and index the text
 automatically.
 
-Text can be associated with an arbitrary metadata object, such as:
+Text can be associated with an arbitrary metadata dictionary, such as:
 
     mem.add_text("Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore\n",
-                 metadata={'timestamp': '2023-04-19', 'type': 'generic'})
+                 metadata={'timestamp': time.time(), 'type': 'generic'})
 
 To retrieve a list of passages associated with a query,
 call the `retrieve` method:
@@ -108,24 +108,16 @@ The text is encoded by the tokenizer as token ids.
      17309, 35, 280, 74, 28, 372, 4, 4557, 13, 1903, 162, 66, 4]
 
 The tokenized text is split into overlapping chunks that are recorded in a chunk queue. The chunk queue holds the complete token 
-sequence and for each chunk, the indexes of the starting and ending token. 
+sequence and for each chunk. 
 
-	0 = {Chunk} <goodai.ltm.mem.chunk.Chunk object at 0x7fb2716e5a00>
-	 capacity = {int} 24
-	 from_token_seq_id = {int} 0
-	 index = {int} 0
-	 indexed = {bool} False
-	 metadata = {NoneType} None
-	 to_token_seq_id = {int} 24
-	1 = {Chunk} <goodai.ltm.mem.chunk.Chunk object at 0x7fb2704194c0>
-	 capacity = {int} 24
-	 from_token_seq_id = {int} 12
-	 index = {int} 1
-	 indexed = {bool} False
-	 metadata = {NoneType} None
-	 to_token_seq_id = {int} 36
-	 
-	 ...
+| Id | Metadata | Content |
+| ----- | -------- | ------- |
+| 0 | {'foo': 'bar'} | "    Jake Morales: Hey Archie, what do you think about teaming up with me and Isaac Coax?" |
+| 1 | {'foo': 'bar'} | " think about teaming up with me and Isaac Coax? \n    We could come up with a plan" |
+| 2 | {'foo': 'bar'} | " \n    We could come up with a plan that would distract Lucas Fern.\n    Archie:" |
+| 3 | {'foo': 'bar'} | " that would distract Lucas Fern.\n    Archie: That would be great. Thanks for helping me out." |
+| 4 | {'foo': 'bar'} | " That would be great. Thanks for helping me out." |
+
 
 The embedding model converts each chunk into a high-dimensional vector, e.g., a unit vector of dimension 768. 
 The embeddings, and the corresponding chunk indexes, are added to the vector database.

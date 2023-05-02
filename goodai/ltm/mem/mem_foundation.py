@@ -1,5 +1,8 @@
 import abc
 import enum
+import io
+import json
+import sys
 from typing import List, Union, Any, Set, Optional, Tuple
 
 import faiss
@@ -11,6 +14,7 @@ from goodai.helpers.collections_helper import remove_duplicates, num_visited_to_
     get_non_adjacent
 from goodai.helpers.tokenizer_helper import get_sentence_punctuation_ids
 from goodai.ltm.mem.base import BaseTextMemory, RetrievedMemory
+from goodai.ltm.mem.chunk import Chunk
 from goodai.ltm.mem.simple_vector_db import SimpleVectorDb
 
 _vector_db_type = Union[faiss.Index, SimpleVectorDb]
@@ -31,8 +35,8 @@ class BaseTextMemoryFoundation(BaseTextMemory):
         self.vector_db = self.create_vector_db(vector_db_type, emb_dim)
         self.adjacent_chunks_ok = adjacent_chunks_ok
         self.device = device
-        self.em_tokenizer = tokenizer
-        self.punctuation_ids = get_sentence_punctuation_ids(self.em_tokenizer, include_line_break=False)
+        self.chunk_tokenizer = tokenizer
+        self.punctuation_ids = get_sentence_punctuation_ids(self.chunk_tokenizer, include_line_break=False)
 
     @staticmethod
     def create_vector_db(vector_db_type: VectorDbType, emb_dim: int) -> _vector_db_type:
@@ -44,7 +48,7 @@ class BaseTextMemoryFoundation(BaseTextMemory):
             raise ValueError(f'Unrecognized vector DB type: {vector_db_type}')
 
     def get_tokenizer(self):
-        return self.em_tokenizer
+        return self.chunk_tokenizer
 
     @abc.abstractmethod
     def retrieve_chunk_sequences(self, chunk_ids: List[int]):
@@ -62,15 +66,34 @@ class BaseTextMemoryFoundation(BaseTextMemory):
         pass
 
     @abc.abstractmethod
-    def get_metadata(self, chunk_id: int) -> Optional[Any]:
+    def get_metadata(self, chunk_id: int) -> Optional[dict]:
         pass
+
+    @abc.abstractmethod
+    def get_all_chunks(self) -> List[Chunk]:
+        pass
+
+    @abc.abstractmethod
+    def get_chunk_text(self, chunk: Chunk) -> str:
+        pass
+
+    def dump(self, stream: io.TextIOBase = sys.stdout):
+        chunks = self.get_all_chunks()
+        stream.write('| Id | Metadata | Content |\n')
+        stream.write('| ----- | -------- | ------- |\n')
+        for chunk in chunks:
+            chunk_text = self.get_chunk_text(chunk)
+            ct_js = json.dumps(chunk_text)
+            stream.write(f'| {chunk.index} | {chunk.metadata} | {ct_js} |')
+            stream.write('\n')
+        stream.flush()
 
     def _retrieve_for_scored_tuples(self, chunk_score_tuples: List[Tuple[float, tuple]], k: int) -> List[RetrievedMemory]:
         has_pm = self.has_match_prob_model
         chunk_score_tuples = chunk_score_tuples[:k]
         final_indexes = [ci for _, (_, ci) in chunk_score_tuples]
         sequences = self.retrieve_complete_sequences(final_indexes, self.punctuation_ids)
-        retrieved_texts = self.em_tokenizer.batch_decode(sequences, skip_special_tokens=True)
+        retrieved_texts = self.chunk_tokenizer.batch_decode(sequences, skip_special_tokens=True)
         result = []
         for cs_tuple, r_text in zip(chunk_score_tuples, retrieved_texts):
             confidence, (distance, chunk_id) = cs_tuple
@@ -97,7 +120,7 @@ class BaseTextMemoryFoundation(BaseTextMemory):
                 prelim_dist_indexes_list.append(row_tuples)
                 prelim_chunk_indexes = [ci for _, ci in row_tuples]
                 chunk_sequences: List[List[int]] = self.retrieve_chunk_sequences(prelim_chunk_indexes)
-                chunk_texts = self.em_tokenizer.batch_decode(chunk_sequences, skip_special_tokens=True)
+                chunk_texts = self.chunk_tokenizer.batch_decode(chunk_sequences, skip_special_tokens=True)
                 for ct in chunk_texts:
                     m_sentences.append((query, ct,))
                     m_indexes.append(i)

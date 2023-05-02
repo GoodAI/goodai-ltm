@@ -2,7 +2,7 @@ from typing import Any, Optional
 
 
 class Chunk:
-    def __init__(self, index: int, capacity: int, from_token_seq_id: int, metadata: Optional[Any]):
+    def __init__(self, index: int, capacity: int, from_token_seq_id: int, metadata: Optional[dict]):
         self.metadata = metadata
         self.index = index
         self.capacity = capacity

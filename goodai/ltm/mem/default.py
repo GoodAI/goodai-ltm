@@ -8,6 +8,7 @@ from transformers import PreTrainedTokenizer
 from goodai.helpers.tokenizer_helper import get_pad_token_id, get_sentence_punctuation_ids
 from goodai.ltm.embeddings.base import BaseTextEmbeddingModel
 from goodai.ltm.mem.base import RetrievedMemory
+from goodai.ltm.mem.chunk import Chunk
 from goodai.ltm.mem.rewrite_model import BaseRewriteModel
 from goodai.ltm.reranking.base import BaseTextMatchingModel
 from goodai.ltm.mem.chunk_queue import ChunkQueue, BaseChunkQueue
@@ -34,21 +35,21 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
         self.device = device
         self.emb_model = emb_model
         self.matching_model = matching_model
-        self.em_tokenizer = tokenizer
+        self.chunk_tokenizer = tokenizer
         self.bucket_capacity = config.chunk_capacity
-        self.pad_token_id = get_pad_token_id(self.em_tokenizer)
-        self.punctuation_ids = get_sentence_punctuation_ids(self.em_tokenizer, include_line_break=False)
+        self.pad_token_id = get_pad_token_id(self.chunk_tokenizer)
+        self.punctuation_ids = get_sentence_punctuation_ids(self.chunk_tokenizer, include_line_break=False)
         self.chunk_queue: BaseChunkQueue = chunk_queue_fn()
         has_matching_model = self.matching_model is not None
         self.query_rewrite_model = query_rewrite_model
         self.memory_rewrite_model = memory_rewrite_model
-        super().__init__(vector_db_type, self.em_tokenizer, has_matching_model,
+        super().__init__(vector_db_type, self.chunk_tokenizer, has_matching_model,
                          self.emb_model.get_num_storage_embeddings(),
                          self.emb_model.get_embedding_dim(),
                          device, config.adjacent_chunks_ok)
 
     def get_tokenizer(self):
-        return self.em_tokenizer
+        return self.chunk_tokenizer
 
     def get_queue_capacity(self):
         return self.chunk_queue.get_capacity()
@@ -61,6 +62,10 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
         if chunk is None:
             return None
         return chunk.metadata
+
+    def get_chunk_text(self, chunk: Chunk) -> str:
+        token_ids = self.chunk_queue.get_chunk_token_ids(chunk)
+        return self.chunk_tokenizer.decode(token_ids, skip_special_tokens=True)
 
     def retrieve_multiple(self, queries: List[str], k: int = 1, rewrite: bool = False, mm_multiplier: int = 10,
                           show_progress_bar: bool = False) -> List[List[RetrievedMemory]]:
@@ -89,7 +94,7 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
         if rewrite and self.memory_rewrite_model:
             text = self.memory_rewrite_model.rewrite_memory(text, rewrite_context)
 
-        token_ids = self.em_tokenizer.encode(text, add_special_tokens=False)
+        token_ids = self.chunk_tokenizer.encode(text, add_special_tokens=False)
         removed_buckets = self.chunk_queue.add_sequence(token_ids, metadata)
         self._ensure_keys_added()
         removed_indexes = [rb.index for rb in removed_buckets]
@@ -98,12 +103,16 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
 
     def retrieve_all_text(self) -> str:
         token_ids = self.chunk_queue.get_latest_token_ids(max_num_tokens=None)
-        return self.em_tokenizer.decode(token_ids, skip_special_tokens=True)
+        return self.chunk_tokenizer.decode(token_ids, skip_special_tokens=True)
 
     def retrieve_all_chunks(self) -> List[str]:
         chunk_list = self.chunk_queue.get_chunk_sequences()
-        tok = self.em_tokenizer
+        tok = self.chunk_tokenizer
         return [tok.decode(seq, skip_special_tokens=True) for seq in chunk_list]
+
+    def get_all_chunks(self) -> List[Chunk]:
+        return self.chunk_queue.get_all_chunks()
+
 
     def _ensure_keys_added(self, batch_size=50):
         picked_chunks, token_id_matrix = self.chunk_queue.get_chunks_for_indexing()
@@ -112,7 +121,7 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
         num_sequences = len(token_id_matrix)
         for i in range(0, num_sequences, batch_size):
             token_id_batch = token_id_matrix[i:i + batch_size]
-            text_batch = self.em_tokenizer.batch_decode(token_id_batch, skip_special_tokens=True)
+            text_batch = self.chunk_tokenizer.batch_decode(token_id_batch, skip_special_tokens=True)
             sk_batch = emb_model.encode_corpus(text_batch, convert_to_tensor=True)
             sk_list.append(sk_batch.detach())
             if num_sequences > batch_size:
