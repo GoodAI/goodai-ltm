@@ -21,7 +21,7 @@ from transformers import AutoModel, AutoTokenizer
 from goodai.ltm.embeddings.default import DefaultEmbeddingModel
 from goodai.ltm.embeddings.emb_qp_prob_model import EmbeddingQueryPassageProbModel
 from goodai.ltm.mem.simple_vector_db import SimpleVectorDb
-from goodai.ltm.training.query_passage.trainer import QPPMTrainer
+from goodai.ltm.training.query_passage.qppm_trainer import QPPMTrainer
 
 load_dotenv()
 _device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')

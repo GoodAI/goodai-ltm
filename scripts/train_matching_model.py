@@ -16,7 +16,7 @@ from goodai.ltm.reranking.default import DefaultRerankingCrossEncoder
 
 from transformers import AutoModel, AutoTokenizer
 
-from goodai.ltm.training.query_passage.trainer import QPPMTrainer
+from goodai.ltm.training.query_passage.qppm_trainer import QPPMTrainer
 
 load_dotenv()
 _device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')

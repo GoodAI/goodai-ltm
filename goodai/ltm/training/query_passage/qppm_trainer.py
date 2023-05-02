@@ -15,7 +15,7 @@ from transformers import PreTrainedTokenizer
 from timeit import default_timer as timer
 
 from goodai.ltm.reranking.prob_model import BaseQueryPassageProbModel
-from goodai.ltm.training.sched_opt import ScheduledOptimizer
+from goodai.helpers.sched_opt import ScheduledOptimizer
 
 
 class QPPMTrainer:
