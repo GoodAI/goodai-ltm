@@ -28,19 +28,6 @@ retrieving source code.
 
     pip install goodai-ltm
 
-
-## Quick start
-
-    from goodai.ltm.mem.auto import AutoTextMemory
-
-    mem = AutoTextMemory.create()
-    mem.add_text("Lorem ipsum dolor sit amet, consectetur adipiscing elit\n")
-    mem.add_text("Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore\n",
-                 metadata={'timestamp': '2023-04-19', 'type': 'generic'})
-    r_memories = mem.retrieve(query='dolorem eum fugiat quo voluptas nulla pariatur?', k=3)
-    for r_mem in r_memories:
-        print(r_mem)
-
 ## Loading a text memory instance
 
 A default memory instance can be created as follows:
@@ -51,20 +38,25 @@ A default memory instance can be created as follows:
 
 You can also configure the memory by passing parameters to the `create` method.
 In the following example, the memory uses a "gpt2" tokenizer
-for chunking, a T5 model for embeddings, and a 
-FAISS index for embedding storage instead of a simple vector 
-database.
+for chunking, a T5 model for embeddings, a 
+FAISS index for embedding storage instead of a simple vector
+database, and a custom chunking configuration.
 
+    import torch
+    from transformers import AutoTokenizer
+    from goodai.ltm.embeddings.auto import AutoTextEmbeddingModel
+    from goodai.ltm.mem.auto import AutoTextMemory
+    from goodai.ltm.mem.config import TextMemoryConfig
+    from goodai.ltm.mem.mem_foundation import VectorDbType
+    
     tok = AutoTokenizer.from_pretrained('gpt2')
     config = TextMemoryConfig()
     config.chunk_capacity = 30  # tokens
     config.queue_capacity = 10000  # chunks
     em = AutoTextEmbeddingModel.from_pretrained('st:sentence-transformers/sentence-t5-base')
-    vector_size = em.get_embedding_dim()
-    faiss_index = faiss.IndexIDMap(faiss.IndexFlatL2(vector_size))
     mem = AutoTextMemory.create(emb_model=em,
                                 matching_model=None, tokenizer=tok,
-                                vector_db=faiss_index, config=config,
+                                vector_db_type=VectorDbType.FAISS_FLAT_L2, config=config,
                                 device=torch.device('cuda:0'))
 
 ## Text memory usage
@@ -77,10 +69,10 @@ Text may consist of phrases, sentences or documents.
 Internally, the memory will chunk and index the text
 automatically.
 
-Text can be associated with an arbitrary metadata object, such as:
+Text can be associated with an arbitrary metadata dictionary, such as:
 
     mem.add_text("Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore\n",
-                 metadata={'timestamp': '2023-04-19', 'type': 'generic'})
+                 metadata={'timestamp': time.time(), 'type': 'generic'})
 
 To retrieve a list of passages associated with a query,
 call the `retrieve` method:
@@ -116,24 +108,16 @@ The text is encoded by the tokenizer as token ids.
      17309, 35, 280, 74, 28, 372, 4, 4557, 13, 1903, 162, 66, 4]
 
 The tokenized text is split into overlapping chunks that are recorded in a chunk queue. The chunk queue holds the complete token 
-sequence and for each chunk, the indexes of the starting and ending token. 
+sequence and for each chunk. 
 
-	0 = {Chunk} <goodai.ltm.mem.chunk.Chunk object at 0x7fb2716e5a00>
-	 capacity = {int} 24
-	 from_token_seq_id = {int} 0
-	 index = {int} 0
-	 indexed = {bool} False
-	 metadata = {NoneType} None
-	 to_token_seq_id = {int} 24
-	1 = {Chunk} <goodai.ltm.mem.chunk.Chunk object at 0x7fb2704194c0>
-	 capacity = {int} 24
-	 from_token_seq_id = {int} 12
-	 index = {int} 1
-	 indexed = {bool} False
-	 metadata = {NoneType} None
-	 to_token_seq_id = {int} 36
-	 
-	 ...
+| Id | Metadata | Content |
+| ----- | -------- | ------- |
+| 0 | {'foo': 'bar'} | "    Jake Morales: Hey Archie, what do you think about teaming up with me and Isaac Coax?" |
+| 1 | {'foo': 'bar'} | " think about teaming up with me and Isaac Coax? \n    We could come up with a plan" |
+| 2 | {'foo': 'bar'} | " \n    We could come up with a plan that would distract Lucas Fern.\n    Archie:" |
+| 3 | {'foo': 'bar'} | " that would distract Lucas Fern.\n    Archie: That would be great. Thanks for helping me out." |
+| 4 | {'foo': 'bar'} | " That would be great. Thanks for helping me out." |
+
 
 The embedding model converts each chunk into a high-dimensional vector, e.g., a unit vector of dimension 768. 
 The embeddings, and the corresponding chunk indexes, are added to the vector database.

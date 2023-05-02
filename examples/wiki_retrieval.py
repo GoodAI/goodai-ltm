@@ -17,11 +17,15 @@ if __name__ == '__main__':
         parsed_text = mwparserfromhell.parse(article_text)
         plain_text = parsed_text.strip_code()
         mem.add_text(plain_text, metadata={'title': article_title})
-    # query = "Describe the composition of Earth's atmosphere."
-    query = "How does the garbage collector work in Python?"
-    r_memories = mem.retrieve(query, k=5)
-    for i, r_memory in enumerate(r_memories):
-        m = r_memory.metadata
-        title = '' if m is None else m['title']
-        print(f'Memory #{i+1} (title={title}):')
-        print(r_memory.passage)
+    queries = [
+        "Describe the composition of Earth's atmosphere.",
+        "How does the garbage collector work in Python?",
+    ]
+    for query in queries:
+        print(f'\n### Query: {query}')
+        r_memories = mem.retrieve(query, k=5)
+        for i, r_memory in enumerate(r_memories):
+            m = r_memory.metadata
+            title = '' if m is None else m['title']
+            print(f'Memory #{i+1} (title={title}):')
+            print(r_memory.passage)
