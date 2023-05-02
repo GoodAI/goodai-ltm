@@ -107,8 +107,7 @@ The text is encoded by the tokenizer as token ids.
      12370, 944, 3631, 116, 166, 115, 283, 62, 19, 10, 563, 14, 74, 21943, 7895, 21572, 4, 50118, 8138, 
      17309, 35, 280, 74, 28, 372, 4, 4557, 13, 1903, 162, 66, 4]
 
-The tokenized text is split into overlapping chunks that are recorded in a chunk queue. The chunk queue holds the complete token 
-sequence and for each chunk. 
+The tokenized text is split into overlapping chunks that are recorded in a chunk queue.
 
 | Id | Metadata | Content |
 | ----- | -------- | ------- |
