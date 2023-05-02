@@ -205,11 +205,11 @@ representing match probabilities. Example:
 
 ## Use in GoodAI's AI game
 
-An early application of GoodAI-LTM is in GoodAI's forthcoming AI game. LLMs are used to shape NPC behavior and to 
-generate dialog. Long-term memory is used to provide characters with backstories and allows them to accumulate 
-experience during game play. 
+An early application of GoodAI-LTM is in GoodAI's forthcoming [AI Game](https://www.goodai.com/ai-in-games/). 
+LLMs are used to shape NPC behavior and to generate dialog. Long-term memory is used to provide characters 
+with backstories and allows them to accumulate  experience during game play. 
 
-![AI-game](game-screenshot-25.png)
+[![AI-game](game-screenshot-25.png)](https://www.youtube.com/watch?v=xkn0H_iWDEQ)
 
 ## Evaluation of embedding models
 
