@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Dict, Tuple, Iterable
+from typing import List, Dict, Tuple, Iterable, Union
 
 import numpy as np
 from datasets import load_dataset
@@ -27,7 +27,7 @@ class SharcEntry:
         while len(snippet) > 0 and snippet[0] == '#':
             snippet = snippet[1:]
         question_ids = tokenizer.encode(' ' + question, add_special_tokens=False)
-        scenario_ids = tokenizer.encode(scenario, add_special_tokens=False)
+        scenario_ids = tokenizer.encode(' ' + scenario, add_special_tokens=False)
         snippet_ids = tokenizer.encode(snippet, add_special_tokens=False)
         return SharcEntry(question_ids, snippet_ids, scenario_ids)
 
@@ -144,27 +144,33 @@ class SharcQueryPassageDataSource(BaseQueryPassageDataSource):
         else:
             return context_ids
 
-    def sample_item(self, is_match: bool) -> QueryPassageExample:
+    def sample_item(self, pos_index: int, is_match: bool) -> QueryPassageExample:
         r = self.random
-        n = len(self.qa_examples)
-        for attempt in range(100):
-            pos_index = r.randint(0, n)
-            pos_tok_entry = self.get_tokenization(pos_index)
-            query_token_ids, nqn = self.get_query_token_ids(pos_tok_entry)
-            if is_match:
-                passage_tok_entry = pos_tok_entry
-            else:
+        pos_tok_entry = self.get_tokenization(pos_index)
+        query_token_ids, nqn = self.get_query_token_ids(pos_tok_entry)
+        if is_match:
+            passage_tok_entry = pos_tok_entry
+        else:
+            neg_index = None
+            n = len(self.qa_examples)
+            for attempt in range(100):
                 neg_index = r.randint(0, n)
                 if neg_index == pos_index:
                     continue
-                neg_tok_entry = self.get_tokenization(neg_index)
-                passage_tok_entry = neg_tok_entry
-            passage_token_ids = self.get_passage_token_ids(passage_tok_entry)
-            return QueryPassageExample(query_token_ids, passage_token_ids, is_match)
+                break
+            if neg_index is None:
+                raise SystemError('Unable to find suitable example!')
+            neg_tok_entry = self.get_tokenization(neg_index)
+            passage_tok_entry = neg_tok_entry
+        passage_token_ids = self.get_passage_token_ids(passage_tok_entry)
+        return QueryPassageExample(query_token_ids, passage_token_ids, is_match)
 
-        raise SystemError('Unable to find suitable qa_example!')
+    def sample_item_indexes(self, total_items: int, sample_count: int) -> Union[List[int], np.ndarray]:
+        replace = sample_count > total_items
+        return self.random.choice(range(total_items), size=sample_count, replace=replace)
 
     def sample_items(self, count: int, approx_positive_fraction: float = 0.5) -> List[QueryPassageExample]:
         rnd_samples = self.random.uniform(size=count)
+        pos_indexes = self.sample_item_indexes(len(self.qa_examples), count)
         is_match = rnd_samples <= approx_positive_fraction
-        return [self.sample_item(is_match[i]) for i, _ in enumerate(range(count))]
+        return [self.sample_item(pos_indexes[i], is_match[i]) for i, _ in enumerate(range(count))]
