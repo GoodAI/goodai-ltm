@@ -8,7 +8,6 @@ from goodai.ltm.mem.mem_foundation import VectorDbType
 from goodai.ltm.reranking.auto import AutoTextMatchingModel
 from goodai.ltm.mem.config import TextMemoryConfig
 from goodai.ltm.mem.default import DefaultTextMemory
-from goodai.ltm.mem.simple_vector_db import SimpleVectorDb
 
 
 @dataclass
@@ -21,18 +20,27 @@ class EvalSpec:
     chunkCapacity: int = 24
 
 
-_hf_eval_specs = [EvalSpec(mid, mid) for mid in [
+_hf_eval_specs_1 = [EvalSpec(mid, mid) for mid in [
     'st:sentence-transformers/all-distilroberta-v1',
-    'st:sentence-transformers/multi-qa-mpnet-base-cos-v1',
     'st:sentence-transformers/sentence-t5-large',
+]]
+
+_hf_eval_specs_2 = [EvalSpec(mid, mid) for mid in [
+    'st:sentence-transformers/multi-qa-mpnet-base-cos-v1',
     'st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1',
     'st:sentence-transformers/all-mpnet-base-v2',
 ]]
 
-_test_eval_specs = [EvalSpec(mid, mid) for mid in [
-    'st:sentence-transformers/multi-qa-mpnet-base-cos-v1',
+_hf_eval_specs_3 = [EvalSpec(mid, mid) for mid in [
+    'st:sentence-transformers/all-roberta-large-v1',
+    'st:sentence-transformers/sentence-t5-xxl',
 ]]
 
+_goodai_eval_specs = [EvalSpec(mid, mid) for mid in [
+    'em-distilroberta-p1-01',
+    'em-distilroberta-p3-01',
+    'em-MiniLM-p3-01',
+]]
 
 if __name__ == '__main__':
     device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
@@ -42,7 +50,7 @@ if __name__ == '__main__':
     # datasets = ['msmarco']
     # datasets = ['qrecc']
     datasets = ['qrecc', 'strategyqa', 'msmarco']
-    eval_specs: List[EvalSpec] = _test_eval_specs
+    eval_specs: List[EvalSpec] = _goodai_eval_specs
 
     ds_top_ks = [f'{ds_name}@{top_k}' for ds_name in datasets for top_k in top_ks]
     table_out = 'Model | ' + ' | '.join([ds_name for ds_name in ds_top_ks]) + '\n'

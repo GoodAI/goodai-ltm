@@ -34,10 +34,10 @@ class AutoTextMemory:
         """
         Creates a memory instance.
         :param mem_type: Reserved parameter.
-        :param vector_db_type: The type of vector database. Default it VectorDbType.SIMPLE.
+        :param vector_db_type: The type of vector database. Default is VectorDbType.SIMPLE.
         :param tokenizer: A chunking tokenizer. It should be a tokenizer that preserves whitespace and casing.
         :param emb_model: The embedding model.
-        :param matching_model: The query-passage matching model.
+        :param matching_model: An optional query-passage matching model.
         :param memory_rewrite_model: The memory rewrite model.
         :param device: The Pytorch device.
         :param config: The memory configuration.

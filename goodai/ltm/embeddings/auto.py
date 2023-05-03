@@ -24,7 +24,7 @@ class AutoTextEmbeddingModel:
     """
 
     @staticmethod
-    def from_pretrained(name: str, device: Union[str, torch.device] = None) -> BaseTextEmbeddingModel:
+    def from_pretrained(name: str, device: Union[str, torch.device] = None, **kwargs) -> BaseTextEmbeddingModel:
         """
         Makes a pretrained embedding model from a descriptor (name).
 
@@ -54,8 +54,8 @@ class AutoTextEmbeddingModel:
         model_type = name[:colon_idx]
         model_name = name[colon_idx + 1:]
         if model_type == 'st':
-            return SentenceTransformerEmbeddingModel(model_name, device=device)
+            return SentenceTransformerEmbeddingModel(model_name, device=device, **kwargs)
         elif model_type == 'openai':
-            return OpenAIEmbeddingModel(model_name)
+            return OpenAIEmbeddingModel(model_name, device=device, **kwargs)
         else:
             raise ValueError(f'Unknown model type: {model_type}')
