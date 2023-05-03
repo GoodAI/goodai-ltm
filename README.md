@@ -22,11 +22,22 @@ query-passage matching after retrieval.
 * **Vector databases**: We currently provide a light-weight local vector database as well as support for FAISS.
 
 The present emphasis on dialog is also a limitation: The memory is not currently optimized for other uses, such as 
-retrieving source code.
+retrieving source code. See the Future plans section for features that are on our todo list.
 
 ## Installation
 
     pip install goodai-ltm
+
+## Short example
+
+The following code snippet creates an instance of LTM, loads in some text and then retrieves the most relevant text chunks given a query:
+
+    from goodai.ltm.mem.auto import AutoTextMemory
+    mem = AutoTextMemory.create()
+    mem.add_text("Lorem ipsum dolor sit amet, consectetur adipiscing elit\n")
+    mem.add_text("Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore\n",
+                 metadata={'timestamp': time.time(), 'type': 'generic'})
+    r_memories = mem.retrieve(query='dolorem eum fugiat quo voluptas nulla pariatur?', k=3)
 
 ## Loading a text memory instance
 
@@ -49,14 +60,16 @@ database, and a custom chunking configuration.
     from goodai.ltm.mem.config import TextMemoryConfig
     from goodai.ltm.mem.mem_foundation import VectorDbType
     
-    tok = AutoTokenizer.from_pretrained('gpt2')
+    embedding_model = AutoTextEmbeddingModel.from_pretrained('st:sentence-transformers/sentence-t5-base')
+    tokenizer = AutoTokenizer.from_pretrained('gpt2')
     config = TextMemoryConfig()
     config.chunk_capacity = 30  # tokens
     config.queue_capacity = 10000  # chunks
-    em = AutoTextEmbeddingModel.from_pretrained('st:sentence-transformers/sentence-t5-base')
-    mem = AutoTextMemory.create(emb_model=em,
-                                matching_model=None, tokenizer=tok,
-                                vector_db_type=VectorDbType.FAISS_FLAT_L2, config=config,
+    mem = AutoTextMemory.create(emb_model=embedding_model,
+                                matching_model=None, 
+                                tokenizer=tokenizer,
+                                vector_db_type=VectorDbType.FAISS_FLAT_L2, 
+                                config=config,
                                 device=torch.device('cuda:0'))
 
 ## Text memory usage
@@ -74,6 +87,8 @@ Text can be associated with an arbitrary metadata dictionary, such as:
     mem.add_text("Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore\n",
                  metadata={'timestamp': time.time(), 'type': 'generic'})
 
+Internally, the memory concatenates text stored using add_text with any text previously sent to the memory.
+
 To retrieve a list of passages associated with a query,
 call the `retrieve` method:
 
@@ -83,7 +98,7 @@ The `retrieve` method returns a list of objects of type `RetrievedMemory`, conta
 the following properties:
 
 * `passage`: The text of the memory. This corresponds to text found in a matching chunk, but it may be expanded using text from adjacent chunks.
-* `distance`: A distance metric between the query and the chunk passage.
+* `distance`: Calculated distance between the query and the chunk passage.
 * `confidence`: If a query-passage matching model is available, this is the probability assigned by the model.
 * `metadata`: Metadata associated with the retrieved text, if any.
 
@@ -144,8 +159,8 @@ An embedding model is loaded as follows:
 
 The `model_name` can be one of the following:
 
-* A SentenceTransformer (Huggingface), starting with "st:", for example, "st:sentence-transformers/multi-qa-mpnet-base-cos-v1".
-* An OpenAI embedding model name, starting with "openai:", for example, "openai:text-embedding-ada-002".
+* A SentenceTransformer (Huggingface), starting with `"st:"`, for example, `"st:sentence-transformers/multi-qa-mpnet-base-cos-v1"`.
+* An OpenAI embedding model name, starting with `"openai:"`, for example, `"openai:text-embedding-ada-002"`.
 * One of our fine-tuned models:
 
 Name | Base model                                       | Params
@@ -247,6 +262,7 @@ st/stsb-distilroberta-base | 67.41 | 78.28 | 69.45 | 87.85 | 54.69 | 69.86 |
 
 We will continue to improve GoodAI-LTM. Possible next steps include
 * Retrieval weighted by recency and importance
+* Flag for preventing internal text concatenation in mem.add_text()
 * Embeddings for source code retrieval
 * Storage and retrieval methods without embeddings
 * Improvements to the currently experimental query and memory rewriting feature and its default prompts
