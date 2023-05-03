@@ -1,5 +1,5 @@
 import logging
-from typing import List, Dict, Tuple, Iterable
+from typing import List, Dict, Tuple, Iterable, Union
 
 import numpy as np
 from datasets import load_dataset, DatasetDict, Dataset
@@ -192,14 +192,14 @@ class QAQueryPassageDataSource(BaseQueryPassageDataSource):
             return None
         return result
 
-    def sample_item(self, is_match: bool, use_different_p=0.5) -> QueryPassageExample:
+    def sample_item(self, pos_index: int, is_match: bool, use_different_p=0.5) -> QueryPassageExample:
         r = self.random
         n = len(self.qa_examples)
         for attempt in range(100):
-            pos_index = r.randint(0, n)
             pos_tok_entry = self.get_tokenization(pos_index)
             if pos_tok_entry.answer_seq_index == -1:
                 logging.warning(f'Did not find location of answer excerpt in example with id {pos_tok_entry.e_id}')
+                pos_index = r.randint(0, n)
                 continue
             query_token_ids, nqn = self.get_query_token_ids(pos_tok_entry)
             if is_match:
@@ -217,12 +217,19 @@ class QAQueryPassageDataSource(BaseQueryPassageDataSource):
                     passage_tok_entry = pos_tok_entry
             passage_token_ids = self.get_passage_token_ids(passage_tok_entry, is_match, non_answer, nqn)
             if passage_token_ids is None:
+                if is_match or non_answer:
+                    pos_index = r.randint(0, n)
                 continue
             return QueryPassageExample(query_token_ids, passage_token_ids, is_match)
 
         raise SystemError('Unable to find suitable qa_example!')
 
+    def sample_item_indexes(self, total_items: int, sample_count: int) -> Union[List[int], np.ndarray]:
+        replace = sample_count > total_items
+        return self.random.choice(range(total_items), size=sample_count, replace=replace)
+
     def sample_items(self, count: int, approx_positive_fraction: float = 0.5) -> List[QueryPassageExample]:
         rnd_samples = self.random.uniform(size=count)
+        pos_indexes = self.sample_item_indexes(len(self.qa_examples), count)
         is_match = rnd_samples <= approx_positive_fraction
-        return [self.sample_item(is_match[i]) for i, _ in enumerate(range(count))]
+        return [self.sample_item(pos_indexes[i], is_match[i]) for i, _ in enumerate(range(count))]

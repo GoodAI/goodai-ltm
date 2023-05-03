@@ -20,8 +20,10 @@ from transformers import AutoModel, AutoTokenizer
 
 from goodai.ltm.embeddings.default import DefaultEmbeddingModel
 from goodai.ltm.embeddings.emb_qp_prob_model import EmbeddingQueryPassageProbModel
+from goodai.ltm.mem.mem_foundation import VectorDbType
 from goodai.ltm.mem.simple_vector_db import SimpleVectorDb
-from goodai.ltm.training.query_passage.trainer import QPPMTrainer
+from goodai.ltm.training.query_passage.em_trainer import EmbModelTrainer
+from goodai.ltm.training.query_passage.qppm_trainer import QPPMTrainer
 
 load_dotenv()
 _device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
@@ -38,7 +40,7 @@ _data_sources = [
 @click.option('--num-epochs', default=200, type=int, help='The number of epochs')
 @click.option('--save', default=False, type=bool, help='Whether to save the model in S3 bucket', is_flag=True)
 @click.option('--lm-lr', default=3e-6, type=float, help='Learning rate of parameters of pretrained language model')
-@click.option('--extras-lr', default=3e-4, type=float, help='Learning rate of parameters added to model')
+@click.option('--extras-lr', default=2e-4, type=float, help='Learning rate of parameters added to model')
 @click.option('--seed', default=7002, type=int, help='Randomization seed')
 @click.option('--switch-ds-every', default=1, type=int, help='How often (epochs) to switch generated dataset')
 @click.option('--num-ds-examples', default=600, type=int, help='Number of examples in generated dataset')
@@ -64,22 +66,20 @@ def run(model_name: str, batch_size: int, num_epochs: int,
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     emb_model = DefaultEmbeddingModel(lang_model, tokenizer, num_retrieval_embeddings, num_storage_embeddings)
     print(f'Num storage embeddings: {num_storage_embeddings}')
-    model = EmbeddingQueryPassageProbModel(emb_model)
-    model = model.to(_device)
-    num_params = param_count(model)
+    emb_model = emb_model.to(_device)
+    num_params = param_count(emb_model)
     print(f'Num model params: {num_params / 1e+6:.1f} million.')
     random = np.random.RandomState(seed)
     print(f'Will train for {num_epochs} epochs with LR {lm_lr:.4g} [{extras_lr:.4g}] and batch size {batch_size}')
-    trainer = QPPMTrainer(random, tokenizer, num_epochs, switch_ds_every, num_ds_examples,
-                          batch_size, max_query_tokens, min_passage_tokens, max_passage_tokens,
-                          track_validation, lm_lr, extras_lr, _device)
+    trainer = EmbModelTrainer(random, tokenizer, num_epochs, switch_ds_every, num_ds_examples,
+                              batch_size, max_query_tokens, min_passage_tokens, max_passage_tokens,
+                              track_validation, lm_lr, extras_lr, _device)
     for ds_name, weight in _data_sources:
         trainer.add_data_source(ds_name, weight)
-    trainer.train(model)
-    model.eval()
+    trainer.train(emb_model)
+    emb_model.eval()
     matching_model = None
-    vector_db = SimpleVectorDb()
-    memory = DefaultTextMemory(vector_db, tokenizer, emb_model, matching_model, _device, TextMemoryConfig())
+    memory = DefaultTextMemory(VectorDbType.SIMPLE, tokenizer, emb_model, matching_model, _device, TextMemoryConfig())
     # TODO evaluation
     if save:
         del trainer

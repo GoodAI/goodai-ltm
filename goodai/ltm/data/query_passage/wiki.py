@@ -109,6 +109,7 @@ class WikiQueryPassageDataSource(BaseQueryPassageDataSource):
         return passage_ids
 
     def sample_items(self, count: int, approx_positive_fraction: float = 0.5) -> List[QueryPassageExample]:
+        # Note: sampling not suitable for embedding model training
         r = self.random
         result = []
         for i in range(count):

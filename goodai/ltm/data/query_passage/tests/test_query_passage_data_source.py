@@ -12,7 +12,8 @@ class TestQueryPassageDataSource(unittest.TestCase):
     def test_show_examples(self):
         tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained('distilroberta-base')
         random = np.random.RandomState(1)
-        ds_names = ['wikianswers', 'sharc', 'adversarial_qa', 'coqa', 'squad_v2']
+        # ds_names = ['wikianswers', 'sharc', 'adversarial_qa', 'coqa', 'squad_v2']
+        ds_names = ['coqa', 'squad_v2']
         for ds_name in ds_names:
             print(f'Processing {ds_name}...')
             self._show_examples(random, ds_name, tokenizer)
