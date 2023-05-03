@@ -9,6 +9,7 @@ from transformers import PreTrainedModel, PreTrainedTokenizer, PretrainedConfig
 from transformers.modeling_outputs import BaseModelOutput
 
 from goodai.helpers.tokenizer_helper import get_attention_after_token
+from goodai.helpers.torch_helper import param_count
 from goodai.ltm.embeddings.trainable import TrainableEmbeddingModel
 
 
@@ -48,6 +49,10 @@ class DefaultEmbeddingModel(TrainableEmbeddingModel):
     @staticmethod
     def _get_embed_dim(model: PreTrainedModel, lm_config: PretrainedConfig):
         return lm_config.hidden_size
+
+    def get_info(self) -> str:
+        return f'GoodAI-finetuned model | Base: {self.lang_model} | ' \
+               f'Params: {param_count(self)/1e+6:.4g} million | Dimensions: {self.get_embedding_dim()}'
 
     def get_device(self):
         return self.dummy.device

@@ -19,7 +19,9 @@ class OpenAIEmbeddingModel(BaseTextEmbeddingModel):
     https://platform.openai.com/docs/guides/embeddings
     """
 
-    def __init__(self, api_key: str = None, model_name: str = 'text-embedding-ada-002', emb_dim: int = 1536):
+    def __init__(self, model_name: str = 'text-embedding-ada-002', emb_dim: int = 1536, api_key: str = None,
+                 device: Union[torch.Tensor, str] = None):
+        self.device = device
         self.api_key = api_key
         self.emb_dim = emb_dim
         self.model_name = model_name
@@ -33,11 +35,17 @@ class OpenAIEmbeddingModel(BaseTextEmbeddingModel):
     def get_num_storage_embeddings(self) -> int:
         return 1
 
+    def get_info(self) -> str:
+        return f'OpenAI embedding model "{self.model_name}" | Dimensions: {self.emb_dim}'
+
     def encode(self, sentences: List[str], batch_size: int = 64, show_progress_bar: bool = False,
                convert_to_tensor: bool = False,
                device: Union[str, torch.device] = None) -> Union[np.ndarray, torch.Tensor]:
+        if device is None:
+            device = self.device
         with _openai_lock:
-            openai.api_key = self.api_key
+            if self.api_key is not None:
+                openai.api_key = self.api_key
             rng = range(0, len(sentences), batch_size)
             if show_progress_bar:
                 rng = tqdm(rng, desc='Embeddings', unit='batch')

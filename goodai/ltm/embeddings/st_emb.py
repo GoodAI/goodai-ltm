@@ -5,6 +5,8 @@ import torch
 from typing import List, Union
 
 from sentence_transformers import SentenceTransformer
+
+from goodai.helpers.torch_helper import param_count
 from goodai.ltm.embeddings.base import BaseTextEmbeddingModel
 
 _openai_lock = threading.Lock()
@@ -17,8 +19,9 @@ class SentenceTransformerEmbeddingModel(BaseTextEmbeddingModel):
     https://huggingface.co/sentence-transformers
     """
 
-    def __init__(self, model_name: str, device: Union[torch.device, str] = None):
-        self.st = SentenceTransformer(model_name, device=device)
+    def __init__(self, model_name: str, device: Union[torch.device, str] = None, **kwargs):
+        self.st = SentenceTransformer(model_name, device=device, **kwargs)
+        self.model_name = model_name
 
     def get_embedding_dim(self) -> int:
         return self.st.get_sentence_embedding_dimension()
@@ -28,6 +31,10 @@ class SentenceTransformerEmbeddingModel(BaseTextEmbeddingModel):
 
     def get_num_storage_embeddings(self) -> int:
         return 1
+
+    def get_info(self) -> str:
+        return f'SentenceTransformer | Name: {self.model_name} | ' \
+               f'Params: {param_count(self.st)/1e+6:.4g} million | Dimensions: {self.get_embedding_dim()}'
 
     def encode(self, sentences: List[str], batch_size: int = 64, show_progress_bar: bool = False,
                convert_to_tensor: bool = False,

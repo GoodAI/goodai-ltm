@@ -68,12 +68,14 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
         return self.chunk_tokenizer.decode(token_ids, skip_special_tokens=True)
 
     def retrieve_multiple(self, queries: List[str], k: int = 1, rewrite: bool = False, mm_multiplier: int = 10,
-                          show_progress_bar: bool = False) -> List[List[RetrievedMemory]]:
+                          show_progress_bar: bool = False,
+                          max_query_length: Optional[int] = 40) -> List[List[RetrievedMemory]]:
         if rewrite and not self.query_rewrite_model:
             raise ValueError("For query rewriting, a rewriting model must be provided")
         if rewrite and self.query_rewrite_model:
             queries = [self.query_rewrite_model.rewrite_query(q) for q in queries]
-        return super().retrieve_multiple(queries, k, rewrite, mm_multiplier, show_progress_bar)
+        return super().retrieve_multiple(queries, k, rewrite, mm_multiplier, show_progress_bar,
+                                         max_query_length=max_query_length)
 
     def retrieve_chunk_sequences(self, chunk_ids: List[int]):
         return self.chunk_queue.retrieve_chunk_sequences(chunk_ids)
@@ -123,6 +125,9 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
             token_id_batch = token_id_matrix[i:i + batch_size]
             text_batch = self.chunk_tokenizer.batch_decode(token_id_batch, skip_special_tokens=True)
             sk_batch = emb_model.encode_corpus(text_batch, convert_to_tensor=True)
+            if sk_batch.size(0) != len(text_batch):
+                raise SystemError(f'Number of storage embeddings returned by embedding model is {sk_batch.size(0)}, '
+                                  f'while the number of encoded texts is {len(text_batch)}')
             sk_list.append(sk_batch.detach())
             if num_sequences > batch_size:
                 del sk_batch
