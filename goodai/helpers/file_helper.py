@@ -54,7 +54,7 @@ def url_as_file(url) -> str:
     progress_fn = file_name + '-in-progress'
 
     if not os.path.exists(file_name) or os.path.exists(progress_fn):
-        logging.info(f'Downloading {url}')
+        logging.warning(f'Downloading {url}')
         with urllib.request.urlopen(url) as url_file:
             with open(progress_fn, 'w') as fd:
                 fd.write('.')
