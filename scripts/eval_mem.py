@@ -54,7 +54,7 @@ if __name__ == '__main__':
     # datasets = ['msmarco']
     # datasets = ['qrecc']
     datasets = ['qrecc', 'strategyqa', 'msmarco']
-    eval_specs: List[EvalSpec] = _openai_eval_specs
+    eval_specs: List[EvalSpec] = _hf_eval_specs_3
 
     ds_top_ks = [f'{ds_name}@{top_k}' for ds_name in datasets for top_k in top_ks]
     table_out = 'Model | ' + ' | '.join([ds_name for ds_name in ds_top_ks]) + '\n'
