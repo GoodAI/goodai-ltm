@@ -9,15 +9,12 @@ from goodai.ltm.embeddings.st_emb import SentenceTransformerEmbeddingModel
 from goodai.ltm.embeddings.trainable import TrainableEmbeddingModel
 from goodai.ltm.embeddings.base import BaseTextEmbeddingModel
 
-_models_base = 'https://github.com/GoodAI/goodai-ltm-artifacts/releases/download/models'
+_models_base = 'https://github.com/GoodAI/goodai-ltm-artifacts/releases/download/models/goodai-ltm-emb-model'
 
 _pretrained_map = {
-    'p2-qa-mpnet': f'{_models_base}/goodai-ltm-emb-model-p2-1063',
-    'p3-distilroberta': f'{_models_base}/goodai-ltm-emb-model-p3-1062',
-    'p3-reserved-01': f'{_models_base}/goodai-ltm-emb-model-p3-1064',
-    'p3-reserved-02': f'{_models_base}/goodai-ltm-emb-model-p3-1067',
-    'p1-reserved-03': f'{_models_base}/goodai-ltm-emb-model-p1-1068',
-    'p1-reserved-04': f'{_models_base}/goodai-ltm-emb-model-p1-1069',
+    'em-distilroberta-p1-01': f'{_models_base}-p1-1118',
+    'em-distilroberta-p3-01': f'{_models_base}-p3-1116',
+    'em-MiniLM-p3-01': f'{_models_base}-p3-1117',
 }
 
 
