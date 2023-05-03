@@ -35,6 +35,9 @@ class OpenAIEmbeddingModel(BaseTextEmbeddingModel):
     def get_num_storage_embeddings(self) -> int:
         return 1
 
+    def get_info(self) -> str:
+        return f'OpenAI embedding model "{self.model_name}" | Dimensions: {self.emb_dim}'
+
     def encode(self, sentences: List[str], batch_size: int = 64, show_progress_bar: bool = False,
                convert_to_tensor: bool = False,
                device: Union[str, torch.device] = None) -> Union[np.ndarray, torch.Tensor]:

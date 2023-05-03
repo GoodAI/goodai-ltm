@@ -163,10 +163,11 @@ The `model_name` can be one of the following:
 * An OpenAI embedding model name, starting with `"openai:"`, for example, `"openai:text-embedding-ada-002"`.
 * One of our fine-tuned models:
 
-Name | Base model                                       | Params
----- |--------------------------------------------------| ---
-example1 | sentence-transformers/multi-qa-mpnet-base-cos-v1 | 80m
-example2 | sentence-transformers/all-distrilroberta-v1      | 120m
+Name | Base model                                       | # parameters | # storage emb
+---- |--------------------------------------------------|--------| -----
+em-MiniLM-p3-01 | multi-qa-MiniLM-L6-cos-v1 | 27.2m | 3  
+em-distilroberta-p1-01 | sentence-transformers/all-distrilroberta-v1 | 82.1m  | 1
+em-distilroberta-p3-01 | sentence-transformers/all-distrilroberta-v1 | 82.1m  | 3
 
 ## Embedding model usage
 
@@ -248,6 +249,16 @@ em-MiniLM-p3-01 | 72.87 | 80.02 | 78.00 | 89.75 | 73.38 | 79.96 |
 em-distilroberta-p1-01 | 77.67 | 83.84 | 83.25 | 94.15 | 79.78 | 84.39 |
 em-distilroberta-p3-01 | 78.33 | 84.66 | 86.55 | 95.40 | 79.51 | 85.29 |
 
+Model `em-distilroberta-p1-01` is the default model used
+by the goodai-ltm. While `em-distilroberta-p3-01` has better
+retrieval accuracy, note that it requires storing 3 embeddings
+per chunk. The distilroberta models have 82 million parameters
+and their embedding size is 768.
+
+Model `em-MiniLM-p3-01` is a good choice if you need
+a lightweight model. It has only 22.7 million parameters.
+It produces 3 storage embeddings per chunk, but these 
+are embeddings of size 384.
 
 ## Evaluation of query-passage matching models
 

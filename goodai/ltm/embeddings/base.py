@@ -35,6 +35,13 @@ class BaseTextEmbeddingModel(ABC):
         pass
 
     @abstractmethod
+    def get_info(self) -> str:
+        """
+        :return: Information about the model.
+        """
+        pass
+
+    @abstractmethod
     def encode_queries(self, queries: List[str], batch_size: int = 64, show_progress_bar: bool = False,
                        convert_to_tensor: bool = False,
                        device: Union[str, torch.device] = None) -> Union[np.ndarray, torch.Tensor]:

@@ -81,3 +81,4 @@ class BaseTextMemory(ABC):
         :param stream: This IO stream is where text is dumped
         """
         pass
+
