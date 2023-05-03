@@ -23,14 +23,15 @@ if __name__ == '__main__':
         "How did Earth's atmosphere form?",
         "What are the functional programming aspects of Python?",
     ]
-    for query in queries:
-        print(f'\n### Query: {query}')
-        r_memories = mem.retrieve(query, k=5)
-        for i, r_memory in enumerate(r_memories):
-            m = r_memory.metadata
-            title = '' if m is None else m['title']
-            print(f'Memory #{i+1} (title={title}):')
-            print(r_memory.passage)
-
-    # Workaround for exception in wiki_wiki destructor
-    wiki_wiki._session.adapters = {}
+    try:
+        for query in queries:
+            print(f'\n### Query: {query}')
+            r_memories = mem.retrieve(query, k=5)
+            for i, r_memory in enumerate(r_memories):
+                m = r_memory.metadata
+                title = '' if m is None else m['title']
+                print(f'Memory #{i+1} (title={title}):')
+                print(r_memory.passage)
+    finally:
+        # Workaround for exception in wiki_wiki destructor
+        wiki_wiki._session.adapters = {}

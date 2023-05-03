@@ -21,37 +21,29 @@ class EvalSpec:
     chunkCapacity: int = 24
 
 
+_hf_eval_specs = [EvalSpec(mid, mid) for mid in [
+    'st:sentence-transformers/all-distilroberta-v1',
+    'st:sentence-transformers/multi-qa-mpnet-base-cos-v1',
+    'st:sentence-transformers/sentence-t5-large',
+    'st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1',
+    'st:sentence-transformers/all-mpnet-base-v2',
+]]
+
+_test_eval_specs = [EvalSpec(mid, mid) for mid in [
+    'st:sentence-transformers/multi-qa-mpnet-base-cos-v1',
+]]
+
+
 if __name__ == '__main__':
     device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
     torch.manual_seed(1001)
     top_ks = [3, 10]
     tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/all-distilroberta-v1')
-    # datasets = ["qp_squad_v2"]  # "['msmarco']  # ['qrecc', 'strategyqa']
-    datasets = ['msmarco']
+    # datasets = ['msmarco']
     # datasets = ['qrecc']
-    # datasets = ['qrecc', 'strategyqa', 'msmarco']
-    eval_specs: List[EvalSpec] = [
-        # EvalSpec('st/all-distilroberta-v1', 'st:sentence-transformers/all-distilroberta-v1', None,
-        #          maxQueryTokens=40, hasQueryNoise=True),
-        # EvalSpec('p4-distilroberta', 'p4-distilroberta', None,
-        #          maxQueryTokens=40, hasQueryNoise=True),
-        EvalSpec('st/multi-qa-mpnet-base-cos-v1', 'st:sentence-transformers/multi-qa-mpnet-base-cos-v1',
-                 chunkCapacity=24),
+    datasets = ['qrecc', 'strategyqa', 'msmarco']
+    eval_specs: List[EvalSpec] = _test_eval_specs
 
-        # EvalSpec('st/stsb-distilroberta-base', 'st:sentence-transformers/multi-qa-mpnet-base-cos-v1',
-        #          matchingModelName='st:cross-encoder/stsb-distilroberta-base',
-        #          chunkCapacity=24),
-
-        # EvalSpec('st/sentence-t5-large', 'st:sentence-transformers/sentence-t5-large', None,
-        #          maxQueryTokens=40, hasQueryNoise=True),
-        # EvalSpec('st/multi-qa-MiniLM-L6-cos-v1', 'st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1', None,
-        #          maxQueryTokens=40, hasQueryNoise=True),
-        # EvalSpec('st/all-mpnet-base-v2', 'st:sentence-transformers/all-mpnet-base-v2', None,
-        #          maxQueryTokens=40, hasQueryNoise=True),
-        # EvalSpec('st/all-roberta-large-v1', 'st:sentence-transformers/all-roberta-large-v1', None,
-        #          maxQueryTokens=40, hasQueryNoise=True),
-        # EvalSpec('experimental', 'p3-distilroberta'),
-    ]
     ds_top_ks = [f'{ds_name}@{top_k}' for ds_name in datasets for top_k in top_ks]
     table_out = 'Model | ' + ' | '.join([ds_name for ds_name in ds_top_ks]) + '\n'
     table_out += '----- | ' + ' | '.join(['-' * len(ds_name) for ds_name in ds_top_ks]) + '\n'

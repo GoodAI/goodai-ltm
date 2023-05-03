@@ -167,8 +167,27 @@ class BaseTextMemoryFoundation(BaseTextMemory):
         return self._multi_retrieve_for_tuples(queries, prelim_dist_indexes, expected_key_db_top_k, k,
                                                show_progress_bar=show_progress_bar)
 
+    def _truncate_queries(self, queries: List[str], max_query_length: int):
+        if max_query_length <= 0:
+            raise ValueError(f'max_query_length={max_query_length} is invalid')
+        ct = self.chunk_tokenizer
+        tokenization = ct.batch_encode_plus(queries, add_special_tokens=False,
+                                            return_attention_mask=False)
+        token_ids: List[List[int]] = tokenization['input_ids']
+        result = []
+        for seq, query in zip(token_ids, queries):
+            if len(seq) > max_query_length:
+                truncated_seq = seq[-max_query_length:]
+                result.append(ct.decode(truncated_seq, skip_special_tokens=True))
+            else:
+                result.append(query)
+        return result
+
     def retrieve_multiple(self, queries: List[str], k: int = 1, rewrite: bool = False, mm_multiplier: int = 10,
-                          show_progress_bar: bool = False) -> List[List[RetrievedMemory]]:
+                          show_progress_bar: bool = False,
+                          max_query_length: Optional[int] = 40) -> List[List[RetrievedMemory]]:
+        if max_query_length is not None:
+            queries = self._truncate_queries(queries, max_query_length)
         rk = self.get_retrieval_key_for_text(queries, show_progress_bar=show_progress_bar)
         batch_size, num_rk, emb_size = rk.size(0), rk.size(1), rk.size(2),
         if num_rk != 1:

@@ -47,19 +47,24 @@ class BaseTextMemory(ABC):
 
     @abstractmethod
     def retrieve_multiple(self, queries: List[str], k: int, rewrite: bool = False, show_progress_bar: bool = False,
+                          max_query_length: Optional[int] = 40,
                           **kwargs) -> List[List[RetrievedMemory]]:
         pass
 
-    def retrieve(self, query: str, k: int, rewrite: bool = False, **kwargs) -> List[RetrievedMemory]:
+    def retrieve(self, query: str, k: int, rewrite: bool = False,
+                 max_query_length: Optional[int] = 40, **kwargs) -> List[RetrievedMemory]:
         """
-        Retrieves memories.
+        Performs a memory search and retrieves relevant passages.
         :param query: The query used to search for memories
         :param k: The number of requested memories
         :param rewrite: Whether the query should be rewritten by an LLM
+        :param max_query_length: The maximum number of tokens from the query that should be used
+                                 to perform lookups. The left side of the query is truncated accordingly.
         :param kwargs: Additional argument passed to underlying models
-        :return:
+        :return: A list of RetrievedMemory instances.
         """
-        multi_result = self.retrieve_multiple([query], k=k, rewrite=rewrite, **kwargs)
+        multi_result = self.retrieve_multiple([query], k=k, rewrite=rewrite,
+                                              max_query_length=max_query_length, **kwargs)
         return multi_result[0]
 
     @abstractmethod
