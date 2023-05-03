@@ -42,6 +42,10 @@ _goodai_eval_specs = [EvalSpec(mid, mid) for mid in [
     'em-MiniLM-p3-01',
 ]]
 
+_openai_eval_specs = [EvalSpec(mid, mid) for mid in [
+    'openai:text-embedding-ada-002',
+]]
+
 if __name__ == '__main__':
     device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
     torch.manual_seed(1001)
@@ -50,7 +54,7 @@ if __name__ == '__main__':
     # datasets = ['msmarco']
     # datasets = ['qrecc']
     datasets = ['qrecc', 'strategyqa', 'msmarco']
-    eval_specs: List[EvalSpec] = _goodai_eval_specs
+    eval_specs: List[EvalSpec] = _openai_eval_specs
 
     ds_top_ks = [f'{ds_name}@{top_k}' for ds_name in datasets for top_k in top_ks]
     table_out = 'Model | ' + ' | '.join([ds_name for ds_name in ds_top_ks]) + '\n'

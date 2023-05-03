@@ -157,7 +157,8 @@ class BaseTextMemoryFoundation(BaseTextMemory):
         # distances, indexes: (batch_size, downstream_top_k)
         prelim_dist_indexes = []
         batch_size = len(queries)
-        assert batch_size == distances.shape[0] == indexes.shape[0]
+        assert batch_size == distances.shape[0] == indexes.shape[0], \
+            f'batch_size={batch_size}, distances.shape={distances.shape}, indexes.shape={indexes.shape}'
         for i in range(batch_size):
             row_d = distances[i]
             row_i = indexes[i]
@@ -192,6 +193,10 @@ class BaseTextMemoryFoundation(BaseTextMemory):
         batch_size, num_rk, emb_size = rk.size(0), rk.size(1), rk.size(2),
         if num_rk != 1:
             raise ValueError('Memory does not support multiple retrieval embeddings')
+        n_queries = len(queries)
+        if batch_size != n_queries:
+            raise SystemError(f'Batch returned by embeddings model is of shape {rk.shape} '
+                              f'while the number of queries is {n_queries}')
         rk_np = rk.view(batch_size, emb_size).detach().cpu().numpy()
         adjacent_chunks_ok = self.adjacent_chunks_ok
         expected_key_db_top_k = k
