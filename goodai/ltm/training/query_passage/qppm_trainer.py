@@ -23,8 +23,9 @@ class QPPMTrainer:
                  num_epochs: int, switch_ds_every: int, num_ds_examples: int, batch_size: int,
                  max_query_tokens: int, min_passage_tokens: int, max_passage_tokens: int,
                  track_validation: bool, lm_lr: float, extras_lr: float, device: torch.device,
-                 num_warmup_steps: int = 0, weight_decay: float = 1e-3):
+                 num_warmup_steps: int = 0, weight_decay: float = 1e-3, approx_positive_fraction: float = 0.5):
         super().__init__()
+        self.approx_positive_fraction = approx_positive_fraction
         self.weight_decay = weight_decay
         self.num_warmup_steps = num_warmup_steps
         self.extras_lr = extras_lr
@@ -143,4 +144,5 @@ class QPPMTrainer:
     def create_dataset(self, training: bool):
         data_sources = self.train_data_sources if training else self.valid_data_sources
         return QueryPassageDataset(data_sources, self.tokenizer, self.num_ds_examples,
-                                   device=self.device)
+                                   device=self.device,
+                                   approx_positive_fraction=self.approx_positive_fraction)

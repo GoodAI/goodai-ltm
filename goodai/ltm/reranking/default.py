@@ -150,7 +150,6 @@ class DefaultRerankingCrossEncoder(nn.Module, BaseQueryPassageProbModel, BaseTex
                 passage_ids = passage_ids[-max_passage_tokens:]
             passage_ids_list.append(passage_ids)
             query_ids_list.append(query_ids)
-        # Convert input_ids_list to tensor input_ids and attention_mask by adding padding
         device = self.get_device()
         query_seq_len = self.default_query_seq_len if use_preferred_seq_lengths else None
         passage_seq_len = self.default_passage_seq_len if use_preferred_seq_lengths else None
