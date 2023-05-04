@@ -1,4 +1,5 @@
 import itertools
+import logging
 import math
 import torch
 from torch import nn
@@ -17,7 +18,8 @@ class DefaultRerankingCrossEncoder(nn.Module, BaseQueryPassageProbModel, BaseTex
     sep_id_tensor: torch.Tensor
 
     def __init__(self, model_name: str, default_query_seq_len: Optional[int] = None,
-                 default_passage_seq_len: Optional[int] = None, num_end_chars_lb_ignore=18):
+                 default_passage_seq_len: Optional[int] = None, num_end_chars_lb_ignore=18,
+                 dropout=0.01):
         super().__init__()
         self.num_end_chars_lb_ignore = num_end_chars_lb_ignore
         self.default_passage_seq_len = default_passage_seq_len
@@ -29,23 +31,25 @@ class DefaultRerankingCrossEncoder(nn.Module, BaseQueryPassageProbModel, BaseTex
         self.classifier = ContrastClassifier(cls_emb_scale)
         lb_token_ids = self.tokenizer.encode('\n', add_special_tokens=False)
         if len(lb_token_ids) != 1:
-            raise ValueError(f'Tokenizer {self.tokenizer.name_or_path} does not have a line break token!')
+            logging.warning(f'Tokenizer {self.tokenizer.name_or_path} does not have a line break token.')
+            self.lb_token_id = -1
+        else:
+            self.lb_token_id = lb_token_ids[0]
         if self.tokenizer.sep_token_id is None:
             self.tokenizer.sep_token_id = self.tokenizer.eos_token_id
         if self.tokenizer.sep_token_id is None:
             raise ValueError(f'Tokenizer {model_name} does not have SEP or EOS tokens!')
         if self.tokenizer.sep_token_id == self.tokenizer.pad_token_id:
             raise ValueError(f'Tokenizer {model_name} with SEP equal to PAD not supported!')
-        self.lb_token_id = lb_token_ids[0]
         sep_id_tensor = torch.as_tensor([[self.tokenizer.sep_token_id]], dtype=torch.long)
         self.register_buffer('sep_id_tensor', sep_id_tensor)
         self.dummy = nn.Parameter()
         self.query_slfatt_model = nn.Sequential(
-            nn.Dropout(p=0.03),
+            nn.Dropout(p=dropout),
             nn.Linear(hidden_size, 1)
         )
         self.passage_slfatt_model = nn.Sequential(
-            nn.Dropout(p=0.03),
+            nn.Dropout(p=dropout),
             nn.Linear(hidden_size, 4)
         )
 

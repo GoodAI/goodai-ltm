@@ -12,8 +12,8 @@ class TestQueryPassageDataSource(unittest.TestCase):
     def test_show_examples(self):
         tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained('distilroberta-base')
         random = np.random.RandomState(1)
-        # ds_names = ['wikianswers', 'sharc', 'adversarial_qa', 'coqa', 'squad_v2']
-        ds_names = ['coqa', 'squad_v2']
+        ds_names = ['wikianswers', 'sharc', 'adversarial_qa', 'coqa', 'squad_v2', 'wiki']
+        # ds_names = ['coqa', 'squad_v2']
         for ds_name in ds_names:
             print(f'Processing {ds_name}...')
             self._show_examples(random, ds_name, tokenizer)
@@ -25,7 +25,7 @@ class TestQueryPassageDataSource(unittest.TestCase):
                                                               max_passage_tokens=36)
 
         # Sample 100 examples from the training data source
-        examples = train_ds.sample_items(100)
+        examples = train_ds.sample_items(100, approx_positive_fraction=0.1)
 
         # Sort examples by match value
         examples.sort(key=lambda x: x.match, reverse=True)
