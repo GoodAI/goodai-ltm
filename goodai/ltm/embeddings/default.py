@@ -51,7 +51,7 @@ class DefaultEmbeddingModel(TrainableEmbeddingModel):
         return lm_config.hidden_size
 
     def get_info(self) -> str:
-        return f'GoodAI-finetuned model | Base: {self.lang_model} | ' \
+        return f'GoodAI-finetuned model | Base: {self.lang_model.name_or_path} | ' \
                f'Params: {param_count(self)/1e+6:.4g} million | Dimensions: {self.get_embedding_dim()}'
 
     def get_device(self):
