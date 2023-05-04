@@ -164,10 +164,10 @@ The `model_name` can be one of the following:
 * One of our fine-tuned models:
 
 Name | Base model                                       | # parameters | # storage emb
----- |--------------------------------------------------|--------| -----
-em-MiniLM-p3-01 | multi-qa-MiniLM-L6-cos-v1 | 27.2m | 3  
-em-distilroberta-p1-01 | sentence-transformers/all-distrilroberta-v1 | 82.1m  | 1
-em-distilroberta-p3-01 | sentence-transformers/all-distrilroberta-v1 | 82.1m  | 3
+---- |--------------------------------------------------|--------------| -----
+em-MiniLM-p3-01 | multi-qa-MiniLM-L6-cos-v1 | 22.7m        | 3  
+em-distilroberta-p1-01 | sentence-transformers/all-distrilroberta-v1 | 82.1m        | 1
+em-distilroberta-p3-01 | sentence-transformers/all-distrilroberta-v1 | 82.1m        | 3
 
 ## Embedding model usage
 
