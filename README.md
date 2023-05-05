@@ -115,6 +115,17 @@ To store this text, we create an instance of the default memory class and add th
 
     mem = AutoTextMemory.create()
     mem.add_text(text_example)
+   
+Optionally, text can be rewritten to form memories that are less ambiguous and more self contained. To do this, we
+pass both the text to be stored and some preceding text for context to the `add_text` method.
+
+    passage = "Archie: That would be great."
+    context = """Jake Morales: Hey Archie, what do you think about teaming up with me and Isaac Coax? 
+        We could come up with a plan that would distract Lucas Fern."""
+    mem.add_text(text=passage, rewrite=True, rewrite_context=context)
+    
+This will rewrite the passage "Archie: That would be great." as "Archie thinks it would be great to team up with Jake Morales and Isaac Coax to come up 
+with a plan that would distract Lucas Fern." The rewritten text will be stored.
     
 The text is encoded by the tokenizer as token ids.
 
@@ -189,7 +200,7 @@ the `encode_corpus` method, as follows:
 A peculiarity of our embedding model is that queries
 and passages can have more than one embedding.
 Embedding tensors have 3 axes: The batch size, the number of
-embeddings, and the number embedding dimensions. Typically,
+embeddings, and the number of embedding dimensions. Typically,
 the number of embeddings per query/passage will be 1, except for the 
 passage embeddings in some of our fine-tuned models.
 
