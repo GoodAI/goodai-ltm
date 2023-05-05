@@ -235,7 +235,7 @@ queries that may be found in a chat. To this end we've developed
 an evaluation based on datasets [QReCC](https://github.com/apple/ml-qrecc),
 [StrategyQA](https://allenai.org/data/strategyqa), and
 [MS MARCO](https://microsoft.github.io/msmarco/). 
-Results in the following table show top-1, top-3 and top-10
+Results in the following table show top-3 and top-10
 retrieval accuracy for each dataset.
 
 Model | qrecc @3 | qrecc @10 | strategyqa @3 | strategyqa @10 | msmarco @3 | msmarco @10

@@ -44,13 +44,9 @@ class DefaultRerankingCrossEncoder(nn.Module, BaseQueryPassageProbModel, BaseTex
         sep_id_tensor = torch.as_tensor([[self.tokenizer.sep_token_id]], dtype=torch.long)
         self.register_buffer('sep_id_tensor', sep_id_tensor)
         self.dummy = nn.Parameter()
-        self.query_slfatt_model = nn.Sequential(
-            nn.Dropout(p=dropout),
-            nn.Linear(hidden_size, 1)
-        )
         self.passage_slfatt_model = nn.Sequential(
             nn.Dropout(p=dropout),
-            nn.Linear(hidden_size, 4)
+            nn.Linear(hidden_size, 5),
         )
 
     def get_device(self):
@@ -60,23 +56,25 @@ class DefaultRerankingCrossEncoder(nn.Module, BaseQueryPassageProbModel, BaseTex
         return self.model.parameters()
 
     def get_added_parameters(self):
-        return itertools.chain(self.query_slfatt_model.parameters(),
-                               self.passage_slfatt_model.parameters(),
+        return itertools.chain(self.passage_slfatt_model.parameters(),
                                self.classifier.parameters())
 
     @staticmethod
     def get_embedding(hidden_states: torch.Tensor, attention_mask: torch.Tensor,
-                      att_model: nn.Module) -> torch.Tensor:
+                      att_model: Optional[nn.Module]) -> torch.Tensor:
         # hidden_states: (batch_size, seq_len, emb_size,)
         x_att_mask = attention_mask[:, :, None]
-        # x_att_mask: (batch_size, seq_len, 1,)
-        slf_att_logits = att_model(hidden_states)
-        # slf_att_logits: (batch_size, seq_len, total_keys,)
-        slf_att_logits = slf_att_logits - 200.0 * (1.0 - x_att_mask)
-        slf_att_logits = torch.clamp(slf_att_logits, min=-100, max=+80)
-        slf_att_weights = torch.softmax(slf_att_logits, dim=1)
-        # slf_att_weights: (batch_size, seq_len, total_keys,)
-        dot_product = hidden_states[:, :, None, :] * slf_att_weights[:, :, :, None]
+        if att_model:
+            # x_att_mask: (batch_size, seq_len, 1,)
+            slf_att_logits = att_model(hidden_states)
+            # slf_att_logits: (batch_size, seq_len, total_keys,)
+            slf_att_logits = slf_att_logits - 200.0 * (1.0 - x_att_mask)
+            slf_att_logits = torch.clamp(slf_att_logits, min=-100, max=+80)
+            slf_att_weights = torch.softmax(slf_att_logits, dim=1)
+            # slf_att_weights: (batch_size, seq_len, total_keys,)
+            dot_product = hidden_states[:, :, None, :] * slf_att_weights[:, :, :, None]
+        else:
+            dot_product = hidden_states[:, :, None, :] * x_att_mask[:, :, :, None]
         raw_w_mean = torch.sum(dot_product, dim=1)
         # raw_w_mean: (batch_size, total_keys, emb_size,)
         return F.normalize(raw_w_mean, dim=-1)
@@ -97,7 +95,7 @@ class DefaultRerankingCrossEncoder(nn.Module, BaseQueryPassageProbModel, BaseTex
                                                 self.lb_token_id, exclude_last_n_chars=self.num_end_chars_lb_ignore,
                                                 device=self.get_device())
         emb_q_att_mask = query_attention_mask * lb_att_mask
-        query_embedding = self.get_embedding(query_hidden_states, emb_q_att_mask, self.query_slfatt_model)
+        query_embedding = self.get_embedding(query_hidden_states, emb_q_att_mask, None)
         passage_embedding = self.get_embedding(passage_hidden_states, passage_attention_mask, self.passage_slfatt_model)
         match_probabilities = self.classifier(query_embedding, passage_embedding)
         return match_probabilities
