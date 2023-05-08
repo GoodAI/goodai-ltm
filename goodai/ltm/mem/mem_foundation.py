@@ -3,7 +3,7 @@ import enum
 import io
 import json
 import sys
-from typing import List, Union, Any, Set, Optional, Tuple
+from typing import List, Union, Set, Optional, Tuple
 
 import faiss
 import numpy as np
@@ -27,13 +27,14 @@ class VectorDbType(enum.Enum):
 
 class BaseTextMemoryFoundation(BaseTextMemory):
     def __init__(self, vector_db_type: VectorDbType, tokenizer: PreTrainedTokenizer, has_match_prob_model: bool,
-                 num_storage_embeddings: int, emb_dim: int,
-                 device: torch.device, adjacent_chunks_ok: bool):
+                 num_storage_embeddings: int, emb_dim: int, reranking_k_multiplier: int,
+                 device: torch.device):
         super().__init__()
+        self.reranking_k_multiplier = reranking_k_multiplier
         self.num_storage_embeddings = num_storage_embeddings
         self.has_match_prob_model = has_match_prob_model
         self.vector_db = self.create_vector_db(vector_db_type, emb_dim)
-        self.adjacent_chunks_ok = adjacent_chunks_ok
+        self.adjacent_chunks_ok = False  # TODO should be dealt with after chunking configuration enhancements
         self.device = device
         self.chunk_tokenizer = tokenizer
         self.punctuation_ids = get_sentence_punctuation_ids(self.chunk_tokenizer, include_line_break=False)
@@ -109,14 +110,19 @@ class BaseTextMemoryFoundation(BaseTextMemory):
                                    show_progress_bar: bool = False) -> List[List[RetrievedMemory]]:
         adjacent_chunks_ok = self.adjacent_chunks_ok
         has_pm = self.has_match_prob_model
+        # At this point:
+        # - Duplicate chunk IDs have already been removed in prelim_dist_indexes
+        # - prelim_dist_indexes is ordered by distance
         if has_pm:
             m_sentences = []
             m_indexes = []
             prelim_dist_indexes_list = []
             for i, (query, row_tuples) in enumerate(zip(queries, prelim_dist_indexes)):
+                # Heuristic: Assuming embedding ordering is approximately good enough
+                # to determine if adjacent chunks would be removed and should not be considered further
                 nv = num_visited_to_get_expected_count(row_tuples, expected_key_db_top_k, adjacent_chunks_ok,
                                                        key_fn=lambda _t: _t[1])
-                row_tuples = row_tuples[:nv * 2]
+                row_tuples = row_tuples[:nv]
                 prelim_dist_indexes_list.append(row_tuples)
                 prelim_chunk_indexes = [ci for _, ci in row_tuples]
                 chunk_sequences: List[List[int]] = self.retrieve_chunk_sequences(prelim_chunk_indexes)
@@ -184,9 +190,9 @@ class BaseTextMemoryFoundation(BaseTextMemory):
                 result.append(query)
         return result
 
-    def retrieve_multiple(self, queries: List[str], k: int = 1, rewrite: bool = False, mm_multiplier: int = 10,
-                          show_progress_bar: bool = False,
-                          max_query_length: Optional[int] = 40) -> List[List[RetrievedMemory]]:
+    def retrieve_multiple(self, queries: List[str], k: int, rewrite: bool = False, show_progress_bar: bool = False,
+                          max_query_length: Optional[int] = 40,
+                          **kwargs) -> List[List[RetrievedMemory]]:
         if max_query_length is not None:
             queries = self._truncate_queries(queries, max_query_length)
         rk = self.get_retrieval_key_for_text(queries, show_progress_bar=show_progress_bar)
@@ -201,7 +207,7 @@ class BaseTextMemoryFoundation(BaseTextMemory):
         adjacent_chunks_ok = self.adjacent_chunks_ok
         expected_key_db_top_k = k
         if self.has_match_prob_model:
-            expected_key_db_top_k *= mm_multiplier
+            expected_key_db_top_k *= self.reranking_k_multiplier
         downstream_top_k = expected_key_db_top_k * self.num_storage_embeddings
         if not adjacent_chunks_ok:
             downstream_top_k *= 3

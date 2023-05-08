@@ -7,8 +7,11 @@ from goodai.ltm.reranking.base import BaseTextMatchingModel
 from goodai.ltm.reranking.default import DefaultRerankingCrossEncoder
 from goodai.ltm.reranking.st_ce import SentenceTransformerTextMatchingModel
 
+_models_base = 'https://github.com/GoodAI/goodai-ltm-artifacts/releases/download/models/goodai-ltm-qpm-model'
+
+
 _pretrained_map = {
-    # TODO
+    'qpm-distilroberta-01': f'{_models_base}-1145'
 }
 
 
@@ -29,7 +32,7 @@ class AutoTextMatchingModel:
                 raise ValueError(f'Model not found: {name}')
             with open_url_as_file(url) as fd:
                 model_dict = pickle.load(fd)
-                model: DefaultRerankingCrossEncoder = model_dict['model']
+                model: DefaultRerankingCrossEncoder = model_dict['qpmm']
                 model.to(device)
                 model.zero_grad(set_to_none=True)
                 model.eval()

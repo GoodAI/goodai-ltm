@@ -18,6 +18,13 @@ class EvalSpec:
     maxQueryTokens: int = 40
     hasQueryNoise: bool = True
     chunkCapacity: int = 24
+    rerankingKFactor: int = 10
+
+    @classmethod
+    def for_qpm(cls, qpm_model_name: str, emb_model_name: str, reranking_k_factor: int):
+        m_id = f'x{reranking_k_factor} w/ {emb_model_name}'
+        return cls(id=m_id, embModelName=emb_model_name, matchingModelName=qpm_model_name,
+                   rerankingKFactor=reranking_k_factor)
 
 
 _hf_eval_specs_1 = [EvalSpec(mid, mid) for mid in [
@@ -46,6 +53,62 @@ _openai_eval_specs = [EvalSpec(mid, mid) for mid in [
     'openai:text-embedding-ada-002',
 ]]
 
+_qpm_eval_specs_1 = [EvalSpec.for_qpm('qpm-distilroberta-01', mid, rkf) for mid, rkf in [
+    ('em-distilroberta-p3-01', 10),
+    ('em-distilroberta-p3-01', 5),
+]]
+
+_qpm_eval_specs_2 = [EvalSpec.for_qpm('qpm-distilroberta-01', mid, rkf) for mid, rkf in [
+    ('st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1', 2),
+    ('st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1', 3),
+]]
+
+_qpm_eval_specs_3 = [EvalSpec.for_qpm('qpm-distilroberta-01', mid, rkf) for mid, rkf in [
+    ('em-distilroberta-p3-01', 2),
+    ('em-distilroberta-p3-01', 3),
+]]
+
+_qpm_eval_specs_4 = [EvalSpec.for_qpm('qpm-distilroberta-01', mid, rkf) for mid, rkf in [
+    ('st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1', 4),
+    ('st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1', 5),
+]]
+
+_qpm_eval_specs_5 = [EvalSpec.for_qpm('qpm-distilroberta-01', mid, rkf) for mid, rkf in [
+    ('em-distilroberta-p3-01', 4),
+    ('em-distilroberta-p3-01', 5),
+]]
+
+_qpm_eval_specs_6 = [EvalSpec.for_qpm('qpm-distilroberta-01', mid, rkf) for mid, rkf in [
+    ('em-distilroberta-p1-01', 2),
+    ('em-distilroberta-p1-01', 3),
+]]
+
+_qpm_eval_specs_7 = [EvalSpec.for_qpm('qpm-distilroberta-01', mid, rkf) for mid, rkf in [
+    ('st:sentence-transformers/multi-qa-mpnet-base-cos-v1', 2),
+    ('st:sentence-transformers/multi-qa-mpnet-base-cos-v1', 3),
+]]
+
+_qpm_eval_specs_8 = [EvalSpec.for_qpm('qpm-distilroberta-01', mid, rkf) for mid, rkf in [
+    ('st:sentence-transformers/all-distilroberta-v1', 2),
+    ('st:sentence-transformers/all-distilroberta-v1', 3),
+]]
+
+_qpm_eval_specs_9 = [EvalSpec.for_qpm('qpm-distilroberta-01', mid, rkf) for mid, rkf in [
+    ('st:sentence-transformers/multi-qa-mpnet-base-cos-v1', 4),
+    ('st:sentence-transformers/multi-qa-mpnet-base-cos-v1', 5),
+]]
+
+_qpm_eval_specs_10 = [EvalSpec.for_qpm('qpm-distilroberta-01', mid, rkf) for mid, rkf in [
+    ('st:sentence-transformers/multi-qa-mpnet-base-cos-v1', 10),
+    ('st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1', 10),
+]]
+
+_qpm_eval_specs_11 = [EvalSpec.for_qpm('qpm-distilroberta-01', mid, rkf) for mid, rkf in [
+    ('st:sentence-transformers/multi-qa-mpnet-base-cos-v1', 7),
+    ('st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1', 7),
+]]
+
+
 if __name__ == '__main__':
     device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
     torch.manual_seed(1001)
@@ -54,7 +117,8 @@ if __name__ == '__main__':
     # datasets = ['msmarco']
     # datasets = ['qrecc']
     datasets = ['qrecc', 'strategyqa', 'msmarco']
-    eval_specs: List[EvalSpec] = _hf_eval_specs_3
+
+    eval_specs: List[EvalSpec] = _qpm_eval_specs_10
 
     ds_top_ks = [f'{ds_name}@{top_k}' for ds_name in datasets for top_k in top_ks]
     table_out = 'Model | ' + ' | '.join([ds_name for ds_name in ds_top_ks]) + '\n'
@@ -69,6 +133,7 @@ if __name__ == '__main__':
         matching_model = None if mmn is None else AutoTextMatchingModel.from_pretrained(mmn)
         config = TextMemoryConfig()
         config.chunk_capacity = spec.chunkCapacity
+        config.reranking_k_factor = spec.rerankingKFactor
         table_out += spec.id + ' | '
         for dataset in datasets:
             print(f'Evaluation of {spec.id} on {dataset}...')
