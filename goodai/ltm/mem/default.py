@@ -45,8 +45,8 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
         self.memory_rewrite_model = memory_rewrite_model
         super().__init__(vector_db_type, self.chunk_tokenizer, has_matching_model,
                          self.emb_model.get_num_storage_embeddings(),
-                         self.emb_model.get_embedding_dim(),
-                         device, config.adjacent_chunks_ok)
+                         self.emb_model.get_embedding_dim(), config.reranking_k_factor,
+                         device)
 
     def get_tokenizer(self):
         return self.chunk_tokenizer
@@ -67,14 +67,14 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
         token_ids = self.chunk_queue.get_chunk_token_ids(chunk)
         return self.chunk_tokenizer.decode(token_ids, skip_special_tokens=True)
 
-    def retrieve_multiple(self, queries: List[str], k: int = 1, rewrite: bool = False, mm_multiplier: int = 10,
+    def retrieve_multiple(self, queries: List[str], k: int = 1, rewrite: bool = False,
                           show_progress_bar: bool = False,
                           max_query_length: Optional[int] = 40) -> List[List[RetrievedMemory]]:
         if rewrite and not self.query_rewrite_model:
             raise ValueError("For query rewriting, a rewriting model must be provided")
         if rewrite and self.query_rewrite_model:
             queries = [self.query_rewrite_model.rewrite_query(q) for q in queries]
-        return super().retrieve_multiple(queries, k, rewrite, mm_multiplier, show_progress_bar,
+        return super().retrieve_multiple(queries, k, rewrite, show_progress_bar,
                                          max_query_length=max_query_length)
 
     def retrieve_chunk_sequences(self, chunk_ids: List[int]):

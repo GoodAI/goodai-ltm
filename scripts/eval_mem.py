@@ -18,6 +18,13 @@ class EvalSpec:
     maxQueryTokens: int = 40
     hasQueryNoise: bool = True
     chunkCapacity: int = 24
+    rerankingKMultiplier: int = 10
+
+    @classmethod
+    def for_qpm(cls, qpm_model_name: str, emb_model_name: str, reranking_k_multiplier: int):
+        m_id = f'x{reranking_k_multiplier} w/ {emb_model_name}'
+        return cls(id=m_id, embModelName=emb_model_name, matchingModelName=qpm_model_name,
+                   rerankingKMultiplier=reranking_k_multiplier)
 
 
 _hf_eval_specs_1 = [EvalSpec(mid, mid) for mid in [
@@ -46,6 +53,12 @@ _openai_eval_specs = [EvalSpec(mid, mid) for mid in [
     'openai:text-embedding-ada-002',
 ]]
 
+_qpm_eval_specs_1 = [EvalSpec.for_qpm('qpm-distilroberta-01', mid, rkf) for mid, rkf in [
+    ('em-distilroberta-p3-01', 10),
+    ('em-distilroberta-p3-01', 5),
+]]
+
+
 if __name__ == '__main__':
     device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
     torch.manual_seed(1001)
@@ -54,7 +67,8 @@ if __name__ == '__main__':
     # datasets = ['msmarco']
     # datasets = ['qrecc']
     datasets = ['qrecc', 'strategyqa', 'msmarco']
-    eval_specs: List[EvalSpec] = _hf_eval_specs_3
+
+    eval_specs: List[EvalSpec] = _qpm_eval_specs_1
 
     ds_top_ks = [f'{ds_name}@{top_k}' for ds_name in datasets for top_k in top_ks]
     table_out = 'Model | ' + ' | '.join([ds_name for ds_name in ds_top_ks]) + '\n'

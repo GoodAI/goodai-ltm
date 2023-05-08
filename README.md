@@ -210,6 +210,8 @@ The `model_name` can be one of the following:
 | ---- | ---------- | ------------ |
 | qpm-distilroberta-01 | sentence-transformers/all-distilroberta-v1 | x |
 
+Note that a limitation of our fine-tuned query-passage matching models is that they are optimized
+for short passages (24 to 36 tokens) and the passages are truncated by the model during inference.
 
 ## Query-passage matching model usage
 
@@ -283,4 +285,5 @@ We will continue to improve GoodAI-LTM. Possible next steps include
 * Embeddings for source code retrieval
 * Storage and retrieval methods without embeddings
 * Improvements to the currently experimental query and memory rewriting feature and its default prompts
+* Configurable chunk overlapping and expansion
 * Iterating on improvements to our datasets and models
