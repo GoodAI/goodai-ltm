@@ -207,8 +207,8 @@ The `model_name` can be one of the following:
 * One of our fine-tuned models:
 
 | Name | Base model | # parameters |
-| ---- | ---------- | ------------ |
-| qpm-distilroberta-01 | sentence-transformers/all-distilroberta-v1 | x |
+| ---- | ---------- |--------------|
+| qpm-distilroberta-01 | sentence-transformers/all-distilroberta-v1 | 82.1m        |
 
 Note that a limitation of our fine-tuned query-passage matching models is that they are optimized
 for short passages (24 to 36 tokens) and the passages are truncated by the model during inference.
