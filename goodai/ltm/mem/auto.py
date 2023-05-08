@@ -1,4 +1,6 @@
 import enum
+import sys
+
 import torch
 from typing import Union
 from transformers import AutoTokenizer, PreTrainedTokenizer
@@ -44,7 +46,9 @@ class AutoTextMemory:
         :return: An instance of BaseTextMemory.
         """
         if tokenizer is None:
-            tokenizer = AutoTokenizer.from_pretrained('distilroberta-base')
+            tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained('distilroberta-base')
+            # Suppress length warning
+            tokenizer.model_max_length = sys.maxsize
         if device is None:
             device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
         if emb_model is None:
