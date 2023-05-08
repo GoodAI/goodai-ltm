@@ -29,7 +29,7 @@ class AutoTextMatchingModel:
         if colon_idx == -1:
             url = _pretrained_map.get(name)
             if url is None:
-                raise ValueError(f'Model not found: {name}')
+                raise ValueError(f'GoodAI model not found: {name}')
             with open_url_as_file(url) as fd:
                 model_dict = pickle.load(fd)
                 model: DefaultRerankingCrossEncoder = model_dict['qpmm']

@@ -9,6 +9,7 @@ from transformers import AutoModel, AutoTokenizer, PreTrainedTokenizer
 from typing import List, Optional, Tuple
 
 from goodai.helpers.tokenizer_helper import get_attention_after_token, get_model_inputs
+from goodai.helpers.torch_helper import param_count
 from goodai.ltm.embeddings.contrast_classifier import ContrastClassifier
 from goodai.ltm.reranking.base import BaseTextMatchingModel
 from goodai.ltm.reranking.prob_model import BaseQueryPassageProbModel
@@ -48,6 +49,9 @@ class DefaultRerankingCrossEncoder(nn.Module, BaseQueryPassageProbModel, BaseTex
             nn.Dropout(p=dropout),
             nn.Linear(hidden_size, 5),
         )
+
+    def get_info(self):
+        return f'{self.__class__} | Params: {param_count(self) / 1e6:.4g} million'
 
     def get_device(self):
         return self.dummy.device

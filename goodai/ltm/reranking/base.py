@@ -26,3 +26,6 @@ class BaseTextMatchingModel(ABC):
                 show_progress_bar: bool = False) -> List[float]:
         pass
 
+    @abstractmethod
+    def get_info(self):
+        pass
