@@ -110,6 +110,9 @@ class BaseTextMemoryFoundation(BaseTextMemory):
                                    show_progress_bar: bool = False) -> List[List[RetrievedMemory]]:
         adjacent_chunks_ok = self.adjacent_chunks_ok
         has_pm = self.has_match_prob_model
+        # At this point:
+        # - Duplicate chunk IDs have already been removed in prelim_dist_indexes
+        # - prelim_dist_indexes is ordered by distance
         if has_pm:
             m_sentences = []
             m_indexes = []

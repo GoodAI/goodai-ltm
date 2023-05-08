@@ -18,13 +18,13 @@ class EvalSpec:
     maxQueryTokens: int = 40
     hasQueryNoise: bool = True
     chunkCapacity: int = 24
-    rerankingKMultiplier: int = 10
+    rerankingKFactor: int = 10
 
     @classmethod
-    def for_qpm(cls, qpm_model_name: str, emb_model_name: str, reranking_k_multiplier: int):
-        m_id = f'x{reranking_k_multiplier} w/ {emb_model_name}'
+    def for_qpm(cls, qpm_model_name: str, emb_model_name: str, reranking_k_factor: int):
+        m_id = f'x{reranking_k_factor} w/ {emb_model_name}'
         return cls(id=m_id, embModelName=emb_model_name, matchingModelName=qpm_model_name,
-                   rerankingKMultiplier=reranking_k_multiplier)
+                   rerankingKFactor=reranking_k_factor)
 
 
 _hf_eval_specs_1 = [EvalSpec(mid, mid) for mid in [
@@ -83,6 +83,7 @@ if __name__ == '__main__':
         matching_model = None if mmn is None else AutoTextMatchingModel.from_pretrained(mmn)
         config = TextMemoryConfig()
         config.chunk_capacity = spec.chunkCapacity
+        config.reranking_k_factor = spec.rerankingKFactor
         table_out += spec.id + ' | '
         for dataset in datasets:
             print(f'Evaluation of {spec.id} on {dataset}...')
