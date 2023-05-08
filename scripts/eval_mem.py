@@ -68,6 +68,46 @@ _qpm_eval_specs_3 = [EvalSpec.for_qpm('qpm-distilroberta-01', mid, rkf) for mid,
     ('em-distilroberta-p3-01', 3),
 ]]
 
+_qpm_eval_specs_4 = [EvalSpec.for_qpm('qpm-distilroberta-01', mid, rkf) for mid, rkf in [
+    ('st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1', 4),
+    ('st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1', 5),
+]]
+
+_qpm_eval_specs_5 = [EvalSpec.for_qpm('qpm-distilroberta-01', mid, rkf) for mid, rkf in [
+    ('em-distilroberta-p3-01', 4),
+    ('em-distilroberta-p3-01', 5),
+]]
+
+_qpm_eval_specs_6 = [EvalSpec.for_qpm('qpm-distilroberta-01', mid, rkf) for mid, rkf in [
+    ('em-distilroberta-p1-01', 2),
+    ('em-distilroberta-p1-01', 3),
+]]
+
+_qpm_eval_specs_7 = [EvalSpec.for_qpm('qpm-distilroberta-01', mid, rkf) for mid, rkf in [
+    ('st:sentence-transformers/multi-qa-mpnet-base-cos-v1', 2),
+    ('st:sentence-transformers/multi-qa-mpnet-base-cos-v1', 3),
+]]
+
+_qpm_eval_specs_8 = [EvalSpec.for_qpm('qpm-distilroberta-01', mid, rkf) for mid, rkf in [
+    ('st:sentence-transformers/all-distilroberta-v1', 2),
+    ('st:sentence-transformers/all-distilroberta-v1', 3),
+]]
+
+_qpm_eval_specs_9 = [EvalSpec.for_qpm('qpm-distilroberta-01', mid, rkf) for mid, rkf in [
+    ('st:sentence-transformers/multi-qa-mpnet-base-cos-v1', 4),
+    ('st:sentence-transformers/multi-qa-mpnet-base-cos-v1', 5),
+]]
+
+_qpm_eval_specs_10 = [EvalSpec.for_qpm('qpm-distilroberta-01', mid, rkf) for mid, rkf in [
+    ('st:sentence-transformers/multi-qa-mpnet-base-cos-v1', 10),
+    ('st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1', 10),
+]]
+
+_qpm_eval_specs_11 = [EvalSpec.for_qpm('qpm-distilroberta-01', mid, rkf) for mid, rkf in [
+    ('st:sentence-transformers/multi-qa-mpnet-base-cos-v1', 7),
+    ('st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1', 7),
+]]
+
 
 if __name__ == '__main__':
     device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
@@ -78,7 +118,7 @@ if __name__ == '__main__':
     # datasets = ['qrecc']
     datasets = ['qrecc', 'strategyqa', 'msmarco']
 
-    eval_specs: List[EvalSpec] = _qpm_eval_specs_2
+    eval_specs: List[EvalSpec] = _qpm_eval_specs_10
 
     ds_top_ks = [f'{ds_name}@{top_k}' for ds_name in datasets for top_k in top_ks]
     table_out = 'Model | ' + ' | '.join([ds_name for ds_name in ds_top_ks]) + '\n'
