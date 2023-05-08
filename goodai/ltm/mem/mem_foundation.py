@@ -118,9 +118,11 @@ class BaseTextMemoryFoundation(BaseTextMemory):
             m_indexes = []
             prelim_dist_indexes_list = []
             for i, (query, row_tuples) in enumerate(zip(queries, prelim_dist_indexes)):
+                # Heuristic: Assuming embedding ordering is approximately good enough
+                # to determine if adjacent chunks would be removed and should not be considered further
                 nv = num_visited_to_get_expected_count(row_tuples, expected_key_db_top_k, adjacent_chunks_ok,
                                                        key_fn=lambda _t: _t[1])
-                row_tuples = row_tuples[:nv * 2]
+                row_tuples = row_tuples[:nv]
                 prelim_dist_indexes_list.append(row_tuples)
                 prelim_chunk_indexes = [ci for _, ci in row_tuples]
                 chunk_sequences: List[List[int]] = self.retrieve_chunk_sequences(prelim_chunk_indexes)
