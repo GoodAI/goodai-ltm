@@ -288,16 +288,16 @@ to weak/low-resource embedding models. The following tests were performed on a m
 to use `qpm-distilroberta-01` as the query-passage matching model, and two different embedding models
 with different values assigned to the `reranking_k_factor` setting.
 
-reranking_k_factor w/ emb model | qrecc@3 | qrecc@10 | strategyqa@3 | strategyqa@10 | msmarco@3 | msmarco@10
------ | ------- | -------- | ------------ | ------------- | --------- | ----------
-x2 w/ st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1 | 75.11 | 80.19 | 86.00 | 92.25 | 75.09 | 79.96 |
-x3 w/ st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1 | 76.04 | 81.39 | 86.30 | 93.50 | 74.91 | 80.96 |
-x4 w/ st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1 | 76.04 | 81.77 | 86.50 | 94.05 | 75.63 | 81.50 |
-x5 w/ st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1 | 76.31 | 82.31 | 86.80 | 94.50 | 75.81 | 81.32 |
-x2 w/ st:sentence-transformers/multi-qa-mpnet-base-cos-v1 | 77.24 | 83.79 | 87.40 | 93.90 | 77.98 | 83.75 |
-x3 w/ st:sentence-transformers/multi-qa-mpnet-base-cos-v1 | 76.97 | 83.90 | 87.75 | 94.95 | 76.71 | 83.03 |
-x4 w/ st:sentence-transformers/multi-qa-mpnet-base-cos-v1 | 77.24 | 84.01 | 87.40 | 95.10 | 76.08 | 82.85 |
-x5 w/ st:sentence-transformers/multi-qa-mpnet-base-cos-v1 | 76.97 | 83.84 | 87.65 | 95.50 | 76.35 | 82.85 |
+reranking_k_factor w/ emb model | qrecc @3 | qrecc @10 | strategyqa @3 | strategyqa @10 | msmarco @3 | msmarco @10
+----- |----------|-----------|---------------|----------------|------------| ----------
+x2 w/ st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1 | 75.11    | 80.19     | 86.00         | 92.25          | 75.09      | 79.96 |
+x3 w/ st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1 | 76.04    | 81.39     | 86.30         | 93.50          | 74.91      | 80.96 |
+x4 w/ st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1 | 76.04    | 81.77     | 86.50         | 94.05          | 75.63      | 81.50 |
+x5 w/ st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1 | 76.31    | 82.31     | 86.80         | 94.50          | 75.81      | 81.32 |
+x2 w/ st:sentence-transformers/multi-qa-mpnet-base-cos-v1 | 77.24    | 83.79     | 87.40         | 93.90          | 77.98      | 83.75 |
+x3 w/ st:sentence-transformers/multi-qa-mpnet-base-cos-v1 | 76.97    | 83.90     | 87.75         | 94.95          | 76.71      | 83.03 |
+x4 w/ st:sentence-transformers/multi-qa-mpnet-base-cos-v1 | 77.24    | 84.01     | 87.40         | 95.10          | 76.08      | 82.85 |
+x5 w/ st:sentence-transformers/multi-qa-mpnet-base-cos-v1 | 76.97    | 83.84     | 87.65         | 95.50          | 76.35      | 82.85 |
 
 These embedding models, with the boosting provided by `qpm-distilroberta-01`, nearly reach the memory
 retrieval accuracy of our best embedding models. Reranking in this manner could be useful if you need
