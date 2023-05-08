@@ -197,12 +197,18 @@ passage embeddings in some of our fine-tuned models.
 
 A query-passage matching/reranking model can be loaded as follows:
 
+    from goodai.ltm.reranking.auto import AutoTextMatchingModel
+    
     model = AutoTextMatchingModel.from_pretrained(model_name)
 
 The `model_name` can be one of the following:
 
 * A "st:" prefix followed by the name of a Huggingface cross-encoder compatible with the SentenceTransformers library, like "st:cross-encoder/stsb-distilroberta-base"
-* 
+* One of our fine-tuned models:
+
+| Name | Base model | # parameters |
+| ---- | ---------- | ------------ |
+| qpm-distilroberta-01 | sentence-transformers/all-distilroberta-v1 | x |
 
 
 ## Query-passage matching model usage
@@ -211,7 +217,7 @@ The `predict` method of the model takes a list of
 query-passage tuples and returns a list of floats
 representing match probabilities. Example:
 
-    model = AutoTextMatchingModel.from_pretrained('st:cross-encoder/stsb-distilroberta-base')
+    model = AutoTextMatchingModel.from_pretrained('qpm-distilroberta-01')
     sentences = [
         ('Mike: What is your favorite color?', 'Steve: My favorite color is purple.'),
         ('Name the inner planets.', 'It was the best of times, it was the worst of times.'),
