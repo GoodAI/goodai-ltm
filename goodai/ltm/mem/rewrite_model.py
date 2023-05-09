@@ -3,6 +3,7 @@ import os
 import string
 from abc import abstractmethod, ABC
 from textwrap import dedent
+from typing import List
 
 import openai
 
@@ -131,7 +132,8 @@ class OpenAIRewriteModel(BaseRewriteModel):
                  temperature: float = 0.7,
                  max_tokens: int = 512,
                  query_rewrite_prompt: str = None,
-                 memory_rewrite_prompt: str = None):
+                 memory_rewrite_prompt: str = None,
+                 max_input_chars: int = 2048):
         self.model_name = model_name
         if api_key:
             self.api_key = api_key
@@ -143,32 +145,39 @@ class OpenAIRewriteModel(BaseRewriteModel):
         self.max_tokens = max_tokens
         self.query_prompt_template = query_rewrite_prompt or DEFAULT_QUERY_PROMPT_TEMPLATE
         self.memory_prompt_template = memory_rewrite_prompt or DEFAULT_MEMORY_PROMPT_TEMPLATE
+        self.max_input_chars = max_input_chars
 
     def rewrite_query(self, query: str) -> str:
+        self.check_inputs([query])
         prompt = self.make_query_prompt(query)
         return self.post_process_query(self.completion(prompt))
 
     def rewrite_memory(self, passage: str, context: str) -> str:
+        self.check_inputs([passage, context])
         prompt = self.make_memory_prompt(passage, context)
         return self.post_process_memory(self.completion(prompt))
 
-    def completion(self, prompt):
+    def completion(self, prompt) -> str:
         openai.api_key = self.api_key
         response = openai.Completion.create(model=self.model_name, prompt=prompt, temperature=self.temperature,
                                             max_tokens=self.max_tokens)
         return response['choices'][0]['text'].strip()
 
-    def make_query_prompt(self, query):
+    def make_query_prompt(self, query) -> str:
         return string.Template(self.query_prompt_template).substitute(query=query)
 
-    def make_memory_prompt(self, passage, context):
+    def make_memory_prompt(self, passage, context) -> str:
         return string.Template(self.memory_prompt_template).substitute(passage=passage, context=context)
 
-    def post_process_query(self, query: str):
+    def post_process_query(self, query: str) -> str:
         return json.loads(query)["processed"]
 
-    def post_process_memory(self, memory: str):
+    def post_process_memory(self, memory: str) -> str:
         return "\n".join(json.loads(memory)["processed"].values())
+
+    def check_inputs(self, inputs: List[str]):
+        if sum([len(e) for e in inputs]) >= self.max_input_chars:
+            raise ValueError(f"Input length exceeding {self.max_input_chars} characters")
 
 
 class OpenAIChatRewriteModel(OpenAIRewriteModel):
@@ -184,20 +193,24 @@ class OpenAIChatRewriteModel(OpenAIRewriteModel):
                  query_rewrite_prompt: str = None,
                  memory_rewrite_prompt: str = None,
                  query_rewrite_system_message: str = None,
-                 memory_rewrite_system_message: str = None):
-        super().__init__(model_name, api_key, temperature, max_tokens, query_rewrite_prompt, memory_rewrite_prompt)
+                 memory_rewrite_system_message: str = None,
+                 max_input_chars: int = 2048):
+        super().__init__(model_name, api_key, temperature, max_tokens, query_rewrite_prompt, memory_rewrite_prompt,
+                         max_input_chars)
         self.query_rewrite_system_message = query_rewrite_system_message or DEFAULT_QUERY_SYSTEM_MESSAGE
         self.memory_rewrite_system_message = memory_rewrite_system_message or DEFAULT_MEMORY_SYSTEM_MESSAGE
 
     def rewrite_query(self, query: str) -> str:
+        self.check_inputs([query])
         prompt = self.make_query_prompt(query)
         return self.post_process_query(self.chat_completion(prompt, self.query_rewrite_system_message))
 
     def rewrite_memory(self, passage: str, context: str) -> str:
+        self.check_inputs([passage, context])
         prompt = self.make_memory_prompt(passage, context)
         return self.post_process_memory(self.chat_completion(prompt, self.memory_rewrite_system_message))
 
-    def chat_completion(self, prompt, system_message):
+    def chat_completion(self, prompt, system_message) -> str:
         messages = [
             {"role": "system", "content": system_message},
             {"role": "user", "content": prompt}
