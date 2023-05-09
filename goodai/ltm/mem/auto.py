@@ -14,7 +14,7 @@ from goodai.ltm.mem.rewrite_model import BaseRewriteModel
 from goodai.ltm.reranking.base import BaseTextMatchingModel
 
 _default_emb_model = None
-_default_matching_model = None
+_default_tokenizer = None
 
 
 class MemType(enum.Enum):
@@ -49,7 +49,11 @@ class AutoTextMemory:
         :return: An instance of BaseTextMemory.
         """
         if tokenizer is None:
-            tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained('distilroberta-base')
+            global _default_tokenizer
+
+            if _default_tokenizer is None:
+                _default_tokenizer = AutoTokenizer.from_pretrained('distilroberta-base')
+            tokenizer = _default_tokenizer
             # Suppress length warning
             tokenizer.model_max_length = sys.maxsize
         if device is None:
