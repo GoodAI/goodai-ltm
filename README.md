@@ -177,9 +177,7 @@ are found and the corresponding texts decoded.
 Optionally, a query-passage matching model can be used to compute pairwise query-passage matching probabilities 
 and rerank the passages.
 
-The diagrams below illustrate what happens during storage and retrieval (sans optional query and memory rewriting).
-
-![Storage](diagram-all-50.png)
+![Storage](diagram-simple.png)
 
 ## Loading an embedding model
 
