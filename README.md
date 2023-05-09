@@ -207,8 +207,8 @@ The `model_name` can be one of the following:
 * One of our fine-tuned models:
 
 | Name | Base model | # parameters |
-| ---- | ---------- | ------------ |
-| qpm-distilroberta-01 | sentence-transformers/all-distilroberta-v1 | x |
+| ---- | ---------- |--------------|
+| qpm-distilroberta-01 | sentence-transformers/all-distilroberta-v1 | 82.1m        |
 
 Note that a limitation of our fine-tuned query-passage matching models is that they are optimized
 for short passages (24 to 36 tokens) and the passages are truncated by the model during inference.
@@ -260,6 +260,7 @@ retrieval accuracy for each dataset.
 
 Model | qrecc @3 | qrecc @10 | strategyqa @3 | strategyqa @10 | msmarco @3 | msmarco @10
 ----- | ------- | -------- | ------------ | ------------- | --------- | ----------
+openai:text-embedding-ada-002 | 67.09 | 76.80 | 68.00 | 82.40 | 73.10 | 80.14 | 
 st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1 | 69.98 | 77.57 | 73.90 | 87.75 | 70.31 | 77.71 |
 st:sentence-transformers/all-distilroberta-v1 | 65.01 | 76.15 | 66.35 | 82.50 | 68.59 | 78.34 |
 st:sentence-transformers/sentence-t5-large | 68.40 | 78.28 | 72.55 | 86.60 | 71.30 | 80.51 |
