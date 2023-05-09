@@ -13,6 +13,9 @@ from goodai.ltm.mem.mem_foundation import VectorDbType
 from goodai.ltm.mem.rewrite_model import BaseRewriteModel
 from goodai.ltm.reranking.base import BaseTextMatchingModel
 
+_default_emb_model = None
+_default_matching_model = None
+
 
 class MemType(enum.Enum):
     TRANSIENT_CHUNK_EMB = 0
@@ -52,8 +55,12 @@ class AutoTextMemory:
         if device is None:
             device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
         if emb_model is None:
-            emb_model = AutoTextEmbeddingModel.from_pretrained('em-distilroberta-p1-01',
-                                                               device=device)
+            global _default_emb_model
+
+            if _default_emb_model is None:
+                _default_emb_model = AutoTextEmbeddingModel.from_pretrained('em-distilroberta-p1-01',
+                                                                            device=device)
+            emb_model = _default_emb_model
         if config is None:
             config = TextMemoryConfig()
         return DefaultTextMemory(vector_db_type, tokenizer, emb_model, matching_model,
