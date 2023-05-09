@@ -1,3 +1,4 @@
+import gc
 import unittest
 
 from goodai.ltm.embeddings.auto import AutoTextEmbeddingModel
@@ -31,3 +32,11 @@ class TestMem(unittest.TestCase):
         mems = []
         for i in range(100):
             mems.append(AutoTextMemory.create())
+
+    def test_create_after_delete(self):
+        mem1 = AutoTextMemory.create()
+        mem1.add_text('foobar')
+        del mem1
+        gc.collect()
+        mem2 = AutoTextMemory.create()
+        mem2.add_text('foobar')
