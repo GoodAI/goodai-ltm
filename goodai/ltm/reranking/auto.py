@@ -3,13 +3,14 @@ from typing import Union
 import torch
 
 from goodai.helpers.file_helper import open_url_as_file
+from goodai.ltm.embeddings.auto import AutoTextEmbeddingModel
 from goodai.ltm.reranking.base import BaseTextMatchingModel
 from goodai.ltm.reranking.default import DefaultRerankingCrossEncoder
+from goodai.ltm.reranking.emb import EmbeddingBasedMatchingModel
 from goodai.ltm.reranking.st_ce import SentenceTransformerTextMatchingModel
 
+_default_dist_param = 0.75
 _models_base = 'https://github.com/GoodAI/goodai-ltm-artifacts/releases/download/models/goodai-ltm-qpm-model'
-
-
 _pretrained_map = {
     'qpm-distilroberta-01': f'{_models_base}-1145'
 }
@@ -41,5 +42,8 @@ class AutoTextMatchingModel:
         model_name = name[colon_idx + 1:]
         if model_type == 'st':
             return SentenceTransformerTextMatchingModel(model_name)
+        elif model_type == 'em':
+            emb_model = AutoTextEmbeddingModel.from_pretrained(model_name, device=device)
+            return EmbeddingBasedMatchingModel(emb_model, _default_dist_param)
         else:
             raise ValueError(f'Unknown model type: {model_type}')

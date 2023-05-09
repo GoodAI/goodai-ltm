@@ -204,6 +204,7 @@ A query-passage matching/reranking model can be loaded as follows:
 The `model_name` can be one of the following:
 
 * A "st:" prefix followed by the name of a Huggingface cross-encoder compatible with the SentenceTransformers library, like "st:cross-encoder/stsb-distilroberta-base"
+* An "em:" prefix followed by the name of an embedding model supported by this library, like "em:openai:text-embedding-ada-002" or "em:em-distilroberta-p3-01"
 * One of our fine-tuned models:
 
 | Name | Base model | # parameters |
