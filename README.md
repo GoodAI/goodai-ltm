@@ -171,12 +171,11 @@ the text is interpreted as a query preceded by context. For example,
     
 will rewrite the query as "Does John like ice cream?". 
 
+The embedding model converts the query into an embedding. Then the stored embeddings closest to the query embedding 
+are found and the corresponding texts decoded.
 
-During retrieval, the stored embeddings closest to the query embedding are found and the corresponding texts 
-decoded. 
-
-<!--- In addition to the steps above, it is also possible to rewrite queries and memories and to perform passage 
-reranking after retrieval.  --->
+Optionally, a query-passage matching model can be used to compute pairwise query-passage matching probabilities 
+and rerank the passages.
 
 The diagrams below illustrate what happens during storage and retrieval (sans optional query and memory rewriting).
 
