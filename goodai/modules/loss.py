@@ -26,3 +26,12 @@ class EmbCrossProbLossModel(nn.Module):
         c_prob_logs = -(c_dist * (5.0 * self.dist_param)).pow(2)
         label = torch.arange(0, batch_size, dtype=torch.long, device=embeddings_a.device)
         return (self.criterion(c_prob_logs, label) + self.criterion(c_prob_logs.transpose(0, 1), label)) / 2
+
+    def get_dist_param_scalar(self) -> float:
+        return self.dist_param[0, 0].item()
+
+    @staticmethod
+    def get_prob(distances: torch.Tensor, dist_param: float):
+        # distances: (batch_size, 1,)
+        c_prob_logs = -(distances * dist_param).pow(2)
+        return torch.exp(c_prob_logs)
