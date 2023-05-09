@@ -27,6 +27,10 @@ class EvalSpec:
                    rerankingKFactor=reranking_k_factor)
 
 
+_hf_eval_specs_0 = [EvalSpec(mid, mid) for mid in [
+    'st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1',
+]]
+
 _hf_eval_specs_1 = [EvalSpec(mid, mid) for mid in [
     'st:sentence-transformers/all-distilroberta-v1',
     'st:sentence-transformers/sentence-t5-large',
@@ -113,12 +117,10 @@ if __name__ == '__main__':
     device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
     torch.manual_seed(1001)
     top_ks = [3, 10]
-    tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/all-distilroberta-v1')
-    # datasets = ['msmarco']
-    # datasets = ['qrecc']
+    tokenizer = AutoTokenizer.from_pretrained('distilroberta-base')
     datasets = ['qrecc', 'strategyqa', 'msmarco']
-
-    eval_specs: List[EvalSpec] = _qpm_eval_specs_10
+    # datasets = ['qrecc']
+    eval_specs: List[EvalSpec] = _openai_eval_specs
 
     ds_top_ks = [f'{ds_name}@{top_k}' for ds_name in datasets for top_k in top_ks]
     table_out = 'Model | ' + ' | '.join([ds_name for ds_name in ds_top_ks]) + '\n'

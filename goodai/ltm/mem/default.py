@@ -3,6 +3,7 @@ from typing import List, Union, Any, Callable, Set, Optional, Tuple
 import numpy as np
 import torch
 from faiss import Index
+from tqdm import tqdm
 from transformers import PreTrainedTokenizer
 
 from goodai.helpers.tokenizer_helper import get_pad_token_id, get_sentence_punctuation_ids
@@ -90,7 +91,7 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
         return self.matching_model.predict(sentences, show_progress_bar=show_progress_bar)
 
     def add_text(self, text: str, metadata: Optional[Any] = None, rewrite: bool = False,
-                 rewrite_context: Optional[str] = None):
+                 rewrite_context: Optional[str] = None, show_progress_bar: bool = False):
         if rewrite and not self.memory_rewrite_model:
             raise ValueError("For memory rewriting, a rewriting model must be provided")
         if rewrite and self.memory_rewrite_model:
@@ -98,7 +99,7 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
 
         token_ids = self.chunk_tokenizer.encode(text, add_special_tokens=False)
         removed_buckets = self.chunk_queue.add_sequence(token_ids, metadata)
-        self._ensure_keys_added()
+        self._ensure_keys_added(show_progress_bar=show_progress_bar)
         removed_indexes = [rb.index for rb in removed_buckets]
         if len(removed_indexes) > 0:
             self.vector_db.remove_ids(np.array(removed_indexes).astype(np.int64))
@@ -115,16 +116,19 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
     def get_all_chunks(self) -> List[Chunk]:
         return self.chunk_queue.get_all_chunks()
 
-
-    def _ensure_keys_added(self, batch_size=50):
+    def _ensure_keys_added(self, batch_size=50, show_progress_bar: bool = False):
         picked_chunks, token_id_matrix = self.chunk_queue.get_chunks_for_indexing()
         emb_model = self.emb_model
         sk_list = []
         num_sequences = len(token_id_matrix)
-        for i in range(0, num_sequences, batch_size):
+        rng = range(0, num_sequences, batch_size)
+        if show_progress_bar:
+            rng = tqdm(rng, desc='Storage', unit='batch')
+        for i in rng:
             token_id_batch = token_id_matrix[i:i + batch_size]
             text_batch = self.chunk_tokenizer.batch_decode(token_id_batch, skip_special_tokens=True)
-            sk_batch = emb_model.encode_corpus(text_batch, convert_to_tensor=True)
+            sk_batch = emb_model.encode_corpus(text_batch, convert_to_tensor=True,
+                                               show_progress_bar=False)
             if sk_batch.size(0) != len(text_batch):
                 raise SystemError(f'Number of storage embeddings returned by embedding model is {sk_batch.size(0)}, '
                                   f'while the number of encoded texts is {len(text_batch)}')

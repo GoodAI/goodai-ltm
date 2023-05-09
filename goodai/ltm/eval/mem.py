@@ -90,8 +90,8 @@ class BaseMemEvaluator(ABC):
 
     def evaluate(self, memory: BaseTextMemory) -> Dict[str, float]:
         facts = self.get_facts_to_be_stored()
-        for fact in tqdm(facts, desc='Storage', unit='fact'):
-            memory.add_text(fact + '\n')
+        facts_text = '\n'.join(facts)
+        memory.add_text(facts_text + '\n', show_progress_bar=True)
         scenarios = self.get_scenarios()
         queries, supports = self.get_queries_and_support(scenarios)
         k = max(self.top_ks)

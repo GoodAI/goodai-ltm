@@ -57,7 +57,7 @@ class OpenAIEmbeddingModel(BaseTextEmbeddingModel):
                 emb_vectors = [entry['embedding'] for entry in data_array]
                 all_emb_vectors.extend(emb_vectors)
         if convert_to_tensor:
-            return torch.as_tensor(emb_vectors, dtype=torch.float, device=device).unsqueeze(1)
+            return torch.as_tensor(all_emb_vectors, dtype=torch.float, device=device).unsqueeze(1)
         else:
             return np.array(all_emb_vectors)[:, None, :]
 

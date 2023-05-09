@@ -14,7 +14,7 @@ from goodai.helpers.torch_helper import param_count
 from goodai.ltm.data.cloud import CloudStorage
 from goodai.ltm.reranking.default import DefaultRerankingCrossEncoder
 
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoTokenizer
 
 from goodai.ltm.training.query_passage.qppm_trainer import QPPMTrainer
 
@@ -32,8 +32,8 @@ _data_sources = [
 @click.option('--batch-size', default=200, type=int, help='Batch size')
 @click.option('--num-epochs', default=200, type=int, help='The number of epochs')
 @click.option('--save', default=False, type=bool, help='Whether to save the model in S3 bucket', is_flag=True)
-@click.option('--lm-lr', default=3e-6, type=float, help='Learning rate of parameters of pretrained language model')
-@click.option('--extras-lr', default=3e-4, type=float, help='Learning rate of parameters added to model')
+@click.option('--lm-lr', default=1.5e-6, type=float, help='Learning rate of parameters of pretrained language model')
+@click.option('--extras-lr', default=5e-5, type=float, help='Learning rate of parameters added to model')
 @click.option('--seed', default=7002, type=int, help='Randomization seed')
 @click.option('--switch-ds-every', default=1, type=int, help='How often (epochs) to switch generated dataset')
 @click.option('--num-ds-examples', default=600, type=int, help='Number of examples in generated dataset')
@@ -53,7 +53,6 @@ def run(model_name: str, batch_size: int, num_epochs: int,
     print(f'Loading model "{model_name}"...')
     if not save:
         logging.warning('Trained model will not be saved.')
-    lang_model = AutoModel.from_pretrained(model_name)
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = DefaultRerankingCrossEncoder(model_name, default_query_seq_len=max_query_tokens,
                                          default_passage_seq_len=max_passage_tokens)
@@ -71,7 +70,6 @@ def run(model_name: str, batch_size: int, num_epochs: int,
     model.eval()
     # TODO evaluation
     # vector_db = SimpleVectorDb()
-    # emb_model = todo()
     # memory = DefaultTextMemory(vector_db, tokenizer, emb_model, model, _device, TextMemoryConfig())
     if save:
         del trainer
