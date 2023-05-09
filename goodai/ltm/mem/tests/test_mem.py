@@ -40,3 +40,10 @@ class TestMem(unittest.TestCase):
         gc.collect()
         mem2 = AutoTextMemory.create()
         mem2.add_text('foobar')
+
+    def test_blank_query(self):
+        mem1 = AutoTextMemory.create()
+        mem1.add_text('foobar')
+        mem1.retrieve('', k=5)
+
+

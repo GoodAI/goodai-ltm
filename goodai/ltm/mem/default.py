@@ -70,13 +70,13 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
 
     def retrieve_multiple(self, queries: List[str], k: int = 1, rewrite: bool = False,
                           show_progress_bar: bool = False,
-                          max_query_length: Optional[int] = 40) -> List[List[RetrievedMemory]]:
+                          max_query_length: Optional[int] = 40, **kwargs) -> List[List[RetrievedMemory]]:
         if rewrite and not self.query_rewrite_model:
             raise ValueError("For query rewriting, a rewriting model must be provided")
         if rewrite and self.query_rewrite_model:
             queries = [self.query_rewrite_model.rewrite_query(q) for q in queries]
         return super().retrieve_multiple(queries, k, rewrite, show_progress_bar,
-                                         max_query_length=max_query_length)
+                                         max_query_length=max_query_length, **kwargs)
 
     def retrieve_chunk_sequences(self, chunk_ids: List[int]):
         return self.chunk_queue.retrieve_chunk_sequences(chunk_ids)
