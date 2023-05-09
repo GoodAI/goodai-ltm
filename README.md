@@ -106,6 +106,8 @@ the following properties:
 
 For a slightly more detailed view of how the memory works, let us revisit the storage and retrieval of text passages.
 
+### Storage
+
     text_example = """\
     Jake Morales: Hey Archie, what do you think about teaming up with me and Isaac Coax? 
     We could come up with a plan that would distract Lucas Fern.
@@ -116,8 +118,12 @@ To store this text, we create an instance of the default memory class and add th
     mem = AutoTextMemory.create()
     mem.add_text(text_example)
    
-Optionally, text can be rewritten to form memories that are less ambiguous and more self contained. To do this, we
-pass both the text to be stored and some preceding text for context to the `add_text` method.
+Optionally, text can be rewritten to form memories that are less ambiguous and more self contained. To do this, we 
+need to provide a rewrite language model when creating the memory. We then pass both the text to be stored and some 
+preceding text for context to the `add_text` method. 
+    
+    r = OpenAIRewriteModel()
+    mem = AutoTextMemory.create(query_rewrite_model=r, memory_rewrite_model=r)
 
     passage = "Archie: That would be great."
     context = """Jake Morales: Hey Archie, what do you think about teaming up with me and Isaac Coax? 
@@ -125,7 +131,7 @@ pass both the text to be stored and some preceding text for context to the `add_
     mem.add_text(text=passage, rewrite=True, rewrite_context=context)
     
 This will rewrite the passage "Archie: That would be great." as "Archie thinks it would be great to team up with Jake Morales and Isaac Coax to come up 
-with a plan that would distract Lucas Fern." The rewritten text will be stored.
+with a plan that would distract Lucas Fern." and store the rewritten text.
     
 The text is encoded by the tokenizer as token ids.
 
@@ -150,11 +156,27 @@ The embeddings, and the corresponding chunk indexes, are added to the vector dat
 The passages are now represented in memory as pairs of vectors and chunk indexes in the vector database and as 
 sequences of tokens in the chunk queue. From the token sequences, the text can be recovered.
 
-During retrieval, the stored embeddings closest to the query embedding are found and the corresponding texts 
-decoded.
+### Retrieval 
 
-In addition to the steps above, it is also possible to rewrite queries and memories and to perform passage 
-reranking after retrieval. 
+To retrieve memories, we pass a query and the desired number of memories to the method `retrieve`. For example,
+
+    mem.retrieve("What does Jake propose?", k=2)
+
+will return the two passages most relevant to the query.
+
+Queries, like memories, can optionally be rewritten. In this case, we still pass a single text to `retrieve`;
+the text is interpreted as a query preceded by context. For example,
+
+    mem.retrieve("John: Not everyone is fond of ice cream. Mary: Do you like it?", k=3, rewrite=True)
+    
+will rewrite the query as "Does John like ice cream?". 
+
+
+During retrieval, the stored embeddings closest to the query embedding are found and the corresponding texts 
+decoded. 
+
+<!--- In addition to the steps above, it is also possible to rewrite queries and memories and to perform passage 
+reranking after retrieval.  --->
 
 The diagrams below illustrate what happens during storage and retrieval (sans optional query and memory rewriting).
 
