@@ -128,7 +128,7 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
             token_id_batch = token_id_matrix[i:i + batch_size]
             text_batch = self.chunk_tokenizer.batch_decode(token_id_batch, skip_special_tokens=True)
             sk_batch = emb_model.encode_corpus(text_batch, convert_to_tensor=True,
-                                               show_progress_bar=False)
+                                               show_progress_bar=False, batch_size=batch_size)
             if sk_batch.size(0) != len(text_batch):
                 raise SystemError(f'Number of storage embeddings returned by embedding model is {sk_batch.size(0)}, '
                                   f'while the number of encoded texts is {len(text_batch)}')
