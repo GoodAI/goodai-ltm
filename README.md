@@ -207,22 +207,23 @@ The `model_name` can be one of the following:
 
 * A "st:" prefix followed by the name of a Huggingface cross-encoder compatible with the SentenceTransformers library, like "st:cross-encoder/stsb-distilroberta-base"
 * An "em:" prefix followed by the name of an embedding model supported by this library, like "em:openai:text-embedding-ada-002" or "em:em-distilroberta-p3-01"
-* One of our fine-tuned models:
-
-| Name | Base model | # parameters |
-| ---- | ---------- |--------------|
-| qpm-distilroberta-01 | sentence-transformers/all-distilroberta-v1 | 82.1m        |
-
-Note that a limitation of our fine-tuned query-passage matching models is that they are optimized
-for short passages (24 to 36 tokens) and the passages are truncated by the model during inference.
 
 Memory instances, by default, do not use a query-passage matching model. To enable one, it should be configured
 as follows:
 
-    qpmm = AutoTextMatchingModel.from_pretrained('qpm-distilroberta-01')
+    from goodai.ltm.embeddings.auto import AutoTextEmbeddingModel
+    from goodai.ltm.mem.auto import AutoTextMemory
+    from goodai.ltm.mem.config import TextMemoryConfig
+    from goodai.ltm.reranking.auto import AutoTextMatchingModel
+    
+    
+    # Low-resource embedding model
+    emb_model = AutoTextEmbeddingModel.from_pretrained('em-MiniLM-p1-01')
+    # QPM model that boosts retrieval accuracy
+    qpm_model = AutoTextMatchingModel.from_pretrained('em:em-distilroberta-p5-01')
     config = TextMemoryConfig()
-    config.reranking_k_factor = 3
-    mem = AutoTextMemory.create(matching_model=qpmm, config=config)
+    config.reranking_k_factor = 8
+    mem = AutoTextMemory.create(matching_model=qpm_model, emb_model=emb_model, config=config)
 
 The `reranking_k_factor` setting tells the memory how many candidates it should consider
 for reranking. The user requests `k` memories. The reranking algorithm considers
@@ -232,7 +233,7 @@ for reranking. The user requests `k` memories. The reranking algorithm considers
 
 The `predict` method of the model takes a list of
 query-passage tuples and returns a list of floats
-representing match probabilities. Example:
+representing estimated match probabilities. Example:
 
     model = AutoTextMatchingModel.from_pretrained('qpm-distilroberta-01')
     sentences = [
@@ -278,39 +279,38 @@ em-distilroberta-p5-01 (ours) | **78.88** | 84.44 | **87.40** | **95.70**  | 79.
 Model `em-distilroberta-p1-01` is the default embedding model used
 by this library. While `em-distilroberta-p3-01` and `em-distilroberta-p5-01` have better
 retrieval accuracy, note that they require storing 3 and 5 embeddings
-per chunk, respectively. The distilroberta models have 82 million parameters
-and their embedding size is 768.
+per chunk, respectively. 
 
-Model `em-MiniLM-p3-01` is a good choice if you need
-a lightweight model. It has only 22.7 million parameters.
-It produces 3 storage embeddings per chunk, but these 
-are embeddings of size 384.
+## Boosting the accuracy of low-resource embedding models
 
-## Evaluation of query-passage matching models
+At this time, we haven't found a reranking cross-encoder that can consistently boost
+the retrieval accuracy of our best embedding models. That said, you can use accurate
+embedding models as query-passage matching models, alongside a low-resource embedding
+model. This combination's accuracy nearly matches that of the best embedding models from 
+this library.
 
-At this time, we have yet to find a reranking cross-encoder that can consistently boost the retrieval accuracy of our best
-embedding models, but our default fine-tuned matching model is able to improve memory accuracy relative
-to weak/low-resource embedding models. The following tests were performed on a memory configured
-to use `qpm-distilroberta-01` as the query-passage matching model, and two different embedding models
-with different values assigned to the `reranking_k_factor` setting.
+The following tests were performed by configuring a memory to use `em-MiniLM-p1-01`
+as the embedding model and `em:em-distilroberta-p5-01` as the matching/reranking model
+with different values of the `reranking_k_factor` setting.
 
-reranking_k_factor w/ emb model | qrecc @3 | qrecc @10 | strategyqa @3 | strategyqa @10 | msmarco @3 | msmarco @10
+reranking_k_factor | qrecc @3 | qrecc @10 | strategyqa @3 | strategyqa @10 | msmarco @3 | msmarco @10
 ----- |----------|-----------|---------------|----------------|------------| ----------
-x2 w/ st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1 | 75.11    | 80.19     | 86.00         | 92.25          | 75.09      | 79.96 |
-x3 w/ st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1 | 76.04    | 81.39     | 86.30         | 93.50          | 74.91      | 80.96 |
-x4 w/ st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1 | 76.04    | 81.77     | 86.50         | 94.05          | 75.63      | 81.50 |
-x5 w/ st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1 | 76.31    | 82.31     | 86.80         | 94.50          | 75.81      | 81.32 |
-x2 w/ st:sentence-transformers/multi-qa-mpnet-base-cos-v1 | 77.24    | 83.79     | 87.40         | 93.90          | 77.98      | 83.75 |
-x3 w/ st:sentence-transformers/multi-qa-mpnet-base-cos-v1 | 76.97    | 83.90     | 87.75         | 94.95          | 76.71      | 83.03 |
-x4 w/ st:sentence-transformers/multi-qa-mpnet-base-cos-v1 | 77.24    | 84.01     | 87.40         | 95.10          | 76.08      | 82.85 |
-x5 w/ st:sentence-transformers/multi-qa-mpnet-base-cos-v1 | 76.97    | 83.84     | 87.65         | 95.50          | 76.35      | 82.85 |
+1 | 76.97    | 79.75     | 84.65         | 89.05          | 76.62      | 79.33 |
+2 | 77.95    | 81.39     | 86.55         | 92.85          | 77.89      | 81.41 |
+3 | 78.33    | 82.53     | 87.10         | 93.90          | 78.61      | 82.85 |
+5 | 78.60    | 83.19     | 87.35         | 94.60          | 78.97      | 83.48 |
+8  | 78.93    | 84.44     | 87.25         | 95.15          | 79.33      | 83.84 |
+10 | 78.93    | 84.50     | 87.45         | 95.55          | 79.15      | 84.21 |
 
-These embedding models, with the boosting provided by `qpm-distilroberta-01`, nearly reach the memory
-retrieval accuracy of our best embedding models. Reranking in this manner could be useful if you need
-to have a compact model with small embeddings in production. Note, however, that the query-passage
-matching model does add a performance overhead when executing queries.
+Model `em-MiniLM-p1-01` stores a single embedding of size 384 per chunk, while model
+`em-distilroberta-p5-01` produces 5 storage embeddings per chunk, of size 768. The number of storage embeddings
+has little impact when the embedding model is used as a query-passage matching model.
+It does matter, however, in terms of chunk storage capacity when embeddings
+are attached to chunks. In the case of the two models in question, the difference 
+in footprint is 10-fold.
 
-The matching model can also be useful if you need the confidence scores of retrieved memories.
+Using a matching model does come with a performance overhead in every query, but in 
+the context of an LLM-based chat agent implementation, the overhead should be unnoticeable.
 
 ## Future plans
 

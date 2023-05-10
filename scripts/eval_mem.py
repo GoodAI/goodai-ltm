@@ -128,8 +128,8 @@ _qpm_eval_specs_13 = [EvalSpec.for_qpm('em:em-distilroberta-p5-01', mid, rkf) fo
 ]]
 
 _qpm_eval_specs_14 = [EvalSpec.for_qpm('em:em-distilroberta-p5-01', mid, rkf) for mid, rkf in [
+    ('em-MiniLM-p1-01', 15),
     ('em-MiniLM-p1-01', 20),
-    ('em-distilroberta-p5-01', 1),
 ]]
 
 _qpm_eval_specs_15 = [EvalSpec.for_qpm('em:em-distilroberta-p5-01', mid, rkf) for mid, rkf in [
@@ -142,7 +142,7 @@ _qpm_eval_specs_17 = [EvalSpec.for_qpm('em:em-distilroberta-p5-01', mid, rkf) fo
 ]]
 
 if __name__ == '__main__':
-    eval_specs: List[EvalSpec] = _qpm_eval_specs_17
+    eval_specs: List[EvalSpec] = _qpm_eval_specs_14
 
     device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
     torch.manual_seed(1001)
