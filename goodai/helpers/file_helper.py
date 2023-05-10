@@ -2,9 +2,11 @@ import codecs
 import hashlib
 import logging
 import os
+import pickle
 import tempfile
 import zipfile
 import urllib.request
+from typing import Any
 from urllib.parse import urlparse
 from tqdm import tqdm
 
@@ -31,6 +33,22 @@ def download_zip(url):
     return temp_dir
 
 
+def unpickle_downloaded_url(url: str) -> Any:
+    for attempt in range(2):
+        with open_url_as_file(url) as fd:
+            try:
+                return pickle.load(fd)
+            except (EOFError, pickle.UnpicklingError):
+                logging.warning(f'Discarding corrupted file downloaded from {url}')
+        cache_file = get_cache_file_for_url(url)
+        try:
+            os.remove(cache_file)
+        except (FileNotFoundError, PermissionError):
+            # ignore
+            pass
+    raise SystemError('Failed to unpickle object')
+
+
 def open_url_as_file(url, mode='rb'):
     file_name = url_as_file(url)
     return open(file_name, mode=mode)
@@ -41,8 +59,7 @@ def codecs_open_url_as_file(url, mode='r', encoding='utf-8'):
     return codecs.open(file_name, mode=mode, encoding=encoding)
 
 
-def url_as_file(url) -> str:
-    # Create the cache directory if it does not exist
+def get_cache_file_for_url(url: str) -> str:
     if not os.path.exists(_cache_dir):
         os.makedirs(_cache_dir)
 
@@ -51,6 +68,11 @@ def url_as_file(url) -> str:
     url_hash = hashlib.md5(url.encode('utf-8')).hexdigest()
     base_name = os.path.basename(url_parts.path)
     file_name = os.path.join(_cache_dir, url_hash + '_' + base_name)
+    return file_name
+
+
+def url_as_file(url) -> str:
+    file_name = get_cache_file_for_url(url)
     progress_fn = file_name + '-in-progress'
 
     if not os.path.exists(file_name) or os.path.exists(progress_fn):
@@ -73,3 +95,4 @@ def url_as_file(url) -> str:
     else:
         logging.info(f'Found cached version of {url}')
     return file_name
+

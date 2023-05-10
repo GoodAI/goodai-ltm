@@ -3,7 +3,7 @@ from typing import Union
 
 import torch
 
-from goodai.helpers.file_helper import open_url_as_file
+from goodai.helpers.file_helper import open_url_as_file, unpickle_downloaded_url
 from goodai.ltm.embeddings.openai_emb import OpenAIEmbeddingModel
 from goodai.ltm.embeddings.st_emb import SentenceTransformerEmbeddingModel
 from goodai.ltm.embeddings.trainable import TrainableEmbeddingModel
@@ -46,13 +46,12 @@ class AutoTextEmbeddingModel:
             url = _pretrained_map.get(name)
             if url is None:
                 raise ValueError(f'GoodAI model not found: {name}')
-            with open_url_as_file(url) as fd:
-                model_dict = pickle.load(fd)
-                model: TrainableEmbeddingModel = model_dict['emb_model']
-                model.to(device)
-                model.zero_grad(set_to_none=True)
-                model.eval()
-                return model
+            model_dict = unpickle_downloaded_url(url)
+            model: TrainableEmbeddingModel = model_dict['emb_model']
+            model.to(device)
+            model.zero_grad(set_to_none=True)
+            model.eval()
+            return model
         model_type = name[:colon_idx]
         model_name = name[colon_idx + 1:]
         if model_type == 'st':

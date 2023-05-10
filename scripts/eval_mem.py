@@ -53,6 +53,11 @@ _goodai_eval_specs = [EvalSpec(mid, mid) for mid in [
     'em-MiniLM-p3-01',
 ]]
 
+_goodai_eval_specs_2 = [EvalSpec(mid, mid) for mid in [
+    'em-MiniLM-p1-01',
+    'em-distilroberta-p5-01',
+]]
+
 _openai_eval_specs = [EvalSpec(mid, mid) for mid in [
     'openai:text-embedding-ada-002',
 ]]
@@ -112,16 +117,26 @@ _qpm_eval_specs_11 = [EvalSpec.for_qpm('qpm-distilroberta-01', mid, rkf) for mid
     ('st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1', 7),
 ]]
 
+_qpm_eval_specs_12 = [EvalSpec.for_qpm('em:em-distilroberta-p5-01', mid, rkf) for mid, rkf in [
+    ('em-MiniLM-p1-01', 2),
+    ('em-MiniLM-p1-01', 3),
+]]
+
+_qpm_eval_specs_13 = [EvalSpec.for_qpm('em:em-distilroberta-p5-01', mid, rkf) for mid, rkf in [
+    ('em-MiniLM-p1-01', 5),
+    ('em-MiniLM-p1-01', 10),
+]]
+
 
 if __name__ == '__main__':
+    eval_specs: List[EvalSpec] = _qpm_eval_specs_12
+
     device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
     torch.manual_seed(1001)
     top_ks = [3, 10]
     tokenizer = AutoTokenizer.from_pretrained('distilroberta-base')
     datasets = ['qrecc', 'strategyqa', 'msmarco']
     # datasets = ['qrecc']
-    eval_specs: List[EvalSpec] = _openai_eval_specs
-
     ds_top_ks = [f'{ds_name}@{top_k}' for ds_name in datasets for top_k in top_ks]
     table_out = 'Model | ' + ' | '.join([ds_name for ds_name in ds_top_ks]) + '\n'
     table_out += '----- | ' + ' | '.join(['-' * len(ds_name) for ds_name in ds_top_ks]) + '\n'

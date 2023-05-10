@@ -165,9 +165,11 @@ The `model_name` can be one of the following:
 
 Name | Base model                                       | # parameters | # storage emb
 ---- |--------------------------------------------------|--------------| -----
+em-MiniLM-p1-01 | multi-qa-MiniLM-L6-cos-v1 | 22.7m        | 1  
 em-MiniLM-p3-01 | multi-qa-MiniLM-L6-cos-v1 | 22.7m        | 3  
 em-distilroberta-p1-01 | sentence-transformers/all-distrilroberta-v1 | 82.1m        | 1
 em-distilroberta-p3-01 | sentence-transformers/all-distrilroberta-v1 | 82.1m        | 3
+em-distilroberta-p5-01 | sentence-transformers/all-distrilroberta-v1 | 82.1m        | 5
 
 ## Embedding model usage
 
@@ -260,21 +262,23 @@ Results in the following table show top-3 and top-10
 retrieval accuracy for each dataset.
 
 Model | qrecc @3 | qrecc @10 | strategyqa @3 | strategyqa @10 | msmarco @3 | msmarco @10
------ | ------- | -------- | ------------ | ------------- | --------- | ----------
-openai:text-embedding-ada-002 | 67.09 | 76.80 | 68.00 | 82.40 | 73.10 | 80.14 | 
-st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1 | 69.98 | 77.57 | 73.90 | 87.75 | 70.31 | 77.71 |
-st:sentence-transformers/all-distilroberta-v1 | 65.01 | 76.15 | 66.35 | 82.50 | 68.59 | 78.34 |
-st:sentence-transformers/sentence-t5-large | 68.40 | 78.28 | 72.55 | 86.60 | 71.30 | 80.51 |
-st:sentence-transformers/all-mpnet-base-v2 | 70.69 | 80.19 | 74.50 | 87.65 | 75.00 | 81.77 |
-st:sentence-transformers/multi-qa-mpnet-base-cos-v1 | 74.95 | 82.42 | 79.75 | 91.25 | 75.00 | 82.85 |
-em-MiniLM-p3-01 (ours) | 72.87 | 80.02 | 78.00 | 89.75 | 73.38 | 79.96 |
-em-distilroberta-p1-01 (ours) | 77.67 | 83.84 | 83.25 | 94.15 | **79.78** | 84.39 |
-em-distilroberta-p3-01 (ours) | **78.33** | **84.66** | **86.55** | **95.40** | 79.51 | **85.29** |
+----- |-------| -------- |-----------|------------| --------- | ----------
+openai:text-embedding-ada-002 | 67.09 | 76.80 | 68.00     | 82.40      | 73.10 | 80.14 | 
+st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1 | 69.98 | 77.57 | 73.90     | 87.75      | 70.31 | 77.71 |
+st:sentence-transformers/all-distilroberta-v1 | 65.01 | 76.15 | 66.35     | 82.50      | 68.59 | 78.34 |
+st:sentence-transformers/sentence-t5-large | 68.40 | 78.28 | 72.55     | 86.60      | 71.30 | 80.51 |
+st:sentence-transformers/all-mpnet-base-v2 | 70.69 | 80.19 | 74.50     | 87.65      | 75.00 | 81.77 |
+st:sentence-transformers/multi-qa-mpnet-base-cos-v1 | 74.95 | 82.42 | 79.75     | 91.25      | 75.00 | 82.85 |
+em-MiniLM-p1-01 (ours) | 72.43 | 79.26 | 75.50 | 89.00 | 71.75 | 79.60 |
+em-MiniLM-p3-01 (ours) | 72.87 | 80.02 | 78.00     | 89.75      | 73.38 | 79.96 |
+em-distilroberta-p1-01 (ours) | 77.67 | 83.84 | 83.25     | 94.15      | **79.78** | 84.39 |
+em-distilroberta-p3-01 (ours) | 78.33 | **84.66** | 86.55     | 95.40      | 79.51 | **85.29** |
+em-distilroberta-p5-01 (ours) | **78.88** | 84.44 | **87.40** | **95.70**  | 79.24 | 84.84 |
 
-Model `em-distilroberta-p1-01` is the default model used
-by this library. While `em-distilroberta-p3-01` has better
-retrieval accuracy, note that it requires storing 3 embeddings
-per chunk. The distilroberta models have 82 million parameters
+Model `em-distilroberta-p1-01` is the default embedding model used
+by this library. While `em-distilroberta-p3-01` and `em-distilroberta-p5-01` have better
+retrieval accuracy, note that they require storing 3 and 5 embeddings
+per chunk, respectively. The distilroberta models have 82 million parameters
 and their embedding size is 768.
 
 Model `em-MiniLM-p3-01` is a good choice if you need
