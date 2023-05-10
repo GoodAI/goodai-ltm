@@ -1,3 +1,4 @@
+import gc
 from typing import List, Tuple
 
 import torch
@@ -21,6 +22,7 @@ class EmbeddingBasedMatchingModel(BaseTextMatchingModel):
         rk = self.emb_model.encode_queries(queries, batch_size=batch_size, show_progress_bar=show_progress_bar,
                                            convert_to_tensor=True)
         rk = rk.detach()
+        gc.collect()
         sk = self.emb_model.encode_corpus(passages, batch_size=batch_size, show_progress_bar=show_progress_bar,
                                           convert_to_tensor=True)
         sk = sk.detach()

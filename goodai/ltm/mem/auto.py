@@ -58,9 +58,9 @@ class AutoTextMemory:
                 tokenizer = _default_tokenizer_wr()
             if tokenizer is None:
                 tokenizer = AutoTokenizer.from_pretrained('distilroberta-base')
+                # Suppress length warning
                 tokenizer.model_max_length = sys.maxsize
                 _default_tokenizer_wr = weakref.ref(tokenizer)
-            # Suppress length warning
         if device is None:
             device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
         if emb_model is None:

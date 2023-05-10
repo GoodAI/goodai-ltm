@@ -9,7 +9,7 @@ class TextMemoryConfig:
     The capacity of the memory's chunk queue, i.e. the maximum number of chunks it can hold.
     """
 
-    reranking_k_factor: int
+    reranking_k_factor: float
     """
     When a reranking mechanism is available, the value of k passed to the query function is
     multiplied by reranking_k_factor and the resulting number of chunks is retrieved from
@@ -19,4 +19,4 @@ class TextMemoryConfig:
     def __init__(self):
         self.chunk_capacity = 24  # Tokens
         self.queue_capacity = 5000  # Chunks
-        self.reranking_k_factor = 10
+        self.reranking_k_factor = 10.0
