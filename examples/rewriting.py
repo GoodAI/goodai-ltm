@@ -10,8 +10,11 @@ if __name__ == '__main__':
     rewrite_model = OpenAIRewriteModel()
 
     # Test the rewrite model
-    original_query = "John: Not everyone is fond of ice cream. Mary: Do you like it?"
-    print(f"Original query: {original_query}")
+    original_query = """\
+        John: Not everyone is fond of ice cream. 
+        Mary: Do you like it?"""
+    print("Original query:")
+    print(original_query)
     rewritten_query = rewrite_model.rewrite_query(original_query)
     print(f"Rewritten query: {rewritten_query}")
 
