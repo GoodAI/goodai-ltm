@@ -15,6 +15,8 @@ _pretrained_map = {
     'em-distilroberta-p1-01': f'{_models_base}-p1-1118',
     'em-distilroberta-p3-01': f'{_models_base}-p3-1116',
     'em-MiniLM-p3-01': f'{_models_base}-p3-1117',
+    'em-MiniLM-p1-01': f'{_models_base}-p1-1151',
+    'em-distilroberta-p5-01': f'{_models_base}-p5-1150',
 }
 
 
