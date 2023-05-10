@@ -249,6 +249,21 @@ representing match probabilities. Example:
     prob = model.predict(sentences)
     print(prob)
 
+## More examples
+
+Additional example code can be found in the `examples` folder. 
+
+`examples/dump_mem.py` adds text to memory and shows how it is stored.
+
+`examples/wiki_retrieval.py` stores and queries articles from Wikipedia.
+
+`examples/rewriting.py` demonstrates query and memory rewriting.
+
+Each example can be run from the command line, for example:
+
+    cd goodai-ltm
+    python examples/rewriting.py
+    
 ## Use in GoodAI's AI game
 
 An early application of GoodAI-LTM is in GoodAI's forthcoming [AI Game](https://www.goodai.com/ai-in-games/). 
