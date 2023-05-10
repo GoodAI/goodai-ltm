@@ -235,7 +235,7 @@ The `predict` method of the model takes a list of
 query-passage tuples and returns a list of floats
 representing estimated match probabilities. Example:
 
-    model = AutoTextMatchingModel.from_pretrained('qpm-distilroberta-01')
+    model = AutoTextMatchingModel.from_pretrained('em:em-distilroberta-p5-01')
     sentences = [
         ('Mike: What is your favorite color?', 'Steve: My favorite color is purple.'),
         ('Name the inner planets.', 'It was the best of times, it was the worst of times.'),
