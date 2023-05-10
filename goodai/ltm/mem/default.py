@@ -87,8 +87,10 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
     def get_retrieval_key_for_text(self, queries: List[str], show_progress_bar: bool = False) -> torch.Tensor:
         return self.emb_model.encode_queries(queries, convert_to_tensor=True, show_progress_bar=show_progress_bar)
 
-    def predict_match(self, sentences: List[Tuple[str, str]], show_progress_bar: bool = False) -> List[float]:
-        return self.matching_model.predict(sentences, show_progress_bar=show_progress_bar)
+    def predict_match(self, sentences: List[Tuple[str, str]], show_progress_bar: bool = False,
+                      batch_size: int = 32) -> List[float]:
+        return self.matching_model.predict(sentences, show_progress_bar=show_progress_bar,
+                                           batch_size=batch_size)
 
     def add_text(self, text: str, metadata: Optional[Any] = None, rewrite: bool = False,
                  rewrite_context: Optional[str] = None, show_progress_bar: bool = False):

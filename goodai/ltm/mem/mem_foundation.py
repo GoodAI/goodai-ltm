@@ -27,10 +27,10 @@ class VectorDbType(enum.Enum):
 
 class BaseTextMemoryFoundation(BaseTextMemory):
     def __init__(self, vector_db_type: VectorDbType, tokenizer: PreTrainedTokenizer, has_match_prob_model: bool,
-                 num_storage_embeddings: int, emb_dim: int, reranking_k_multiplier: int,
+                 num_storage_embeddings: int, emb_dim: int, reranking_k_factor: float,
                  device: torch.device):
         super().__init__()
-        self.reranking_k_multiplier = reranking_k_multiplier
+        self.reranking_k_factor = reranking_k_factor
         self.num_storage_embeddings = num_storage_embeddings
         self.has_match_prob_model = has_match_prob_model
         self.vector_db = self.create_vector_db(vector_db_type, emb_dim)
@@ -63,7 +63,8 @@ class BaseTextMemoryFoundation(BaseTextMemory):
     def get_retrieval_key_for_text(self, queries: List[str], show_progress_bar: bool = False) -> torch.Tensor:
         pass
 
-    def predict_match(self, sentences: List[Tuple[str, str]], show_progress_bar: bool = False) -> List[float]:
+    def predict_match(self, sentences: List[Tuple[str, str]], show_progress_bar: bool = False,
+                      batch_size: int = 32) -> List[float]:
         pass
 
     @abc.abstractmethod
@@ -207,7 +208,7 @@ class BaseTextMemoryFoundation(BaseTextMemory):
         adjacent_chunks_ok = self.adjacent_chunks_ok
         expected_key_db_top_k = k
         if self.has_match_prob_model:
-            expected_key_db_top_k *= self.reranking_k_multiplier
+            expected_key_db_top_k = round(expected_key_db_top_k * self.reranking_k_factor)
         downstream_top_k = expected_key_db_top_k * self.num_storage_embeddings
         if not adjacent_chunks_ok:
             downstream_top_k *= 3

@@ -83,7 +83,7 @@ class TrainableEmbeddingModel(BaseTextEmbeddingModel, nn.Module):
 
     def encode_in_batches(self, enc_fn: Callable, sentences: List[str],
                           add_special_tokens: bool = True,
-                          batch_size: int = 64,
+                          batch_size: int = 50,
                           show_progress_bar: bool = False,
                           convert_to_tensor: bool = False,
                           return_token_lengths: bool = False,
