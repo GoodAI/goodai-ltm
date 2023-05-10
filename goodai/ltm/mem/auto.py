@@ -33,6 +33,7 @@ class AutoTextMemory:
                tokenizer: PreTrainedTokenizer = None,
                emb_model: BaseTextEmbeddingModel = None,
                matching_model: BaseTextMatchingModel = None,
+               query_rewrite_model: BaseRewriteModel = None,
                memory_rewrite_model: BaseRewriteModel = None,
                device: Union[torch.device, str] = None,
                config: TextMemoryConfig = None
@@ -44,6 +45,7 @@ class AutoTextMemory:
         :param tokenizer: A chunking tokenizer. It should be a tokenizer that preserves whitespace and casing.
         :param emb_model: The embedding model.
         :param matching_model: An optional query-passage matching model.
+        :param query_rewrite_model: The query rewrite model.
         :param memory_rewrite_model: The memory rewrite model.
         :param device: The Pytorch device.
         :param config: The memory configuration.
@@ -74,4 +76,5 @@ class AutoTextMemory:
             config = TextMemoryConfig()
         return DefaultTextMemory(vector_db_type, tokenizer, emb_model, matching_model,
                                  device=device, config=config,
+                                 query_rewrite_model=query_rewrite_model,
                                  memory_rewrite_model=memory_rewrite_model)
