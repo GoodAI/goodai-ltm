@@ -88,7 +88,7 @@ class BaseTextMemoryFoundation(BaseTextMemory):
         for chunk in chunks:
             chunk_text = self.get_chunk_text(chunk)
             ct_js = json.dumps(chunk_text)
-            stream.write(f'| {chunk.index} | {chunk.metadata} | {ct_js} |')
+            stream.write(f'| {chunk.chunk_id} | {chunk.metadata} | {ct_js} |')
             stream.write('\n')
         stream.flush()
 

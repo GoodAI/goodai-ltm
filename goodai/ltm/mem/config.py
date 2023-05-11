@@ -25,8 +25,15 @@ class TextMemoryConfig:
     exceeding this maximum length are truncated (after rewriting). 
     """
 
+    chunk_overlap_fraction: float
+    """
+    The fraction of a chunk's length that overlaps with the previous and next chunk.
+    This can be a value from 0 to 0.5.
+    """
+
     def __init__(self):
         self.max_query_length = 40  # Tokens
         self.chunk_capacity = 24  # Tokens
         self.queue_capacity = 5000  # Chunks
         self.reranking_k_factor = 10.0
+        self.chunk_overlap_fraction = 0.5  # 0 to 0.5

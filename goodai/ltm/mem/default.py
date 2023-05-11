@@ -100,7 +100,7 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
         token_ids = self.chunk_tokenizer.encode(text, add_special_tokens=False)
         removed_buckets = self.chunk_queue.add_sequence(token_ids, metadata)
         self._ensure_keys_added(show_progress_bar=show_progress_bar)
-        removed_indexes = [rb.index for rb in removed_buckets]
+        removed_indexes = [rb.chunk_id for rb in removed_buckets]
         if len(removed_indexes) > 0:
             self.vector_db.remove_ids(np.array(removed_indexes).astype(np.int64))
 
@@ -145,7 +145,7 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
             for chunk in picked_chunks:
                 if chunk.is_at_capacity():
                     chunk.set_indexed(True)
-                b_indexes.extend([chunk.index] * num_sk)
+                b_indexes.extend([chunk.chunk_id] * num_sk)
             b_indexes_np = np.array(b_indexes).astype(np.int64)
             self.vector_db.add_with_ids(sk_all_np, b_indexes_np)
 
