@@ -106,6 +106,8 @@ the following properties:
 
 For a slightly more detailed view of how the memory works, let us revisit the storage and retrieval of text passages.
 
+### Storage
+
     text_example = """\
     Jake Morales: Hey Archie, what do you think about teaming up with me and Isaac Coax? 
     We could come up with a plan that would distract Lucas Fern.
@@ -115,6 +117,21 @@ To store this text, we create an instance of the default memory class and add th
 
     mem = AutoTextMemory.create()
     mem.add_text(text_example)
+   
+Optionally, text can be rewritten to form memories that are less ambiguous and more self contained. To do this, we 
+need to provide a rewrite language model when creating the memory. We then pass both the text to be stored and some 
+preceding text for context to the `add_text` method. 
+    
+    r = OpenAIRewriteModel()
+    mem = AutoTextMemory.create(query_rewrite_model=r, memory_rewrite_model=r)
+
+    passage = "Archie: That would be great."
+    context = """Jake Morales: Hey Archie, what do you think about teaming up with me and Isaac Coax? 
+        We could come up with a plan that would distract Lucas Fern."""
+    mem.add_text(text=passage, rewrite=True, rewrite_context=context)
+    
+This will rewrite the passage "Archie: That would be great." as "Archie thinks it would be great to team up with Jake Morales and Isaac Coax to come up 
+with a plan that would distract Lucas Fern." and store the rewritten text.
     
 The text is encoded by the tokenizer as token ids.
 
@@ -139,15 +156,28 @@ The embeddings, and the corresponding chunk indexes, are added to the vector dat
 The passages are now represented in memory as pairs of vectors and chunk indexes in the vector database and as 
 sequences of tokens in the chunk queue. From the token sequences, the text can be recovered.
 
-During retrieval, the stored embeddings closest to the query embedding are found and the corresponding texts 
-decoded.
+### Retrieval 
 
-In addition to the steps above, it is also possible to rewrite queries and memories and to perform passage 
-reranking after retrieval. 
+To retrieve memories, we pass a query and the desired number of memories to the method `retrieve`. For example,
 
-The diagrams below illustrate what happens during storage and retrieval (sans optional query and memory rewriting).
+    mem.retrieve("What does Jake propose?", k=2)
 
-![Storage](diagram-all-50.png)
+will return the two passages most relevant to the query.
+
+Queries, like memories, can optionally be rewritten. In this case, we still pass a single text to `retrieve`;
+the text is interpreted as a query preceded by context. For example,
+
+    mem.retrieve("John: Not everyone is fond of ice cream. Mary: Do you like it?", k=3, rewrite=True)
+    
+will rewrite the query as "Does John like ice cream?". 
+
+The embedding model converts the query into an embedding. Then the stored embeddings closest to the query embedding 
+are found and the corresponding texts decoded.
+
+Optionally, a query-passage matching model can be used to compute pairwise query-passage matching probabilities 
+and rerank the passages.
+
+![Storage](diagram-simple.png)
 
 ## Loading an embedding model
 
@@ -191,7 +221,7 @@ the `encode_corpus` method, as follows:
 A peculiarity of our embedding model is that queries
 and passages can have more than one embedding.
 Embedding tensors have 3 axes: The batch size, the number of
-embeddings, and the number embedding dimensions. Typically,
+embeddings, and the number of embedding dimensions. Typically,
 the number of embeddings per query/passage will be 1, except for the 
 passage embeddings in some of our fine-tuned models.
 
@@ -243,6 +273,21 @@ representing estimated match probabilities. Example:
     prob = model.predict(sentences)
     print(prob)
 
+## More examples
+
+Additional example code can be found in the `examples` folder. 
+
+`examples/dump_mem.py` adds text to memory and shows how it is stored.
+
+`examples/wiki_retrieval.py` stores and queries articles from Wikipedia.
+
+`examples/rewriting.py` demonstrates query and memory rewriting.
+
+Each example can be run from the command line, for example:
+
+    cd goodai-ltm
+    python examples/rewriting.py
+    
 ## Use in GoodAI's AI game
 
 An early application of GoodAI-LTM is in GoodAI's forthcoming [AI Game](https://www.goodai.com/ai-in-games/). 
