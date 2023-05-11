@@ -95,9 +95,7 @@ class BaseMemEvaluator(ABC):
         scenarios = self.get_scenarios()
         queries, supports = self.get_queries_and_support(scenarios)
         k = max(self.top_ks)
-        # Query truncation already taken care of
-        retrieved = memory.retrieve_multiple(queries, k=k, show_progress_bar=True,
-                                             max_query_length=None)
+        retrieved = memory.retrieve_multiple(queries, k=k, show_progress_bar=True)
         top_k_map: Dict[int, int] = dict()
         for q, s_retrieved, s_supports in tqdm(zip(queries, retrieved, supports), desc='Comparison', unit='scenario'):
             s_retrieved_texts = [r.passage for r in s_retrieved]

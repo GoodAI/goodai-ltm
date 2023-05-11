@@ -28,8 +28,10 @@ class VectorDbType(enum.Enum):
 class BaseTextMemoryFoundation(BaseTextMemory):
     def __init__(self, vector_db_type: VectorDbType, tokenizer: PreTrainedTokenizer, has_match_prob_model: bool,
                  num_storage_embeddings: int, emb_dim: int, reranking_k_factor: float,
+                 max_query_length: Optional[int],
                  device: torch.device):
         super().__init__()
+        self.max_query_length = max_query_length
         self.reranking_k_factor = reranking_k_factor
         self.num_storage_embeddings = num_storage_embeddings
         self.has_match_prob_model = has_match_prob_model
@@ -192,10 +194,9 @@ class BaseTextMemoryFoundation(BaseTextMemory):
         return result
 
     def retrieve_multiple(self, queries: List[str], k: int, rewrite: bool = False, show_progress_bar: bool = False,
-                          max_query_length: Optional[int] = 40,
                           **kwargs) -> List[List[RetrievedMemory]]:
-        if max_query_length is not None:
-            queries = self._truncate_queries(queries, max_query_length)
+        if self.max_query_length is not None:
+            queries = self._truncate_queries(queries, self.max_query_length)
         rk = self.get_retrieval_key_for_text(queries, show_progress_bar=show_progress_bar)
         batch_size, num_rk, emb_size = rk.size(0), rk.size(1), rk.size(2),
         if num_rk != 1:

@@ -1,3 +1,6 @@
+from typing import Optional
+
+
 class TextMemoryConfig:
     chunk_capacity: int
     """
@@ -16,7 +19,14 @@ class TextMemoryConfig:
     the chunk store before applying the reranking procedure.
     """
 
+    max_query_length: Optional[int]
+    """
+    The maximum length of queries used to produce embeddings. The left side of queries
+    exceeding this maximum length are truncated (after rewriting). 
+    """
+
     def __init__(self):
+        self.max_query_length = 40  # Tokens
         self.chunk_capacity = 24  # Tokens
         self.queue_capacity = 5000  # Chunks
         self.reranking_k_factor = 10.0
