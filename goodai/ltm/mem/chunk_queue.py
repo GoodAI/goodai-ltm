@@ -153,7 +153,7 @@ class ChunkQueue(BaseChunkQueue, ChunkMixin):
             chunk = self.chunks[c_idx]
             if chunk.to_token_seq_id < next_token_seq_id:
                 chunk.extend_by(min(next_token_seq_id - chunk.to_token_seq_id, chunk.get_room()))
-            elif len(chunk) <= self.chunk_index_at_overlap:
+            if len(chunk) <= self.chunk_index_at_overlap:
                 break
         return self.check_overflow()
 
