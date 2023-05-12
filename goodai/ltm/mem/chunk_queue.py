@@ -174,17 +174,17 @@ class ChunkQueue(BaseChunkQueue, ChunkMixin):
         return self.token_ids[from_index:to_index]
 
     def _get_prev_token_ids(self, chunk_id: int) -> Optional[List[int]]:
-        chunk = self.chunks[chunk_id]
-        first_index = self.first_token_seq_id
-        to_index = chunk.from_token_seq_id - first_index
+        chunk = self.chunk_map[chunk_id]
+        first_seq_id = self.first_token_seq_id
+        to_index = chunk.from_token_seq_id - first_seq_id
         from_index = to_index - self.chunk_capacity
         from_index = max(0, from_index)
         return self.token_ids[from_index:to_index]
 
     def _get_next_token_ids(self, chunk_id: int) -> Optional[List[int]]:
-        chunk = self.chunks[chunk_id]
-        first_index = self.first_token_seq_id
-        from_index = chunk.to_token_seq_id - first_index
+        chunk = self.chunk_map[chunk_id]
+        first_seq_id = self.first_token_seq_id
+        from_index = chunk.to_token_seq_id - first_seq_id
         to_index = from_index + self.chunk_capacity
         return self.token_ids[from_index:to_index]
 
@@ -193,6 +193,7 @@ class ChunkQueue(BaseChunkQueue, ChunkMixin):
         for chunk_id in chunk_ids:
             chunk = self.chunk_map.get(chunk_id)
             if chunk is not None:
+                assert chunk.chunk_id == chunk_id
                 sequence = self.get_chunk_token_ids(chunk)
                 prev_sequence = self._get_prev_token_ids(chunk_id)
                 if prev_sequence is not None:

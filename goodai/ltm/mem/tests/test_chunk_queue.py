@@ -54,7 +54,7 @@ class TestChunkQueue(unittest.TestCase):
     def test_retrieve_complete_sequences_adds_tokens_from_adjacent_chunks(self):
         chunk_capacity = 5
         chunk_index_at_overlap = chunk_capacity // 2
-        _chunk_queue = ChunkQueue(10, chunk_capacity, chunk_index_at_overlap)
+        _chunk_queue = ChunkQueue(12, chunk_capacity, chunk_index_at_overlap)
         _chunk_queue.add_sequence([1, 2, 3], None)
         _chunk_queue.add_sequence([4, 5, 6], None)
         _chunk_queue.add_sequence([7, 8, 9], None)
@@ -75,5 +75,5 @@ class TestChunkQueue(unittest.TestCase):
         seq1 = result[0]
         seq2 = result[1]
 
-        self.assertEqual([6, 7, 8, 9, 10, 11, 12, 10, 8], seq1)
+        self.assertEqual([7, 8, 9, 10, 11, 12, 10, 8], seq1)
         self.assertEqual([9, 10, 11, 12, 10, 8, 12, 14, 11, 12, 3], seq2)
