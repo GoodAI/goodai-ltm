@@ -24,6 +24,14 @@ query-passage matching after retrieval.
 The present emphasis on dialog is also a limitation: The memory is not currently optimized for other uses, such as 
 retrieving source code. See the Future plans section for features that are on our todo list.
 
+## Comparison to other solutions
+
+Compared to Langchain, ...
+
+Compared to Chroma, ...
+
+Compared to vector databases in general, ...
+
 ## Installation
 
     pip install goodai-ltm
