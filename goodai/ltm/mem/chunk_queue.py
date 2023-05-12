@@ -71,7 +71,7 @@ class ChunkQueue(BaseChunkQueue, ChunkMixin):
             raise ValueError('Queue capacity cannot be 2 or less')
         if chunk_capacity < 1:
             raise ValueError('Chunk capacity cannot be zero or less')
-        if chunk_index_at_overlap < math.ceil(chunk_capacity / 2):
+        if chunk_index_at_overlap < chunk_capacity // 2:
             raise ValueError('Chunk overlap cannot be more than 50%')
         self.capacity = queue_capacity
         self.chunk_capacity = chunk_capacity
@@ -121,7 +121,6 @@ class ChunkQueue(BaseChunkQueue, ChunkMixin):
         self.current_chunk_id = chunk_id + 1
         self.chunks.append(chunk)
         self.chunk_map[chunk.chunk_id] = chunk
-        self.check_overflow()
         return chunk
 
     def get_chunk(self, chunk_id: int) -> Chunk:
@@ -146,8 +145,8 @@ class ChunkQueue(BaseChunkQueue, ChunkMixin):
         self.ensure_chunks_exist(metadata)
         self.token_ids += new_token_ids
         next_token_seq_id = len(self.token_ids) + self.first_token_seq_id
-        c_idx = len(self.chunks) - 2
-        while True:
+        start_num_chunks = len(self.chunks)
+        for c_idx in range(start_num_chunks - 2, start_num_chunks + len(new_token_ids) + 1):
             while c_idx >= len(self.chunks):
                 self.add_chunk(metadata)
             chunk = self.chunks[c_idx]
@@ -208,7 +207,7 @@ class ChunkQueue(BaseChunkQueue, ChunkMixin):
         return len(self.chunks)
 
     def get_chunk_sequences(self) -> List[List[int]]:
-        return [self.get_chunk_token_ids(bucket) for bucket in self.chunks]
+        return [self.get_chunk_token_ids(chunk) for chunk in self.chunks]
 
     def get_capacity(self) -> int:
         return self.capacity
