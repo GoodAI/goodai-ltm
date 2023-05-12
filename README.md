@@ -102,7 +102,7 @@ the following properties:
 * `confidence`: If a query-passage matching model is available, this is the probability assigned by the model.
 * `metadata`: Metadata associated with the retrieved text, if any.
 
-## Detailed example
+## How it works
 
 For a slightly more detailed view of how the memory works, let us revisit the storage and retrieval of text passages.
 
@@ -179,7 +179,9 @@ and rerank the passages.
 
 ![Storage](diagram-simple.png)
 
-## Loading an embedding model
+## Embedding models
+
+### Loading
 
 An embedding model is loaded as follows:
 
@@ -201,7 +203,7 @@ em-distilroberta-p1-01 | sentence-transformers/all-distrilroberta-v1 | 82.1m    
 em-distilroberta-p3-01 | sentence-transformers/all-distrilroberta-v1 | 82.1m        | 3
 em-distilroberta-p5-01 | sentence-transformers/all-distrilroberta-v1 | 82.1m        | 5
 
-## Embedding model usage
+### Usage of embedding models
 
 To get embeddings for a list of queries, call 
 the `encode_queries` method, as follows:
@@ -225,7 +227,40 @@ embeddings, and the number of embedding dimensions. Typically,
 the number of embeddings per query/passage will be 1, except for the 
 passage embeddings in some of our fine-tuned models.
 
-## Loading a query-passage matching model
+### Evaluations of embedding models
+
+We're interested in retrieval of relatively short 
+passages (one to a few sentences) using conversational
+queries that may be found in a chat. To this end we've developed
+an evaluation based on datasets [QReCC](https://github.com/apple/ml-qrecc),
+[StrategyQA](https://allenai.org/data/strategyqa), and
+[MS MARCO](https://microsoft.github.io/msmarco/). (Fine-tuning is
+done with different datasets.)
+Results in the following table show top-3 and top-10
+retrieval accuracy for each dataset.
+
+Model | qrecc @3 | qrecc @10 | strategyqa @3 | strategyqa @10 | msmarco @3 | msmarco @10
+----- |-------| -------- |-----------|------------| --------- | ----------
+openai:text-embedding-ada-002 | 67.09 | 76.80 | 68.00     | 82.40      | 73.10 | 80.14 | 
+st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1 | 69.98 | 77.57 | 73.90     | 87.75      | 70.31 | 77.71 |
+st:sentence-transformers/all-distilroberta-v1 | 65.01 | 76.15 | 66.35     | 82.50      | 68.59 | 78.34 |
+st:sentence-transformers/sentence-t5-large | 68.40 | 78.28 | 72.55     | 86.60      | 71.30 | 80.51 |
+st:sentence-transformers/all-mpnet-base-v2 | 70.69 | 80.19 | 74.50     | 87.65      | 75.00 | 81.77 |
+st:sentence-transformers/multi-qa-mpnet-base-cos-v1 | 74.95 | 82.42 | 79.75     | 91.25      | 75.00 | 82.85 |
+em-MiniLM-p1-01 (ours) | 72.43 | 79.26 | 75.50 | 89.00 | 71.75 | 79.60 |
+em-MiniLM-p3-01 (ours) | 72.87 | 80.02 | 78.00     | 89.75      | 73.38 | 79.96 |
+em-distilroberta-p1-01 (ours) | 77.67 | 83.84 | 83.25     | 94.15      | **79.78** | 84.39 |
+em-distilroberta-p3-01 (ours) | 78.33 | **84.66** | 86.55     | 95.40      | 79.51 | **85.29** |
+em-distilroberta-p5-01 (ours) | **78.88** | 84.44 | **87.40** | **95.70**  | 79.24 | 84.84 |
+
+Model `em-distilroberta-p1-01` is the default embedding model used
+by this library. While `em-distilroberta-p3-01` and `em-distilroberta-p5-01` have better
+retrieval accuracy, note that they require storing 3 and 5 embeddings
+per chunk, respectively. 
+
+## Query-passage matching models
+
+### Loading
 
 A query-passage matching/reranking model can be loaded as follows:
 
@@ -259,7 +294,7 @@ The `reranking_k_factor` setting tells the memory how many candidates it should 
 for reranking. The user requests `k` memories. The reranking algorithm considers
 `k * reranking_k_factor` chunks.
 
-## Query-passage matching model usage
+### Usage of query-passage matching models
 
 The `predict` method of the model takes a list of
 query-passage tuples and returns a list of floats
@@ -273,66 +308,13 @@ representing estimated match probabilities. Example:
     prob = model.predict(sentences)
     print(prob)
 
-## More examples
-
-Additional example code can be found in the `examples` folder. 
-
-`examples/dump_mem.py` adds text to memory and shows how it is stored.
-
-`examples/wiki_retrieval.py` stores and queries articles from Wikipedia.
-
-`examples/rewriting.py` demonstrates query and memory rewriting.
-
-Each example can be run from the command line, for example:
-
-    cd goodai-ltm
-    python examples/rewriting.py
-    
-## Use in GoodAI's AI game
-
-An early application of GoodAI-LTM is in GoodAI's forthcoming [AI Game](https://www.goodai.com/ai-in-games/). 
-LLMs are used to shape NPC behavior and to generate dialog. Long-term memory is used to provide characters 
-with backstories and allows them to accumulate  experience during game play. 
-
-[![AI-game](game-screenshot-25.png)](https://www.youtube.com/watch?v=xkn0H_iWDEQ)
-
-## Evaluation of embedding models
-
-We're interested in retrieval of relatively short 
-passages (one to a few sentences) using conversational
-queries that may be found in a chat. To this end we've developed
-an evaluation based on datasets [QReCC](https://github.com/apple/ml-qrecc),
-[StrategyQA](https://allenai.org/data/strategyqa), and
-[MS MARCO](https://microsoft.github.io/msmarco/). 
-Results in the following table show top-3 and top-10
-retrieval accuracy for each dataset.
-
-Model | qrecc @3 | qrecc @10 | strategyqa @3 | strategyqa @10 | msmarco @3 | msmarco @10
------ |-------| -------- |-----------|------------| --------- | ----------
-openai:text-embedding-ada-002 | 67.09 | 76.80 | 68.00     | 82.40      | 73.10 | 80.14 | 
-st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1 | 69.98 | 77.57 | 73.90     | 87.75      | 70.31 | 77.71 |
-st:sentence-transformers/all-distilroberta-v1 | 65.01 | 76.15 | 66.35     | 82.50      | 68.59 | 78.34 |
-st:sentence-transformers/sentence-t5-large | 68.40 | 78.28 | 72.55     | 86.60      | 71.30 | 80.51 |
-st:sentence-transformers/all-mpnet-base-v2 | 70.69 | 80.19 | 74.50     | 87.65      | 75.00 | 81.77 |
-st:sentence-transformers/multi-qa-mpnet-base-cos-v1 | 74.95 | 82.42 | 79.75     | 91.25      | 75.00 | 82.85 |
-em-MiniLM-p1-01 (ours) | 72.43 | 79.26 | 75.50 | 89.00 | 71.75 | 79.60 |
-em-MiniLM-p3-01 (ours) | 72.87 | 80.02 | 78.00     | 89.75      | 73.38 | 79.96 |
-em-distilroberta-p1-01 (ours) | 77.67 | 83.84 | 83.25     | 94.15      | **79.78** | 84.39 |
-em-distilroberta-p3-01 (ours) | 78.33 | **84.66** | 86.55     | 95.40      | 79.51 | **85.29** |
-em-distilroberta-p5-01 (ours) | **78.88** | 84.44 | **87.40** | **95.70**  | 79.24 | 84.84 |
-
-Model `em-distilroberta-p1-01` is the default embedding model used
-by this library. While `em-distilroberta-p3-01` and `em-distilroberta-p5-01` have better
-retrieval accuracy, note that they require storing 3 and 5 embeddings
-per chunk, respectively. 
-
-## Boosting the accuracy of low-resource embedding models
+### Boosting the accuracy of low-resource embedding models
 
 At this time, we haven't found a reranking cross-encoder that can consistently boost
 the retrieval accuracy of our best embedding models. That said, you can use accurate
 embedding models as query-passage matching models, alongside a low-resource embedding
-model. This combination's accuracy nearly matches that of the best embedding models from 
-this library.
+model. *This combination's accuracy nearly matches that of the best embedding models from 
+this library.*
 
 The following tests were performed by configuring a memory to use `em-MiniLM-p1-01`
 as the embedding model and `em:em-distilroberta-p5-01` as the matching/reranking model
@@ -356,6 +338,29 @@ in footprint is 10-fold.
 
 Using a matching model does come with a performance overhead in every query, but in 
 the context of an LLM-based chat agent implementation, the overhead should be unnoticeable.
+
+## More examples
+
+Additional example code can be found in the `examples` folder. 
+
+`examples/dump_mem.py` adds text to memory and shows how it is stored.
+
+`examples/wiki_retrieval.py` stores and queries articles from Wikipedia.
+
+`examples/rewriting.py` demonstrates query and memory rewriting.
+
+Each example can be run from the command line, for example:
+
+    cd goodai-ltm
+    python examples/rewriting.py
+    
+## Use in GoodAI's AI game
+
+An early application of GoodAI-LTM is in GoodAI's forthcoming [AI Game](https://www.goodai.com/ai-in-games/). 
+LLMs are used to shape NPC behavior and to generate dialog. Long-term memory is used to provide characters 
+with backstories and allows them to accumulate  experience during game play. 
+
+[![AI-game](game-screenshot-25.png)](https://www.youtube.com/watch?v=xkn0H_iWDEQ)
 
 ## Future plans
 
