@@ -77,3 +77,30 @@ class TestChunkQueue(unittest.TestCase):
 
         self.assertEqual([7, 8, 9, 10, 11, 12, 10, 8], seq1)
         self.assertEqual([9, 10, 11, 12, 10, 8, 12, 14, 11, 12, 3], seq2)
+
+    def test_zero_chunk_overlap(self):
+        chunk_capacity = 5
+        chunk_index_at_overlap = chunk_capacity
+        _chunk_queue = ChunkQueue(25, chunk_capacity, chunk_index_at_overlap)
+        _chunk_queue.add_sequence([1, 2, 3], None)
+        _chunk_queue.add_sequence([4, 5, 6], None)
+        _chunk_queue.add_sequence([7, 8, 9], None)
+        _chunk_queue.add_sequence([10, 11, 12], None)
+        _chunk_queue.add_sequence([10, 8, 12], None)
+        _chunk_queue.add_sequence([14, 11, 12], None)
+        _chunk_queue.add_sequence([3, 8, 21], None)
+        _chunk_queue.add_sequence([13, 12, 9], None)
+        _chunk_queue.add_sequence([3, 4, 28], None)
+        _chunk_queue.add_sequence([12, 8, 25], None)
+
+        punctuation_ids = {3, 8}
+
+        chunk_ids = [3, 5]
+        result = _chunk_queue.retrieve_complete_sequences(chunk_ids, punctuation_ids)
+
+        self.assertEqual(2, len(result)), f'got {len(result)} sequences'
+        seq1 = result[0]
+        seq2 = result[1]
+
+        self.assertEqual([12, 14, 11, 12, 3, 8, 21, 13, 12, 9, 3], seq1)
+        self.assertEqual([4, 28, 12, 8, 25], seq2)
