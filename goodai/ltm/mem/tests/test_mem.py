@@ -46,4 +46,11 @@ class TestMem(unittest.TestCase):
         mem1.add_text('foobar')
         mem1.retrieve('', k=5)
 
+    def test_nearly_empty_mem(self):
+        mem1 = AutoTextMemory.create()
+        mem1.add_text('a')
+        r_memories = mem1.retrieve('Is there something?', k=5)
+        assert len(r_memories) > 0
+
+
 

@@ -164,6 +164,8 @@ if __name__ == '__main__':
         config = TextMemoryConfig()
         config.chunk_capacity = spec.chunkCapacity
         config.reranking_k_factor = spec.rerankingKFactor
+        # Query truncation taken care of by the evaluator class
+        config.max_query_length = None
         table_out += spec.id + ' | '
         for dataset in datasets:
             print(f'Evaluation of {spec.id} on {dataset}...')

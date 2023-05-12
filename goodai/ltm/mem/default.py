@@ -47,7 +47,7 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
         super().__init__(vector_db_type, self.chunk_tokenizer, has_matching_model,
                          self.emb_model.get_num_storage_embeddings(),
                          self.emb_model.get_embedding_dim(), config.reranking_k_factor,
-                         device)
+                         config.max_query_length, device)
 
     def get_tokenizer(self):
         return self.chunk_tokenizer
@@ -69,14 +69,12 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
         return self.chunk_tokenizer.decode(token_ids, skip_special_tokens=True)
 
     def retrieve_multiple(self, queries: List[str], k: int = 1, rewrite: bool = False,
-                          show_progress_bar: bool = False,
-                          max_query_length: Optional[int] = 40, **kwargs) -> List[List[RetrievedMemory]]:
+                          show_progress_bar: bool = False, **kwargs) -> List[List[RetrievedMemory]]:
         if rewrite and not self.query_rewrite_model:
             raise ValueError("For query rewriting, a rewriting model must be provided")
         if rewrite and self.query_rewrite_model:
             queries = [self.query_rewrite_model.rewrite_query(q) for q in queries]
-        return super().retrieve_multiple(queries, k, rewrite, show_progress_bar,
-                                         max_query_length=max_query_length, **kwargs)
+        return super().retrieve_multiple(queries, k, rewrite, show_progress_bar, **kwargs)
 
     def retrieve_chunk_sequences(self, chunk_ids: List[int]):
         return self.chunk_queue.retrieve_chunk_sequences(chunk_ids)
