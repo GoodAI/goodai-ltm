@@ -30,7 +30,7 @@ by this library. While `em-distilroberta-p3-01` and `em-distilroberta-p5-01` hav
 retrieval accuracy, note that they require storing 3 and 5 embeddings
 per chunk, respectively. 
 
-## Retrieval dataset examples
+### Retrieval dataset examples
 
 The following are 10 queries sampled from the dataset constructed out of StrategyQA, along with the expected
 passage, and the 3 top matching passages retrieved using 2 different embedding models. There is a high margin
