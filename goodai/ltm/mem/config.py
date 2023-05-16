@@ -31,9 +31,16 @@ class TextMemoryConfig:
     This can be a value from 0 to 0.5.
     """
 
+    redundancy_overlap_threshold: float
+    """
+    The fraction of a chunk's length that causes it to be considered redundant if it
+    overlaps with other chunks that are a better match to a query.
+    """
+
     def __init__(self):
         self.max_query_length = 40  # Tokens
         self.chunk_capacity = 24  # Tokens
         self.queue_capacity = 5000  # Chunks
         self.reranking_k_factor = 10.0
         self.chunk_overlap_fraction = 0.5  # 0 to 0.5
+        self.redundancy_overlap_threshold = 0.5

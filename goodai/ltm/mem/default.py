@@ -52,8 +52,9 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
         self.memory_rewrite_model = memory_rewrite_model
         super().__init__(vector_db_type, self.chunk_tokenizer, has_matching_model,
                          self.emb_model.get_num_storage_embeddings(),
-                         self.emb_model.get_embedding_dim(), config.reranking_k_factor,
-                         config.max_query_length, device)
+                         self.emb_model.get_embedding_dim(), config.chunk_capacity,
+                         config.reranking_k_factor, config.max_query_length,
+                         config.chunk_overlap_fraction, config.redundancy_overlap_threshold, device)
 
     def get_tokenizer(self):
         return self.chunk_tokenizer
@@ -74,6 +75,9 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
         token_ids = self.chunk_queue.get_chunk_token_ids(chunk)
         return self.chunk_tokenizer.decode(token_ids, skip_special_tokens=True)
 
+    def get_chunk(self, chunk_id: int) -> Chunk:
+        return self.chunk_queue.get_chunk(chunk_id)
+
     def retrieve_multiple(self, queries: List[str], k: int = 1, rewrite: bool = False,
                           show_progress_bar: bool = False, **kwargs) -> List[List[RetrievedMemory]]:
         if rewrite and not self.query_rewrite_model:
@@ -82,8 +86,8 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
             queries = [self.query_rewrite_model.rewrite_query(q) for q in queries]
         return super().retrieve_multiple(queries, k, rewrite, show_progress_bar, **kwargs)
 
-    def retrieve_chunk_sequences(self, chunk_ids: List[int]):
-        return self.chunk_queue.retrieve_chunk_sequences(chunk_ids)
+    def retrieve_chunk_sequences(self, chunks: List[Chunk]):
+        return self.chunk_queue.retrieve_chunk_sequences_given_chunks(chunks)
 
     def retrieve_complete_sequences(self, chunk_ids: List[int], punctuation_ids: Set[int]):
         return self.chunk_queue.retrieve_complete_sequences(chunk_ids, punctuation_ids)

@@ -35,7 +35,11 @@ class BaseChunkQueue(ABC):
         pass
 
     @abstractmethod
-    def retrieve_chunk_sequences(self, chunk_ids: List[int]):
+    def retrieve_chunk_sequences(self, chunk_ids: List[int]) -> List[List[int]]:
+        pass
+
+    @abstractmethod
+    def retrieve_chunk_sequences_given_chunks(self, chunks: List[Chunk]) -> List[List[int]]:
         pass
 
     @abstractmethod
@@ -238,6 +242,13 @@ class ChunkQueue(BaseChunkQueue, ChunkMixin):
             if chunk is not None:
                 sequence = self.get_chunk_token_ids(chunk)
                 sequences.append(sequence)
+        return sequences
+
+    def retrieve_chunk_sequences_given_chunks(self, chunks: List[Chunk]):
+        sequences = []
+        for chunk in chunks:
+            sequence = self.get_chunk_token_ids(chunk)
+            sequences.append(sequence)
         return sequences
 
     def flush(self):
