@@ -1,5 +1,40 @@
 
-## Examples
+### Evaluations of embedding models
+
+We're interested in retrieval of relatively short 
+passages (one to a few sentences) using conversational
+queries that may be found in a chat. To this end we've developed
+an evaluation based on datasets [QReCC](https://github.com/apple/ml-qrecc),
+[StrategyQA](https://allenai.org/data/strategyqa), and
+[MS MARCO](https://microsoft.github.io/msmarco/). (Fine-tuning is
+done with different datasets.)
+Results in the following table show top-3 and top-10
+retrieval accuracy for each dataset.
+
+Model | qrecc @3 | qrecc @10 | strategyqa @3 | strategyqa @10 | msmarco @3 | msmarco @10
+----- |-------| -------- |-----------|------------| --------- | ----------
+openai:text-embedding-ada-002 | 67.09 | 76.80 | 68.00     | 82.40      | 73.10 | 80.14 | 
+st:sentence-transformers/multi-qa-MiniLM-L6-cos-v1 | 69.98 | 77.57 | 73.90     | 87.75      | 70.31 | 77.71 |
+st:sentence-transformers/all-distilroberta-v1 | 65.01 | 76.15 | 66.35     | 82.50      | 68.59 | 78.34 |
+st:sentence-transformers/sentence-t5-large | 68.40 | 78.28 | 72.55     | 86.60      | 71.30 | 80.51 |
+st:sentence-transformers/all-mpnet-base-v2 | 70.69 | 80.19 | 74.50     | 87.65      | 75.00 | 81.77 |
+st:sentence-transformers/multi-qa-mpnet-base-cos-v1 | 74.95 | 82.42 | 79.75     | 91.25      | 75.00 | 82.85 |
+**em-MiniLM-p1-01** (ours) | 72.43 | 79.26 | 75.50 | 89.00 | 71.75 | 79.60 |
+**em-MiniLM-p3-01** (ours) | 72.87 | 80.02 | 78.00     | 89.75      | 73.38 | 79.96 |
+**em-distilroberta-p1-01** (ours) | 77.67 | 83.84 | 83.25     | 94.15      | **79.78** | 84.39 |
+**em-distilroberta-p3-01** (ours) | 78.33 | **84.66** | 86.55     | 95.40      | 79.51 | **85.29** |
+**em-distilroberta-p5-01** (ours) | **78.88** | 84.44 | **87.40** | **95.70**  | 79.24 | 84.84 |
+
+Model `em-distilroberta-p1-01` is the default embedding model used
+by this library. While `em-distilroberta-p3-01` and `em-distilroberta-p5-01` have better
+retrieval accuracy, note that they require storing 3 and 5 embeddings
+per chunk, respectively. 
+
+## Retrieval dataset examples
+
+The following are 10 queries sampled from the dataset constructed out of StrategyQA, along with the expected
+passage, and the 3 top matching passages retrieved using 2 different embedding models. There is a high margin
+of error when selecting a sample of size 10, but we picked one that is representative of the overall results.
 
 <table border=1 width="100%">
 <tr><th width="25%">Query</th><th width="25%">Expected Passage</th><th width="25%">em-distilroberta-p5-01</th><th width="25%">openai:text-embedding-ada-002</th></tr>
@@ -14,3 +49,35 @@
 <tr><td valign=top>Stephen: Medical condition where poor blood flow to the brain causes cell death<br>Rachel: Did Dale Jr.&#x27;s father crash his car due to a stroke?<br>Stephen:</td><td valign=top>Dale Earnhardt Jr. is his late father&#x27;s namesake.</td><td valign=top>1) <b>The Fibonaacci number is a sequence of numbers that adds a number to the one before it and goes on forever.<br>Dale Earnhardt Jr. is his late father&#x27;s namesake.</b><br>2) A caracal is a small wild cat<br>Dale Jr. and his father Dale Sr. last raced together at the Daytona 500 in 2001.<br>3) Cerebral palsy is a disease that results from damage to a young person&#x27;s brain.<br>The bottom of the gulf is one of the world&#x27;s largest ship cemeteries.<br></td><td valign=top>1) in 1908<br>Multiple Sclerosis is a progressive condition affecting the brain and spinal chord.<br>Saddam Hussein died on December 30th, 2006.<br>2) Parsifal was loosely based on a poem about Percival<br>Hypothermia typically occurs from exposure to extreme cold.<br>Traffic collisions sometimes result in extremely expensive physical damage.<br>Goofy is an anthropomorphic dog character.<br>3) Cerebral palsy is a disorder caused by damage to fetal or infant brains.<br>Bitcoin was launched as a currency in 2009.<br></td></tr>
 <tr><td valign=top>Stephen: Academic tertiary education, such as from colleges and universities<br>Rachel: Did Emma Stone pursue a higher education?<br>Stephen:</td><td valign=top>Higher education, also called post-secondary education, third-level or tertiary education, is an optional final stage of formal learning that occurs after completion of secondary education.</td><td valign=top>1) <b>Shivambu is another term for &#x27;Urine Therapy&#x27;, an alternative belief about healing with urine.<br>Higher education, also called post-secondary education, third-level or tertiary education, is an optional final stage of formal learning that occurs after completion of secondary education.</b><br>2) Superbad features two main characters that are nerds on a quest for love, and ends with them being victorious.<br>Johns Hopkins University had an endowment of $6.<br>3) The qualifications to be a tax collector in the US inlude a bachelor&#x27;s degree in accounting.<br>Naomi Watts starred in King Kong (2005 film).<br>Gay men can have any of the various sex organs that humans have.<br></td><td valign=top>1) <b>Higher education, also called post-secondary education, third-level or tertiary education, is an optional final stage of formal learning that occurs after completion of secondary education.</b><br>2) Alfa Romeo makes cars.<br>Some of the things geologists study include gemstones, minerals, and stone<br>The Toronto Star has a classifieds section<br>QWERTY keyboards are an alphabet key layout that were first used on typrwriters<br>3) College degrees require at least 2 years of study to obtain.<br>LeBron James is 6 feet 9 inches tall.<br></td></tr>
 </table>
+
+### Boosting the accuracy of low-resource embedding models
+
+At this time, we haven't found a reranking cross-encoder that can consistently boost
+the retrieval accuracy of our best embedding models. That said, you can use accurate
+embedding models as query-passage matching models, alongside a low-resource embedding
+model. *This combination's accuracy nearly matches that of the best embedding models from 
+this library.*
+
+The following tests were performed by configuring a memory to use `em-MiniLM-p1-01`
+as the embedding model and `em:em-distilroberta-p5-01` as the matching/reranking model
+with different values of the `reranking_k_factor` setting.
+
+reranking_k_factor | qrecc @3 | qrecc @10 | strategyqa @3 | strategyqa @10 | msmarco @3 | msmarco @10
+----- |----------|-----------|---------------|----------------|------------| ----------
+1 | 76.97    | 79.75     | 84.65         | 89.05          | 76.62      | 79.33 |
+2 | 77.95    | 81.39     | 86.55         | 92.85          | 77.89      | 81.41 |
+3 | 78.33    | 82.53     | 87.10         | 93.90          | 78.61      | 82.85 |
+5 | 78.60    | 83.19     | 87.35         | 94.60          | 78.97      | 83.48 |
+8  | 78.93    | 84.44     | 87.25         | 95.15          | 79.33      | 83.84 |
+10 | 78.93    | 84.50     | 87.45         | 95.55          | 79.15      | 84.21 |
+
+Model `em-MiniLM-p1-01` stores a single embedding of size 384 per chunk, while model
+`em-distilroberta-p5-01` produces 5 storage embeddings per chunk, of size 768. The number of storage embeddings
+has little impact when the embedding model is used as a query-passage matching model.
+It does matter, however, in terms of chunk storage capacity when embeddings
+are attached to chunks. In the case of the two models in question, the difference 
+in footprint is 10-fold.
+
+Using a matching model does come with a performance overhead in every query, but in 
+the context of an LLM-based chat agent implementation, the overhead should be unnoticeable.
+
