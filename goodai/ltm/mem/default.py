@@ -1,4 +1,5 @@
 import gc
+import math
 from typing import List, Union, Any, Callable, Set, Optional, Tuple
 import numpy as np
 import torch
@@ -30,7 +31,12 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
                  ):
         if chunk_queue_fn is None:
             def chunk_queue_fn():
-                return ChunkQueue(config.queue_capacity, config.chunk_capacity)
+                cc = config.chunk_capacity
+                cof = config.chunk_overlap_fraction
+                if cof < 0 or cof > 0.5:
+                    raise ValueError(f'Invalid chunk overlap fraction: {cof}')
+                ciao = cc - math.ceil(cc * cof)
+                return ChunkQueue(config.queue_capacity, cc, ciao)
 
         self.config = config
         self.device = device
