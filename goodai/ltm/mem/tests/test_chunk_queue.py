@@ -108,12 +108,14 @@ class TestChunkQueue(unittest.TestCase):
     def test_overlap_of_1_token(self):
         chunk_capacity = 5
         chunk_index_at_overlap = chunk_capacity - 1
-        _chunk_queue = ChunkQueue(25, chunk_capacity, chunk_index_at_overlap, first_token_seq_id=17)
+        _chunk_queue = ChunkQueue(25, chunk_capacity, chunk_index_at_overlap, first_token_seq_id=39)
         _chunk_queue.add_sequence([1, 2, 3], None)
         _chunk_queue.add_sequence([4, 5, 6], None)
+        _chunk_queue.add_sequence([], None)
         _chunk_queue.add_sequence([7, 8, 9], None)
         _chunk_queue.add_sequence([10, 11, 12], None)
         _chunk_queue.add_sequence([10, 8, 12], None)
+        _chunk_queue.add_sequence([], None)
         _chunk_queue.add_sequence([14, 11, 12], None)
         _chunk_queue.add_sequence([3, 8, 21], None)
         _chunk_queue.add_sequence([13, 12, 9], None)
