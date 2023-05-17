@@ -11,9 +11,9 @@ import numpy as np
 import torch
 from transformers import PreTrainedTokenizer
 
-from goodai.helpers.tokenizer_helper import get_sentence_punctuation_ids
 from goodai.ltm.mem.base import BaseTextMemory, RetrievedMemory
 from goodai.ltm.mem.chunk import Chunk
+from goodai.ltm.mem.chunk_queue import PassageInfo
 from goodai.ltm.mem.simple_vector_db import SimpleVectorDb
 
 _vector_db_type = Union[faiss.Index, SimpleVectorDb]
@@ -28,28 +28,29 @@ class VectorDbType(enum.Enum):
 class RetrievedChunk:
     chunk: Chunk
     distance: float
+    passage: PassageInfo
     confidence: Optional[float] = None
+
+    def with_confidence(self, confidence: float) -> 'RetrievedChunk':
+        return RetrievedChunk(chunk=self.chunk, distance=self.distance,
+                              passage=self.passage,
+                              confidence=confidence)
 
     def sort_key(self):
         return self.distance if self.confidence is None else -self.confidence
 
-    def with_confidence(self, confidence: float) -> 'RetrievedChunk':
-        return RetrievedChunk(self.chunk, self.distance, confidence)
-
     @staticmethod
-    def has_overlap(included_indexes: Set[int], chunk: Chunk,
+    def has_overlap(included_indexes: Set[int], p_from: int, p_to: int,
                     overlap_threshold: float):
-        chunk_from = chunk.from_token_seq_id
-        chunk_to = chunk.to_token_seq_id
-        if chunk_from not in included_indexes and (chunk_to - 1) not in included_indexes:
+        if p_from not in included_indexes and (p_to - 1) not in included_indexes:
             return False
-        if chunk_to <= chunk_from:
+        if p_to <= p_from:
             return False
-        intersection = included_indexes.intersection(range(chunk_from, chunk_to))
+        intersection = included_indexes.intersection(range(p_from, p_to))
         len_inter = len(intersection)
         if len_inter <= 0:
             return False
-        overlap_fraction = len_inter / (chunk_to - chunk_from)
+        overlap_fraction = len_inter / (p_to - p_from)
         return overlap_fraction >= overlap_threshold
 
     @classmethod
@@ -66,14 +67,15 @@ class RetrievedChunk:
             if chunk_id in id_set:
                 continue
             id_set.add(chunk_id)
-            if cls.has_overlap(included_indexes, chunk, overlap_threshold):
+            passage = item.passage
+            p_from = passage.fromIndex
+            p_to = passage.toIndex
+            if cls.has_overlap(included_indexes, p_from, p_to, overlap_threshold):
                 continue
             result.append(item)
             if len(result) >= max_count:
                 break
-            chunk_from = chunk.from_token_seq_id
-            chunk_to = chunk.to_token_seq_id
-            included_indexes.update(range(chunk_from, chunk_to))
+            included_indexes.update(range(p_from, p_to))
         return result
 
 
@@ -88,6 +90,8 @@ class BaseTextMemoryFoundation(BaseTextMemory):
             raise ValueError(f'Invalid chunk overlap fraction: {overlap_fraction}')
         if overlap_threshold <= 0 or overlap_threshold > 1.0:
             raise ValueError(f'Invalid redundancy overlap threshold: {overlap_threshold}')
+        if reranking_k_factor < 1:
+            raise ValueError('reranking_k_factor cannot be less than 1')
         self.chunk_capacity = chunk_capacity
         self.overlap_threshold = overlap_threshold
         self.overlap_fraction = overlap_fraction
@@ -98,7 +102,6 @@ class BaseTextMemoryFoundation(BaseTextMemory):
         self.vector_db = self.create_vector_db(vector_db_type, emb_dim)
         self.device = device
         self.chunk_tokenizer = tokenizer
-        self.punctuation_ids = get_sentence_punctuation_ids(self.chunk_tokenizer, include_line_break=False)
 
     @staticmethod
     def create_vector_db(vector_db_type: VectorDbType, emb_dim: int) -> _vector_db_type:
@@ -114,10 +117,6 @@ class BaseTextMemoryFoundation(BaseTextMemory):
 
     @abc.abstractmethod
     def retrieve_chunk_sequences(self, chunks: List[Chunk]):
-        pass
-
-    @abc.abstractmethod
-    def retrieve_complete_sequences(self, chunk_ids: List[int], punctuation_ids: Set[int]):
         pass
 
     @abc.abstractmethod
@@ -144,6 +143,10 @@ class BaseTextMemoryFoundation(BaseTextMemory):
     def get_chunk(self, chunk_id: int) -> Chunk:
         pass
 
+    @abc.abstractmethod
+    def get_complete_passage(self, chunk: Chunk) -> PassageInfo:
+        pass
+
     def dump(self, stream: io.TextIOBase = sys.stdout):
         chunks = self.get_all_chunks()
         stream.write('| Id | Metadata | Content |\n')
@@ -159,8 +162,7 @@ class BaseTextMemoryFoundation(BaseTextMemory):
             List[RetrievedMemory]:
         has_pm = self.has_match_prob_model
         processed_r_chunks = processed_r_chunks[:k]
-        final_chunk_ids: List[int] = [r_chunk.chunk.chunk_id for r_chunk in processed_r_chunks]
-        sequences = self.retrieve_complete_sequences(final_chunk_ids, self.punctuation_ids)
+        sequences = [r_chunk.passage.tokenIds for r_chunk in processed_r_chunks]
         retrieved_texts = self.chunk_tokenizer.batch_decode(sequences, skip_special_tokens=True)
         result = []
         for r_chunk, r_text in zip(processed_r_chunks, retrieved_texts):
@@ -208,7 +210,7 @@ class BaseTextMemoryFoundation(BaseTextMemory):
         return result
 
     def _multi_retrieve(self, queries: List[str], distances: np.ndarray, indexes: np.ndarray,
-                        expected_key_db_top_k: int, k: int,
+                        expected_key_db_top_k: int, expansion_top_k: int, k: int,
                         show_progress_bar: bool = False) -> List[List[RetrievedMemory]]:
         # len(queries) == batch_size
         # distances, indexes: (batch_size, downstream_top_k)
@@ -219,16 +221,34 @@ class BaseTextMemoryFoundation(BaseTextMemory):
         for i in range(batch_size):
             row_d = distances[i]
             row_i = indexes[i]
-            row_chunks = [self.get_chunk(chunk_id) for chunk_id in row_i]
-            row_r_chunks = [RetrievedChunk(chunk, distance) for chunk, distance in zip(row_chunks, row_d)]
+            # Remove duplicate and "not found" chunk IDs
+            distinct_d_i = []
+            id_set = set()
+            for distance, chunk_id in zip(row_d, row_i):
+                if chunk_id in id_set or chunk_id < 0:
+                    continue
+                id_set.add(chunk_id)
+                distinct_d_i.append((distance, chunk_id,))
+            # Without duplicates, we only need at most expansion_top_k chunks at this point
+            distinct_d_i = distinct_d_i[:expansion_top_k]
+            # Retrieve chunk objects from queue
+            row_chunks = [self.get_chunk(chunk_id) for _, chunk_id in distinct_d_i]
+            row_passages = [self.get_complete_passage(chunk) for chunk in row_chunks]
+            row_r_chunks = [RetrievedChunk(chunk, distance, passage)
+                            for chunk, passage, (distance, _) in
+                            zip(row_chunks, row_passages, distinct_d_i)]
+            # Removal of overlapping passages
             row_r_chunks = RetrievedChunk.remove_duplicates_and_overlaps(row_r_chunks, self.overlap_threshold,
                                                                          expected_key_db_top_k)
+            # At this point there are at most expected_key_db_top_k chunks per row
             prelim_r_chunks.append(row_r_chunks)
         return self._multi_retrieve_for_r_chunks(queries, prelim_r_chunks, k,
                                                  show_progress_bar=show_progress_bar)
 
     def retrieve_multiple(self, queries: List[str], k: int, rewrite: bool = False, show_progress_bar: bool = False,
                           **kwargs) -> List[List[RetrievedMemory]]:
+        if k <= 0:
+            raise ValueError('k must be greater than zero')
         if self.max_query_length is not None:
             queries = self._truncate_queries(queries, self.max_query_length)
         rk = self.get_retrieval_key_for_text(queries, show_progress_bar=show_progress_bar)
@@ -243,19 +263,24 @@ class BaseTextMemoryFoundation(BaseTextMemory):
         expected_key_db_top_k = k
         if self.has_match_prob_model:
             expected_key_db_top_k = round(expected_key_db_top_k * self.reranking_k_factor)
-        # The vector_db can return multiple entries with the same ID if chunks are associated
-        # with multiple embeddings
-        downstream_top_k = expected_key_db_top_k * self.num_storage_embeddings
+
         # Extra items retrieved, anticipating possible overlaps
         # TODO assumes chunk expansion is to at most 1 chunk on each side
         cc = self.chunk_capacity
         max_extra_passage_len = cc * 2
         num_possible_side_chunks = round((max_extra_passage_len / cc) / (1 - self.overlap_fraction))
-        downstream_top_k *= (1 + num_possible_side_chunks)
-        distances, indexes = self.vector_db.search(rk_np, k=downstream_top_k)
+        expansion_top_k = 1 + (expected_key_db_top_k - 1) * (1 + num_possible_side_chunks)
+
+        # The vector_db can return multiple entries with the same ID if chunks are associated
+        # with multiple embeddings
+        coverage_top_k = 1 + (expansion_top_k - 1) * self.num_storage_embeddings
+
+        # Call to vector database
+        distances, indexes = self.vector_db.search(rk_np, k=coverage_top_k)
+
         # Assumes vector_db returns ordered results
         assert distances.shape[0] == indexes.shape[0] == batch_size
-        return self._multi_retrieve(queries, distances, indexes, expected_key_db_top_k, k,
+        return self._multi_retrieve(queries, distances, indexes, expected_key_db_top_k, expansion_top_k, k,
                                     show_progress_bar=show_progress_bar)
 
     def _truncate_queries(self, queries: List[str], max_query_length: int):

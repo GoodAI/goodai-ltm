@@ -1,73 +1,20 @@
 import math
 from abc import abstractmethod, ABC
+from dataclasses import dataclass
 from typing import List, Tuple, Set, Dict, Optional, Any
 
 from goodai.ltm.mem.chunk import Chunk
 from goodai.ltm.mem.chunk_mixin import ChunkMixin
 
 
-class BaseChunkQueue(ABC):
-    """
-    Abstract base class for text memory chunk queues.
-    """
-
-    def __init__(self):
-        super().__init__()
-
-    @abstractmethod
-    def get_capacity(self) -> int:
-        pass
-
-    @abstractmethod
-    def add_sequence(self, token_ids: List[int], metadata: Optional[Any]):
-        pass
-
-    @abstractmethod
-    def check_overflow(self) -> List[Chunk]:
-        pass
-
-    @abstractmethod
-    def get_chunks_for_indexing(self) -> Tuple[List[Chunk], List[List[int]]]:
-        pass
-
-    @abstractmethod
-    def get_latest_token_ids(self, max_num_tokens: Optional[int]):
-        pass
-
-    @abstractmethod
-    def retrieve_chunk_sequences(self, chunk_ids: List[int]) -> List[List[int]]:
-        pass
-
-    @abstractmethod
-    def retrieve_chunk_sequences_given_chunks(self, chunks: List[Chunk]) -> List[List[int]]:
-        pass
-
-    @abstractmethod
-    def retrieve_complete_sequences(self, chunk_ids: List[int], punctuation_ids: Set[int]):
-        pass
-
-    @abstractmethod
-    def flush(self):
-        pass
-
-    @abstractmethod
-    def get_chunk_sequences(self) -> List[List[int]]:
-        pass
-
-    @abstractmethod
-    def get_chunk(self, chunk_id: int) -> Chunk:
-        pass
-
-    @abstractmethod
-    def get_all_chunks(self) -> List[Chunk]:
-        pass
-
-    @abstractmethod
-    def get_chunk_token_ids(self, chunk: Chunk):
-        pass
+@dataclass
+class PassageInfo:
+    fromIndex: int
+    toIndex: int
+    tokenIds: List[int]
 
 
-class ChunkQueue(BaseChunkQueue, ChunkMixin):
+class ChunkQueue(ChunkMixin):
     def __init__(self, queue_capacity: int, chunk_capacity: int, chunk_index_at_overlap: int,
                  first_token_seq_id: int = 0):
         super().__init__()
@@ -177,36 +124,41 @@ class ChunkQueue(BaseChunkQueue, ChunkMixin):
         to_index = chunk.to_token_seq_id - first_index
         return self.token_ids[from_index:to_index]
 
-    def _get_prev_token_ids(self, chunk_id: int) -> Optional[List[int]]:
-        chunk = self.chunk_map[chunk_id]
+    def _get_prev_token_ids(self, chunk: Chunk) -> Optional[List[int]]:
         first_seq_id = self.first_token_seq_id
         to_index = chunk.from_token_seq_id - first_seq_id
         from_index = to_index - self.chunk_capacity
         from_index = max(0, from_index)
         return self.token_ids[from_index:to_index]
 
-    def _get_next_token_ids(self, chunk_id: int) -> Optional[List[int]]:
-        chunk = self.chunk_map[chunk_id]
+    def _get_next_token_ids(self, chunk: Chunk) -> Optional[List[int]]:
         first_seq_id = self.first_token_seq_id
         from_index = chunk.to_token_seq_id - first_seq_id
         to_index = from_index + self.chunk_capacity
         return self.token_ids[from_index:to_index]
 
-    def retrieve_complete_sequences(self, chunk_ids: List[int], punctuation_ids: Set[int]):
+    def retrieve_complete_sequences(self, chunk_ids: List[int], punctuation_ids: Set[int]) -> List[List[int]]:
         sequences = []
         for chunk_id in chunk_ids:
             chunk = self.chunk_map.get(chunk_id)
             if chunk is not None:
-                assert chunk.chunk_id == chunk_id
-                sequence = self.get_chunk_token_ids(chunk)
-                prev_sequence = self._get_prev_token_ids(chunk_id)
-                if prev_sequence is not None:
-                    sequence = self._from_last_punctuation(prev_sequence, punctuation_ids) + sequence
-                next_sequence = self._get_next_token_ids(chunk_id)
-                if next_sequence is not None:
-                    sequence = sequence + self._to_first_punctuation(next_sequence, punctuation_ids)
-                sequences.append(sequence)
+                passage = self.get_complete_passage(chunk, punctuation_ids)
+                sequence = passage.tokenIds
+            else:
+                sequence = []
+            sequences.append(sequence)
         return sequences
+
+    def get_complete_passage(self, chunk: Chunk, punctuation_ids: Set[int]) -> PassageInfo:
+        # TODO assumes expansion of one chunk capacity to the left and right
+        prev_token_ids = self._get_prev_token_ids(chunk)
+        prev_token_ids = self._from_last_punctuation(prev_token_ids, punctuation_ids)
+        next_token_ids = self._get_next_token_ids(chunk)
+        next_token_ids = self._to_first_punctuation(next_token_ids, punctuation_ids)
+        p_from = chunk.from_token_seq_id - len(prev_token_ids)
+        p_to = chunk.to_token_seq_id + len(next_token_ids)
+        expanded_seq = prev_token_ids + self.get_chunk_token_ids(chunk) + next_token_ids
+        return PassageInfo(p_from, p_to, expanded_seq)
 
     def get_queue_size(self):
         return len(self.chunks)

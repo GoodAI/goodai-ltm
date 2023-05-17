@@ -13,7 +13,7 @@ from goodai.ltm.mem.base import RetrievedMemory
 from goodai.ltm.mem.chunk import Chunk
 from goodai.ltm.mem.rewrite_model import BaseRewriteModel
 from goodai.ltm.reranking.base import BaseTextMatchingModel
-from goodai.ltm.mem.chunk_queue import ChunkQueue, BaseChunkQueue
+from goodai.ltm.mem.chunk_queue import ChunkQueue, PassageInfo
 from goodai.ltm.mem.config import TextMemoryConfig
 from goodai.ltm.mem.mem_foundation import BaseTextMemoryFoundation, VectorDbType
 from goodai.ltm.mem.simple_vector_db import SimpleVectorDb
@@ -25,19 +25,15 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
     def __init__(self, vector_db_type: VectorDbType, tokenizer: PreTrainedTokenizer,
                  emb_model: BaseTextEmbeddingModel, matching_model: Optional[BaseTextMatchingModel],
                  device: torch.device, config: TextMemoryConfig,
-                 chunk_queue_fn: Callable[[], BaseChunkQueue] = None,
                  query_rewrite_model: Optional[BaseRewriteModel] = None,
                  memory_rewrite_model: Optional[BaseRewriteModel] = None
                  ):
-        if chunk_queue_fn is None:
-            def chunk_queue_fn():
-                cc = config.chunk_capacity
-                cof = config.chunk_overlap_fraction
-                if cof < 0 or cof > 0.5:
-                    raise ValueError(f'Invalid chunk overlap fraction: {cof}')
-                ciao = cc - math.ceil(cc * cof)
-                return ChunkQueue(config.queue_capacity, cc, ciao)
-
+        cc = config.chunk_capacity
+        cof = config.chunk_overlap_fraction
+        if cof < 0 or cof > 0.5:
+            raise ValueError(f'Invalid chunk overlap fraction: {cof}')
+        ciao = cc - math.ceil(cc * cof)
+        self.chunk_queue = ChunkQueue(config.queue_capacity, cc, ciao)
         self.config = config
         self.device = device
         self.emb_model = emb_model
@@ -46,10 +42,9 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
         self.bucket_capacity = config.chunk_capacity
         self.pad_token_id = get_pad_token_id(self.chunk_tokenizer)
         self.punctuation_ids = get_sentence_punctuation_ids(self.chunk_tokenizer, include_line_break=False)
-        self.chunk_queue: BaseChunkQueue = chunk_queue_fn()
-        has_matching_model = self.matching_model is not None
         self.query_rewrite_model = query_rewrite_model
         self.memory_rewrite_model = memory_rewrite_model
+        has_matching_model = self.matching_model is not None
         super().__init__(vector_db_type, self.chunk_tokenizer, has_matching_model,
                          self.emb_model.get_num_storage_embeddings(),
                          self.emb_model.get_embedding_dim(), config.chunk_capacity,
@@ -75,6 +70,9 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
         token_ids = self.chunk_queue.get_chunk_token_ids(chunk)
         return self.chunk_tokenizer.decode(token_ids, skip_special_tokens=True)
 
+    def get_complete_passage(self, chunk: Chunk) -> PassageInfo:
+        return self.chunk_queue.get_complete_passage(chunk, self.punctuation_ids)
+
     def get_chunk(self, chunk_id: int) -> Chunk:
         return self.chunk_queue.get_chunk(chunk_id)
 
@@ -88,9 +86,6 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
 
     def retrieve_chunk_sequences(self, chunks: List[Chunk]):
         return self.chunk_queue.retrieve_chunk_sequences_given_chunks(chunks)
-
-    def retrieve_complete_sequences(self, chunk_ids: List[int], punctuation_ids: Set[int]):
-        return self.chunk_queue.retrieve_complete_sequences(chunk_ids, punctuation_ids)
 
     def get_retrieval_key_for_text(self, queries: List[str], show_progress_bar: bool = False) -> torch.Tensor:
         return self.emb_model.encode_queries(queries, convert_to_tensor=True, show_progress_bar=show_progress_bar)
