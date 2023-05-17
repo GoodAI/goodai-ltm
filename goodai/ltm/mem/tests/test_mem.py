@@ -1,5 +1,6 @@
 import gc
 import unittest
+from typing import List, Tuple
 
 from transformers import AutoTokenizer
 
@@ -7,6 +8,7 @@ from goodai.ltm.embeddings.auto import AutoTextEmbeddingModel
 from goodai.ltm.eval.metrics import get_correctness_score
 from goodai.ltm.mem.auto import AutoTextMemory
 from goodai.ltm.mem.config import TextMemoryConfig
+from goodai.ltm.reranking.base import BaseTextMatchingModel
 
 
 class TestMem(unittest.TestCase):
@@ -94,5 +96,28 @@ class TestMem(unittest.TestCase):
         r_memories = mem1.retrieve('Is there something?', k=5)
         assert len(r_memories) > 0
 
+    def test_custom_qpm_model(self):
+        class _CustomQPM(BaseTextMatchingModel):
+            def predict(self, sentences: List[Tuple[str, str]], batch_size: int = 32,
+                        show_progress_bar: bool = False) -> List[float]:
+                scores = []
+                for query, passage in sentences:
+                    if 'UV-light' in passage:
+                        score = 0.9
+                    elif 'greenhouse' in passage:
+                        score = 0.7
+                    else:
+                        score = 0.5
+                    scores.append(score)
+                return scores
 
+            def get_info(self):
+                return ''
+
+        qpm = _CustomQPM()
+        mem = AutoTextMemory.create(matching_model=qpm, emb_model=self._lr_emb_model)
+        mem.add_text(self._text)
+        r_memories = mem.retrieve('Is water vapor widely present in the atmosphere?', k=5)
+        assert 'UV-light' in r_memories[0].passage
+        assert 'greenhouse' in r_memories[1].passage
 
