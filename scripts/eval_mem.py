@@ -19,6 +19,7 @@ class EvalSpec:
     hasQueryNoise: bool = True
     chunkCapacity: int = 24
     rerankingKFactor: int = 10
+    overlapThreshold: float = 0.75
 
     @classmethod
     def for_qpm(cls, qpm_model_name: str, emb_model_name: str, reranking_k_factor: int):
@@ -141,8 +142,12 @@ _qpm_eval_specs_17 = [EvalSpec.for_qpm('em:em-distilroberta-p5-01', mid, rkf) fo
     ('em-distilroberta-p5-01', 1),
 ]]
 
+_qpm_eval_specs_18 = [EvalSpec.for_qpm('em:em-distilroberta-p5-01', mid, rkf) for mid, rkf in [
+    ('em-MiniLM-p1-01', 15),
+]]
+
 if __name__ == '__main__':
-    eval_specs: List[EvalSpec] = _qpm_eval_specs_14
+    eval_specs: List[EvalSpec] = _qpm_eval_specs_18
 
     device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
     torch.manual_seed(1001)
@@ -164,6 +169,7 @@ if __name__ == '__main__':
         config = TextMemoryConfig()
         config.chunk_capacity = spec.chunkCapacity
         config.reranking_k_factor = spec.rerankingKFactor
+        config.redundancy_overlap_threshold = spec.overlapThreshold
         # Query truncation taken care of by the evaluator class
         config.max_query_length = None
         table_out += spec.id + ' | '

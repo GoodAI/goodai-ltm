@@ -2,9 +2,9 @@ from typing import Any, Optional
 
 
 class Chunk:
-    def __init__(self, index: int, capacity: int, from_token_seq_id: int, metadata: Optional[dict]):
+    def __init__(self, chunk_id: int, capacity: int, from_token_seq_id: int, metadata: Optional[dict]):
         self.metadata = metadata
-        self.index = index
+        self.chunk_id = chunk_id
         self.capacity = capacity
         self.from_token_seq_id = from_token_seq_id
         self.to_token_seq_id = from_token_seq_id

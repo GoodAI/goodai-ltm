@@ -1,76 +1,35 @@
+import math
 from abc import abstractmethod, ABC
+from dataclasses import dataclass
 from typing import List, Tuple, Set, Dict, Optional, Any
 
 from goodai.ltm.mem.chunk import Chunk
 from goodai.ltm.mem.chunk_mixin import ChunkMixin
 
 
-class BaseChunkQueue(ABC):
-    """
-    Abstract base class for text memory chunk queues.
-    """
+@dataclass
+class PassageInfo:
+    fromIndex: int
+    toIndex: int
+    tokenIds: List[int]
 
-    def __init__(self):
+
+class ChunkQueue(ChunkMixin):
+    def __init__(self, queue_capacity: int, chunk_capacity: int, chunk_index_at_overlap: int,
+                 first_token_seq_id: int = 0):
         super().__init__()
-
-    @abstractmethod
-    def get_capacity(self) -> int:
-        pass
-
-    @abstractmethod
-    def add_sequence(self, token_ids: List[int], metadata: Optional[Any]):
-        pass
-
-    @abstractmethod
-    def check_overflow(self) -> List[Chunk]:
-        pass
-
-    @abstractmethod
-    def get_chunks_for_indexing(self) -> Tuple[List[Chunk], List[List[int]]]:
-        pass
-
-    @abstractmethod
-    def get_latest_token_ids(self, max_num_tokens: Optional[int]):
-        pass
-
-    @abstractmethod
-    def retrieve_chunk_sequences(self, chunk_ids: List[int]):
-        pass
-
-    @abstractmethod
-    def retrieve_complete_sequences(self, chunk_ids: List[int], punctuation_ids: Set[int]):
-        pass
-
-    @abstractmethod
-    def flush(self):
-        pass
-
-    @abstractmethod
-    def get_chunk_sequences(self) -> List[List[int]]:
-        pass
-
-    @abstractmethod
-    def get_chunk(self, chunk_id: int) -> Chunk:
-        pass
-
-    @abstractmethod
-    def get_all_chunks(self) -> List[Chunk]:
-        pass
-
-    @abstractmethod
-    def get_chunk_token_ids(self, chunk: Chunk):
-        pass
-
-
-class ChunkQueue(BaseChunkQueue, ChunkMixin):
-    def __init__(self, queue_capacity: int, chunk_capacity: int, first_token_seq_id: int = 0):
-        super().__init__()
-        assert queue_capacity > 2, 'capacity cannot be 2 or less.'
-        self.chunks: List[Chunk] = []
+        if queue_capacity <= 2:
+            raise ValueError('Queue capacity cannot be 2 or less')
+        if chunk_capacity < 1:
+            raise ValueError('Chunk capacity cannot be zero or less')
+        if chunk_index_at_overlap < chunk_capacity // 2:
+            raise ValueError('Chunk overlap cannot be more than 50%')
         self.capacity = queue_capacity
         self.chunk_capacity = chunk_capacity
-        self.half_chunk_capacity = chunk_capacity // 2
-        self.current_chunk_index = 0
+        self.chunks: List[Chunk] = []
+        self.min_tokens_for_indexing = chunk_capacity // 2
+        self.chunk_index_at_overlap = chunk_index_at_overlap
+        self.current_chunk_id = 0
         self.first_token_seq_id = first_token_seq_id
         self.token_ids = []
         self.chunk_map: Dict[int, Chunk] = dict()
@@ -78,7 +37,7 @@ class ChunkQueue(BaseChunkQueue, ChunkMixin):
     def _pop_chunk(self):
         chunk = self.chunks.pop(0)
         if chunk is not None:
-            self.chunk_map.pop(chunk.index)
+            self.chunk_map.pop(chunk.chunk_id)
             if len(self.chunks) == 0:
                 assert len(self.chunk_map) == 0
                 self.token_ids = []
@@ -102,26 +61,17 @@ class ChunkQueue(BaseChunkQueue, ChunkMixin):
                 removed_chunks.append(removed_chunk)
         return removed_chunks
 
-    def ensure_chunks_exist(self, metadata: Optional[Any]):
-        while len(self.chunks) < 2:
-            self.add_chunk(metadata)
-
     def add_chunk(self, metadata: Optional[Any]) -> Chunk:
-        b_index = self.current_chunk_index
+        chunk_id = self.current_chunk_id
         last_chunk = self.chunks[-1] if len(self.chunks) >= 1 else None
-        prev_last_chunk = self.chunks[-2] if len(self.chunks) >= 2 else None
-        first_token_seq_id: int
-        if prev_last_chunk is not None:
-            first_token_seq_id = prev_last_chunk.from_token_seq_id + self.chunk_capacity
-        elif last_chunk is not None:
-            first_token_seq_id = last_chunk.from_token_seq_id + self.half_chunk_capacity
+        if last_chunk is None:
+            from_token_seq_id = self.first_token_seq_id
         else:
-            first_token_seq_id = self.first_token_seq_id
-        chunk = Chunk(b_index, self.chunk_capacity, first_token_seq_id, metadata)
-        self.current_chunk_index = b_index + 1
+            from_token_seq_id = last_chunk.from_token_seq_id + self.chunk_index_at_overlap
+        chunk = Chunk(chunk_id, self.chunk_capacity, from_token_seq_id, metadata)
+        self.current_chunk_id = chunk_id + 1
         self.chunks.append(chunk)
-        self.chunk_map[chunk.index] = chunk
-        self.check_overflow()
+        self.chunk_map[chunk.chunk_id] = chunk
         return chunk
 
     def get_chunk(self, chunk_id: int) -> Chunk:
@@ -138,42 +88,35 @@ class ChunkQueue(BaseChunkQueue, ChunkMixin):
     def get_next_token_sequence_id(self) -> int:
         return self.first_token_seq_id + len(self.token_ids)
 
-    def add_sequence(self, token_ids: List[int], metadata: Optional[Any]) -> List[Chunk]:
+    def ensure_chunks_exist(self, metadata: Optional[Any]):
+        while len(self.chunks) < 2:
+            self.add_chunk(metadata)
+
+    def add_sequence(self, new_token_ids: List[int], metadata: Optional[Any]) -> List[Chunk]:
         self.ensure_chunks_exist(metadata)
-        remain_token_ids = token_ids
-        while len(remain_token_ids) > 0:
-            first_bucket = self.chunks[0]
-            if len(first_bucket) < self.half_chunk_capacity:
-                initial_room = self.half_chunk_capacity - len(first_bucket)
-                leading_token_ids = remain_token_ids[:initial_room]
-                self.extend_chunk(first_bucket, leading_token_ids, True)
-                remain_token_ids = remain_token_ids[initial_room:]
-                continue
-            chunk1 = self.chunks[-1]
-            chunk2 = self.chunks[-2]
-            room2 = chunk2.get_room()
-            if room2 <= 0:
+        self.token_ids += new_token_ids
+        next_token_seq_id = len(self.token_ids) + self.first_token_seq_id
+        start_num_chunks = len(self.chunks)
+        for c_idx in range(start_num_chunks - 2, start_num_chunks + len(new_token_ids) + 1):
+            while c_idx >= len(self.chunks):
                 self.add_chunk(metadata)
-                chunk1 = self.chunks[-1]
-                chunk2 = self.chunks[-2]
-                room1 = chunk1.get_room()
-                room2 = chunk2.get_room()
-            else:
-                room1 = chunk1.get_room()
-                if len(chunk1) == 0:
-                    chunk1.metadata = metadata
-            assert room1 > 0 and room2 > 0, f'room1={room1}, room2={room2}, num_buckets={len(self.chunks)}'
-            min_room = min(room1, room2)
-            if len(remain_token_ids) <= min_room:
-                self.extend_chunk(chunk1, remain_token_ids, True)
-                self.extend_chunk(chunk2, remain_token_ids, False)
-                remain_token_ids = []
-            else:
-                leading_token_ids = remain_token_ids[:min_room]
-                self.extend_chunk(chunk1, leading_token_ids, True)
-                self.extend_chunk(chunk2, leading_token_ids, False)
-                remain_token_ids = remain_token_ids[min_room:]
+            chunk = self.chunks[c_idx]
+            if chunk.to_token_seq_id < next_token_seq_id:
+                chunk.extend_by(min(next_token_seq_id - chunk.to_token_seq_id, chunk.get_room()))
+            if len(chunk) <= self.chunk_index_at_overlap and chunk.to_token_seq_id >= next_token_seq_id:
+                break
         return self.check_overflow()
+
+    def get_chunks_for_indexing(self) -> Tuple[List[Chunk], List[List[int]]]:
+        token_id_matrix = []
+        picked_buckets = []
+        for i, chunk in enumerate(self.chunks):
+            if not chunk.is_indexed():
+                token_ids = self.get_chunk_token_ids(chunk)
+                if len(token_ids) >= self.min_tokens_for_indexing or (i == 0 and len(token_ids) > 0):
+                    picked_buckets.append(chunk)
+                    token_id_matrix.append(token_ids)
+        return picked_buckets, token_id_matrix,
 
     def get_chunk_token_ids(self, chunk: Chunk):
         first_index = self.first_token_seq_id
@@ -181,58 +124,47 @@ class ChunkQueue(BaseChunkQueue, ChunkMixin):
         to_index = chunk.to_token_seq_id - first_index
         return self.token_ids[from_index:to_index]
 
-    def get_chunks_for_indexing(self) -> Tuple[List[Chunk], List[List[int]]]:
-        min_tokens_for_indexing = self.half_chunk_capacity
-        token_id_matrix = []
-        picked_buckets = []
-        for i, chunk in enumerate(self.chunks):
-            if not chunk.is_indexed():
-                token_ids = self.get_chunk_token_ids(chunk)
-                if len(token_ids) >= min_tokens_for_indexing or (i == 0 and len(token_ids) > 0):
-                    picked_buckets.append(chunk)
-                    token_id_matrix.append(token_ids)
-        return picked_buckets, token_id_matrix,
+    def _get_prev_token_ids(self, chunk: Chunk) -> Optional[List[int]]:
+        first_seq_id = self.first_token_seq_id
+        to_index = chunk.from_token_seq_id - first_seq_id
+        from_index = to_index - self.chunk_capacity
+        from_index = max(0, from_index)
+        return self.token_ids[from_index:to_index]
 
-    def _get_prev_token_ids(self, chunk_id: int) -> Optional[List[int]]:
-        prev_chunk = self.chunk_map.get(chunk_id - 2)
-        if prev_chunk is not None:
-            return self.get_chunk_token_ids(prev_chunk)
-        prev_chunk = self.chunk_map.get(chunk_id - 1)
-        if prev_chunk is not None:
-            pc_token_ids = self.get_chunk_token_ids(prev_chunk)
-            return pc_token_ids[:self.half_chunk_capacity]
-        return None
+    def _get_next_token_ids(self, chunk: Chunk) -> Optional[List[int]]:
+        first_seq_id = self.first_token_seq_id
+        from_index = chunk.to_token_seq_id - first_seq_id
+        to_index = from_index + self.chunk_capacity
+        return self.token_ids[from_index:to_index]
 
-    def _get_next_token_ids(self, chunk_id: int) -> Optional[List[int]]:
-        next_chunk = self.chunk_map.get(chunk_id + 2)
-        if next_chunk is not None:
-            return self.get_chunk_token_ids(next_chunk)
-        next_chunk = self.chunk_map.get(chunk_id + 1)
-        if next_chunk is not None:
-            nc_token_ids = self.get_chunk_token_ids(next_chunk)
-            return nc_token_ids[self.half_chunk_capacity:]
-        return None
-
-    def retrieve_complete_sequences(self, chunk_ids: List[int], punctuation_ids: Set[int]):
+    def retrieve_complete_sequences(self, chunk_ids: List[int], punctuation_ids: Set[int]) -> List[List[int]]:
         sequences = []
         for chunk_id in chunk_ids:
             chunk = self.chunk_map.get(chunk_id)
             if chunk is not None:
-                sequence = self.get_chunk_token_ids(chunk)
-                prev_sequence = self._get_prev_token_ids(chunk_id)
-                if prev_sequence is not None:
-                    sequence = self._from_last_punctuation(prev_sequence, punctuation_ids) + sequence
-                next_sequence = self._get_next_token_ids(chunk_id)
-                if next_sequence is not None:
-                    sequence = sequence + self._to_first_punctuation(next_sequence, punctuation_ids)
-                sequences.append(sequence)
+                passage = self.get_complete_passage(chunk, punctuation_ids)
+                sequence = passage.tokenIds
+            else:
+                sequence = []
+            sequences.append(sequence)
         return sequences
+
+    def get_complete_passage(self, chunk: Chunk, punctuation_ids: Set[int]) -> PassageInfo:
+        # TODO assumes expansion of one chunk capacity to the left and right
+        prev_token_ids = self._get_prev_token_ids(chunk)
+        prev_token_ids = self._from_last_punctuation(prev_token_ids, punctuation_ids)
+        next_token_ids = self._get_next_token_ids(chunk)
+        next_token_ids = self._to_first_punctuation(next_token_ids, punctuation_ids)
+        p_from = chunk.from_token_seq_id - len(prev_token_ids)
+        p_to = chunk.to_token_seq_id + len(next_token_ids)
+        expanded_seq = prev_token_ids + self.get_chunk_token_ids(chunk) + next_token_ids
+        return PassageInfo(p_from, p_to, expanded_seq)
 
     def get_queue_size(self):
         return len(self.chunks)
 
     def get_chunk_sequences(self) -> List[List[int]]:
-        return [self.get_chunk_token_ids(bucket) for bucket in self.chunks]
+        return [self.get_chunk_token_ids(chunk) for chunk in self.chunks]
 
     def get_capacity(self) -> int:
         return self.capacity
@@ -264,9 +196,16 @@ class ChunkQueue(BaseChunkQueue, ChunkMixin):
                 sequences.append(sequence)
         return sequences
 
+    def retrieve_chunk_sequences_given_chunks(self, chunks: List[Chunk]):
+        sequences = []
+        for chunk in chunks:
+            sequence = self.get_chunk_token_ids(chunk)
+            sequences.append(sequence)
+        return sequences
+
     def flush(self):
         self.chunks = []
         self.token_ids = []
         self.first_token_seq_id = 0
-        self.current_chunk_index = 0
+        self.current_chunk_id = 0
         self.chunk_map.clear()
