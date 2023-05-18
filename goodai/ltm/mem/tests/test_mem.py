@@ -14,7 +14,7 @@ from goodai.ltm.reranking.base import BaseTextMatchingModel
 class TestMem(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls._lr_emb_model = AutoTextEmbeddingModel.from_pretrained('em-MiniLM-p3-01')
+        cls._lr_emb_model = AutoTextEmbeddingModel.from_pretrained('em-MiniLM-p1-01')
         cls._text = "Earth has a dynamic atmosphere, which sustains Earth's surface conditions and protects " \
                     "it from most meteoroids and UV-light at entry. It has a composition of primarily nitrogen " \
                     "and oxygen. Water vapor is widely present in the atmosphere, forming clouds that cover most " \

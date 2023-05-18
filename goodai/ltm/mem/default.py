@@ -1,6 +1,5 @@
-import gc
 import math
-from typing import List, Union, Any, Callable, Set, Optional, Tuple
+from typing import List, Union, Any, Optional, Tuple
 import numpy as np
 import torch
 from faiss import Index
