@@ -143,12 +143,12 @@ _qpm_eval_specs_17 = [EvalSpec.for_qpm('em:em-distilroberta-p5-01', mid, rkf) fo
 ]]
 
 _qpm_eval_specs_18 = [EvalSpec.for_qpm('em:em-distilroberta-p5-01', mid, rkf) for mid, rkf in [
+    ('em-MiniLM-p1-01', 10),
     ('em-MiniLM-p1-01', 12),
-    ('em-MiniLM-p1-01', 15),
 ]]
 
 if __name__ == '__main__':
-    eval_specs: List[EvalSpec] = _hf_eval_specs_0
+    eval_specs: List[EvalSpec] = _qpm_eval_specs_18
 
     device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
     torch.manual_seed(1001)

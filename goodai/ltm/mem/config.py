@@ -33,8 +33,8 @@ class TextMemoryConfig:
 
     redundancy_overlap_threshold: float
     """
-    The fraction of a chunk's length that causes it to be considered redundant if it
-    overlaps with other chunks that are a better match to a query.
+    The fraction of a retrieved passage's length that causes it to be considered 
+    redundant if it overlaps with other passages that are a better match to a query.
     """
 
     def __init__(self):
@@ -43,4 +43,4 @@ class TextMemoryConfig:
         self.queue_capacity = 5000  # Chunks
         self.reranking_k_factor = 10.0
         self.chunk_overlap_fraction = 0.5  # 0 to 0.5
-        self.redundancy_overlap_threshold = 0.5
+        self.redundancy_overlap_threshold = 0.75

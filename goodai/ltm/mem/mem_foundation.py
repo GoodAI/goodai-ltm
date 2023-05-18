@@ -174,14 +174,13 @@ class BaseTextMemoryFoundation(BaseTextMemory):
                                           confidence=confidence, metadata=metadata))
         return result
 
-    def _multi_retrieve_for_r_chunks(self, queries: List[str], prelim_r_chunks: List[List[RetrievedChunk]], k: int,
+    def _multi_retrieve_for_r_chunks(self, queries: List[str], prelim_r_chunks: List[List[RetrievedChunk]],
+                                     expected_key_db_top_k: int, k: int,
                                      show_progress_bar: bool = False) -> List[List[RetrievedMemory]]:
         # At this point:
         # - No chunks are None
         # - Duplicate chunk IDs have already been removed in prelim_r_chunks
-        # - Overlapping chunks have already been removed
-        # - The length of prelim_r_chunks elements should be k or whatever is
-        #   expected by the matching model, if any
+        # - Overlapping chunks are yet to be removed
         # - prelim_r_chunks is ordered by distance
         if self.has_match_prob_model:
             m_sentences = []
@@ -206,6 +205,11 @@ class BaseTextMemoryFoundation(BaseTextMemory):
             processed_r_chunks = prelim_r_chunks
         result = []
         for row_r_chunks in processed_r_chunks:
+            # Removal of overlapping passages
+            row_r_chunks = RetrievedChunk.remove_duplicates_and_overlaps(row_r_chunks, self.overlap_threshold,
+                                                                         expected_key_db_top_k)
+            # At this point there are at most expected_key_db_top_k chunks per row
+            # TODO custom reranker would go here
             result.append(self._retrieve_for_processed_r_chunks(row_r_chunks, k=k))
         return result
 
@@ -237,12 +241,8 @@ class BaseTextMemoryFoundation(BaseTextMemory):
             row_r_chunks = [RetrievedChunk(chunk, distance, passage)
                             for chunk, passage, (distance, _) in
                             zip(row_chunks, row_passages, distinct_d_i)]
-            # Removal of overlapping passages
-            row_r_chunks = RetrievedChunk.remove_duplicates_and_overlaps(row_r_chunks, self.overlap_threshold,
-                                                                         expected_key_db_top_k)
-            # At this point there are at most expected_key_db_top_k chunks per row
             prelim_r_chunks.append(row_r_chunks)
-        return self._multi_retrieve_for_r_chunks(queries, prelim_r_chunks, k,
+        return self._multi_retrieve_for_r_chunks(queries, prelim_r_chunks, expected_key_db_top_k, k,
                                                  show_progress_bar=show_progress_bar)
 
     def retrieve_multiple(self, queries: List[str], k: int, rewrite: bool = False, show_progress_bar: bool = False,

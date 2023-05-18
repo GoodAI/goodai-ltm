@@ -138,9 +138,6 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
                 raise SystemError(f'Number of storage embeddings returned by embedding model is {sk_batch.size(0)}, '
                                   f'while the number of encoded texts is {len(text_batch)}')
             sk_list.append(sk_batch.detach())
-            if num_sequences > batch_size:
-                del sk_batch
-                gc.collect()
         if len(sk_list) > 0:
             sk_all = torch.cat(sk_list)
             num_chunks, num_sk = sk_all.size(0), sk_all.size(1),
