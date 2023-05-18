@@ -133,3 +133,32 @@ class TestChunkQueue(unittest.TestCase):
 
         self.assertEqual([9, 10, 11, 12, 10, 8, 12, 14, 11, 12, 3], seq1)
         self.assertEqual([21, 13, 12, 9, 3, 4, 28, 12, 8], seq2)
+
+    def test_separators(self):
+        chunk_capacity = 5
+        chunk_index_at_overlap = chunk_capacity // 2
+        _chunk_queue = ChunkQueue(25, chunk_capacity, chunk_index_at_overlap, first_token_seq_id=75)
+        _chunk_queue.add_sequence([1, 2, 3], None)
+        _chunk_queue.add_sequence([4, 5, 6], None)
+        _chunk_queue.add_separator(0)
+        _chunk_queue.add_sequence([7, 8, 9], None)
+        _chunk_queue.add_sequence([10, 11, 12], None)
+        _chunk_queue.add_separator(0)
+        _chunk_queue.add_sequence([10, 8, 12], None)
+        _chunk_queue.add_sequence([14, 11, 12], None)
+        _chunk_queue.add_separator(0)
+        _chunk_queue.add_sequence([3, 8, 21], None)
+        _chunk_queue.add_sequence([13, 12, 9], None)
+        _chunk_queue.add_separator(0)
+        _chunk_queue.add_sequence([3, 4, 28], None)
+        _chunk_queue.add_sequence([12, 8, 25], None)
+
+        punctuation_ids = {3, 8}
+
+        chunk_ids = [3, 6, 9]
+        result = _chunk_queue.retrieve_complete_sequences(chunk_ids, punctuation_ids)
+
+        self.assertEqual(3, len(result)), f'got {len(result)} sequences'
+        expected = [[7, 8, 9, 10, 11, 12, 0, 0, 0], [10, 8, 12, 14, 11, 12, 0, 0, 0], [3, 8, 21, 13, 12, 9, 0, 0, 0]]
+        for e_seq, r_seq in zip(expected, result):
+            self.assertEqual(e_seq, r_seq)
