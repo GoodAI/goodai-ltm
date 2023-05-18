@@ -121,3 +121,20 @@ class TestMem(unittest.TestCase):
         assert 'UV-light' in r_memories[0].passage
         assert 'greenhouse' in r_memories[1].passage
 
+    def test_separators(self):
+        facts = [
+            'Cane toads have a life expectancy of 10 to 15 years in the wild.',
+            'Kayaks are used to transport people in water.',
+            'Darth Vader is portrayed as a man who always appears in black full-body armor and a mask.',
+            'Tony Bennett had four children.'
+        ]
+        config = TextMemoryConfig()
+        config.chunk_capacity = 128
+        mem = AutoTextMemory.create(emb_model=self._lr_emb_model, config=config)
+        for i, fact in enumerate(facts):
+            mem.add_text(fact, metadata={'index': i})
+            mem.add_separator()
+        for i, query in enumerate(facts):
+            r_memories = mem.retrieve(query, k=1)
+            self.assertEqual(query.strip(), r_memories[0].passage.strip())
+            self.assertEqual(i, r_memories[0].metadata['index'])

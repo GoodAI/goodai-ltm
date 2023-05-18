@@ -12,6 +12,7 @@ from goodai.ltm.mem.config import TextMemoryConfig
 from goodai.ltm.mem.default import DefaultTextMemory
 from goodai.ltm.mem.mem_foundation import VectorDbType
 from goodai.ltm.mem.rewrite_model import BaseRewriteModel
+from goodai.ltm.reranking.auto import AutoTextMatchingModel
 from goodai.ltm.reranking.base import BaseTextMatchingModel
 
 _default_emb_model_wr: Optional[weakref.ref] = None
@@ -31,8 +32,8 @@ class AutoTextMemory:
     def create(mem_type: MemType = MemType.TRANSIENT_CHUNK_EMB,
                vector_db_type: VectorDbType = VectorDbType.SIMPLE,
                tokenizer: PreTrainedTokenizer = None,
-               emb_model: BaseTextEmbeddingModel = None,
-               matching_model: BaseTextMatchingModel = None,
+               emb_model: Union[BaseTextEmbeddingModel, Optional[str]] = None,
+               matching_model: Union[BaseTextMatchingModel, Optional[str]] = None,
                query_rewrite_model: BaseRewriteModel = None,
                memory_rewrite_model: BaseRewriteModel = None,
                device: Union[torch.device, str] = None,
@@ -72,6 +73,10 @@ class AutoTextMemory:
                 emb_model = AutoTextEmbeddingModel.from_pretrained('em-distilroberta-p1-01',
                                                                    device=device)
                 _default_emb_model_wr = weakref.ref(emb_model)
+        elif isinstance(emb_model, str):
+            emb_model = AutoTextEmbeddingModel.from_pretrained(emb_model)
+        if isinstance(matching_model, str):
+            matching_model = AutoTextMatchingModel.from_pretrained(matching_model)
         if config is None:
             config = TextMemoryConfig()
         return DefaultTextMemory(vector_db_type, tokenizer, emb_model, matching_model,

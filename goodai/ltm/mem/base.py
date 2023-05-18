@@ -12,6 +12,11 @@ class RetrievedMemory:
     The (expanded) passage text
     """
 
+    timestamp: float
+    """
+    The timestamp of the memory (seconds since Epoch)
+    """
+
     distance: float
     """
     A distance metric between the retrieved passage and the query
@@ -43,6 +48,21 @@ class BaseTextMemory(ABC):
         :param metadata: An optional dictionary with metadata
         :param rewrite: Whether the text should be rewritten by an LLM
         :param rewrite_context: The context provided to the LLM for rewriting the text
+        """
+        pass
+
+    @abstractmethod
+    def add_separator(self):
+        """
+        Adds a section separator. The last chunk in the memory queue will be filled with padding.
+        Chunk expansion cannot go across section boundaries.
+        """
+        pass
+
+    @abstractmethod
+    def is_empty(self) -> bool:
+        """
+        :return: Whether the memory contains no tokens
         """
         pass
 

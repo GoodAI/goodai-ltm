@@ -26,7 +26,6 @@ class ChunkQueue(ChunkMixin):
         self.capacity = queue_capacity
         self.chunk_capacity = chunk_capacity
         self.chunks: List[Chunk] = []
-        self.min_tokens_for_indexing = chunk_capacity // 2
         self.chunk_index_at_overlap = chunk_index_at_overlap
         self.current_chunk_id = 0
         self.first_token_seq_id = first_token_seq_id
@@ -124,8 +123,11 @@ class ChunkQueue(ChunkMixin):
                     self.add_chunk(metadata)
             chunk = self.chunks[c_idx]
             if chunk.to_token_seq_id < next_token_seq_id:
-                chunk.extend_by(min(next_token_seq_id - chunk.to_token_seq_id, chunk.get_room()))
-
+                room = chunk.get_room()
+                if room > 0:
+                    chunk.extend_by(min(next_token_seq_id - chunk.to_token_seq_id, room))
+                    if metadata and (chunk.metadata is None or room > self.chunk_capacity // 2):
+                        chunk.metadata = metadata
             if (_no_new_chunks or len(chunk) <= self.chunk_index_at_overlap) and \
                     chunk.to_token_seq_id >= next_token_seq_id:
                 break
@@ -137,7 +139,7 @@ class ChunkQueue(ChunkMixin):
         for i, chunk in enumerate(self.chunks):
             if not chunk.is_indexed():
                 token_ids = self.get_chunk_token_ids(chunk)
-                if len(token_ids) >= self.min_tokens_for_indexing or (i == 0 and len(token_ids) > 0):
+                if len(token_ids) > 0:
                     picked_buckets.append(chunk)
                     token_id_matrix.append(token_ids)
         return picked_buckets, token_id_matrix,

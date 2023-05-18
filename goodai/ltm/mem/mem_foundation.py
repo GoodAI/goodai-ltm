@@ -199,8 +199,9 @@ class BaseTextMemoryFoundation(BaseTextMemory):
             metadata = r_chunk.chunk.metadata
             if not has_pm:
                 confidence = None
-            result.append(RetrievedMemory(passage=r_text.strip(), distance=r_chunk.distance,
-                                          confidence=confidence, metadata=metadata))
+            result.append(RetrievedMemory(passage=r_text.strip(), timestamp=r_chunk.chunk.timestamp,
+                                          distance=r_chunk.distance, confidence=confidence,
+                                          metadata=metadata))
         return result
 
     def _multi_retrieve_for_r_chunks(self, queries: List[str], prelim_r_chunks: List[List[RetrievedChunk]],

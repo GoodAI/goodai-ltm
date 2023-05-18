@@ -162,3 +162,17 @@ class TestChunkQueue(unittest.TestCase):
         expected = [[7, 8, 9, 10, 11, 12, 0, 0, 0], [10, 8, 12, 14, 11, 12, 0, 0, 0], [3, 8, 21, 13, 12, 9, 0, 0, 0]]
         for e_seq, r_seq in zip(expected, result):
             self.assertEqual(e_seq, r_seq)
+
+    def test_overflow_with_separators(self):
+        chunk_capacity = 5
+        queue_capacity = 10
+        chunk_index_at_overlap = chunk_capacity // 2
+        _chunk_queue = ChunkQueue(queue_capacity, chunk_capacity, chunk_index_at_overlap, first_token_seq_id=75)
+        for i in range(200):
+            _chunk_queue.add_sequence([1, 2, 3], None)
+            _chunk_queue.add_separator(0)
+        self.assertEqual(6, len(_chunk_queue.separator_seq_ids))
+        self.assertTrue(_chunk_queue.separator_seq_ids[0] >= _chunk_queue.first_token_seq_id)
+        self.assertTrue(_chunk_queue.separator_seq_ids[-1] <= _chunk_queue.first_token_seq_id +
+                        len(_chunk_queue.token_ids))
+

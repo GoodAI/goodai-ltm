@@ -36,7 +36,7 @@ The following code snippet creates an instance of LTM, loads in some text and th
     mem = AutoTextMemory.create()
     mem.add_text("Lorem ipsum dolor sit amet, consectetur adipiscing elit\n")
     mem.add_text("Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore\n",
-                 metadata={'timestamp': time.time(), 'type': 'generic'})
+                 metadata={'title': 'My document', 'tags': ['latin']})
     r_memories = mem.retrieve(query='dolorem eum fugiat quo voluptas nulla pariatur?', k=3)
 
 ## Loading a text memory instance
@@ -85,7 +85,7 @@ automatically.
 Text can be associated with an arbitrary metadata dictionary, such as:
 
     mem.add_text("Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore\n",
-                 metadata={'timestamp': time.time(), 'type': 'generic'})
+                 metadata={'title': 'My document', 'tags': ['latin']})
 
 Internally, the memory concatenates text stored using add_text with any text previously sent to the memory.
 
@@ -98,6 +98,7 @@ The `retrieve` method returns a list of objects of type `RetrievedMemory`, conta
 the following properties:
 
 * `passage`: The text of the memory. This corresponds to text found in a matching chunk, but it may be expanded using text from adjacent chunks.
+* `timestamp`: The time (seconds since Epoch) when the retrieved chunk was created. 
 * `distance`: Calculated distance between the query and the chunk passage.
 * `confidence`: If a query-passage matching model is available, this is the probability assigned by the model.
 * `metadata`: Metadata associated with the retrieved text, if any.
