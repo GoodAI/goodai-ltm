@@ -78,6 +78,35 @@ class RetrievedChunk:
             included_indexes.update(range(p_from, p_to))
         return result
 
+    @classmethod
+    def reduce(cls, items: List['RetrievedChunk'], overlap_threshold: float,
+               expected_non_redundant_count: int) -> List['RetrievedChunk']:
+        # Does not remove overlapping passages.
+        # Returns as many passages as would be needed to get expected_non_redundant_count
+        # after removal of overlapping passages.
+        id_set = set()
+        result = []
+        included_indexes: Set[int] = set()
+        count = 0
+        for item in items:
+            chunk = item.chunk
+            if chunk is None:
+                continue
+            chunk_id = chunk.chunk_id
+            if chunk_id in id_set:
+                continue
+            id_set.add(chunk_id)
+            passage = item.passage
+            p_from = passage.fromIndex
+            p_to = passage.toIndex
+            result.append(item)
+            if not cls.has_overlap(included_indexes, p_from, p_to, overlap_threshold):
+                count += 1
+                if count >= expected_non_redundant_count:
+                    break
+            included_indexes.update(range(p_from, p_to))
+        return result
+
 
 class BaseTextMemoryFoundation(BaseTextMemory):
     def __init__(self, vector_db_type: VectorDbType, tokenizer: PreTrainedTokenizer, has_match_prob_model: bool,
@@ -185,8 +214,12 @@ class BaseTextMemoryFoundation(BaseTextMemory):
         if self.has_match_prob_model:
             m_sentences = []
             m_indexes = []
+            reduced_r_chunks = []
             for i, (query, row_r_chunks) in enumerate(zip(queries, prelim_r_chunks)):
-                prelim_chunks = [r_chunk.chunk for r_chunk in row_r_chunks]
+                row_reduced_r_chunks = RetrievedChunk.reduce(row_r_chunks, self.overlap_threshold,
+                                                             expected_key_db_top_k)
+                reduced_r_chunks.append(row_reduced_r_chunks)
+                prelim_chunks = [r_chunk.chunk for r_chunk in row_reduced_r_chunks]
                 chunk_sequences: List[List[int]] = self.retrieve_chunk_sequences(prelim_chunks)
                 chunk_texts = self.chunk_tokenizer.batch_decode(chunk_sequences, skip_special_tokens=True)
                 for ct in chunk_texts:
@@ -197,7 +230,7 @@ class BaseTextMemoryFoundation(BaseTextMemory):
             for m_index, match_prob in zip(m_indexes, match_probs):
                 chunk_probs_list[m_index].append(match_prob)
             processed_r_chunks = []
-            for chunk_probs, row_r_chunks in zip(chunk_probs_list, prelim_r_chunks):
+            for chunk_probs, row_r_chunks in zip(chunk_probs_list, reduced_r_chunks):
                 new_row_r_chunks = [r_chunk.with_confidence(cp) for cp, r_chunk in zip(chunk_probs, row_r_chunks)]
                 new_row_r_chunks.sort(key=RetrievedChunk.sort_key)
                 processed_r_chunks.append(new_row_r_chunks)

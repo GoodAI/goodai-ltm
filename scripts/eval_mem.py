@@ -143,8 +143,7 @@ _qpm_eval_specs_17 = [EvalSpec.for_qpm('em:em-distilroberta-p5-01', mid, rkf) fo
 ]]
 
 _qpm_eval_specs_18 = [EvalSpec.for_qpm('em:em-distilroberta-p5-01', mid, rkf) for mid, rkf in [
-    ('em-MiniLM-p1-01', 10),
-    ('em-MiniLM-p1-01', 12),
+    ('em-MiniLM-p1-01', 15),
 ]]
 
 if __name__ == '__main__':
