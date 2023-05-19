@@ -1,7 +1,7 @@
 import math
 import unittest
 
-from goodai.ltm.mem.chunk_queue import ChunkQueue
+from goodai.ltm.mem.chunk_queue import ChunkQueue, ChunkExpansionOptions
 
 
 class TestChunkQueue(unittest.TestCase):
@@ -67,9 +67,10 @@ class TestChunkQueue(unittest.TestCase):
         _chunk_queue.add_sequence([12, 8, 25], None)
 
         punctuation_ids = {3, 8}
+        ce_options = ChunkExpansionOptions.default(chunk_capacity, punctuation_ids)
 
         chunk_ids = [3, 5]
-        result = _chunk_queue.retrieve_complete_sequences(chunk_ids, punctuation_ids)
+        result = _chunk_queue.retrieve_complete_sequences(chunk_ids, ce_options)
 
         self.assertEqual(2, len(result)), f'got {len(result)} sequences'
         seq1 = result[0]
@@ -94,9 +95,10 @@ class TestChunkQueue(unittest.TestCase):
         _chunk_queue.add_sequence([12, 8, 25], None)
 
         punctuation_ids = {3, 8}
+        ce_options = ChunkExpansionOptions.default(chunk_capacity, punctuation_ids)
 
         chunk_ids = [3, 5]
-        result = _chunk_queue.retrieve_complete_sequences(chunk_ids, punctuation_ids)
+        result = _chunk_queue.retrieve_complete_sequences(chunk_ids, ce_options)
 
         self.assertEqual(2, len(result)), f'got {len(result)} sequences'
         seq1 = result[0]
@@ -123,9 +125,10 @@ class TestChunkQueue(unittest.TestCase):
         _chunk_queue.add_sequence([12, 8, 25], None)
 
         punctuation_ids = {3, 8}
+        ce_options = ChunkExpansionOptions.default(chunk_capacity, punctuation_ids)
 
         chunk_ids = [3, 5]
-        result = _chunk_queue.retrieve_complete_sequences(chunk_ids, punctuation_ids)
+        result = _chunk_queue.retrieve_complete_sequences(chunk_ids, ce_options)
 
         self.assertEqual(2, len(result)), f'got {len(result)} sequences'
         seq1 = result[0]
@@ -154,9 +157,10 @@ class TestChunkQueue(unittest.TestCase):
         _chunk_queue.add_sequence([12, 8, 25], None)
 
         punctuation_ids = {3, 8}
+        ce_options = ChunkExpansionOptions.default(chunk_capacity, punctuation_ids)
 
         chunk_ids = [3, 6, 9]
-        result = _chunk_queue.retrieve_complete_sequences(chunk_ids, punctuation_ids)
+        result = _chunk_queue.retrieve_complete_sequences(chunk_ids, ce_options)
 
         self.assertEqual(3, len(result)), f'got {len(result)} sequences'
         expected = [[7, 8, 9, 10, 11, 12, 0, 0, 0], [10, 8, 12, 14, 11, 12, 0, 0, 0], [3, 8, 21, 13, 12, 9, 0, 0, 0]]

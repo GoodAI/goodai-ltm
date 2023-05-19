@@ -1,9 +1,10 @@
 import bisect
 from dataclasses import dataclass
-from typing import List, Tuple, Set, Dict, Optional, Any
+from typing import List, Tuple, Dict, Optional, Any, Set
+
+from transformers import PreTrainedTokenizer
 
 from goodai.ltm.mem.chunk import Chunk
-from goodai.ltm.mem.chunk_mixin import ChunkMixin
 
 
 @dataclass
@@ -13,7 +14,33 @@ class PassageInfo:
     tokenIds: List[int]
 
 
-class ChunkQueue(ChunkMixin):
+@dataclass
+class ChunkExpansionOptions:
+    maxSideTokens: int
+    leftStopAfterTokenIds: List[List[int]]
+    rightStopAtTokenIds: List[List[int]]
+
+    @classmethod
+    def default(cls, max_side_tokens: int, punctuation_ids: Set[int]):
+        token_ids = [[tid] for tid in punctuation_ids]
+        return cls(maxSideTokens=max_side_tokens, leftStopAfterTokenIds=token_ids,
+                   rightStopAtTokenIds=token_ids)
+
+    @classmethod
+    def from_text(cls, tokenizer: PreTrainedTokenizer, max_side_tokens: int,
+                  left_stop_after: List[str], right_stop_at: List[str]):
+        left_tokenization = tokenizer.batch_encode_plus(left_stop_after, add_special_tokens=False,
+                                                        return_attention_mask=False)
+        left_token_ids = left_tokenization['input_ids']
+        right_tokenization = tokenizer.batch_encode_plus(right_stop_at, add_special_tokens=False,
+                                                         return_attention_mask=False)
+        right_token_ids = right_tokenization['input_ids']
+        return cls(maxSideTokens=max_side_tokens,
+                   leftStopAfterTokenIds=left_token_ids,
+                   rightStopAtTokenIds=right_token_ids)
+
+
+class ChunkQueue:
     def __init__(self, queue_capacity: int, chunk_capacity: int, chunk_index_at_overlap: int,
                  first_token_seq_id: int = 0):
         super().__init__()
@@ -169,29 +196,70 @@ class ChunkQueue(ChunkMixin):
         to_index = min(section_to_seq_id - self.first_token_seq_id, from_index + self.chunk_capacity)
         return self.token_ids[from_index:to_index]
 
-    def retrieve_complete_sequences(self, chunk_ids: List[int], punctuation_ids: Set[int]) -> List[List[int]]:
+    def retrieve_complete_sequences(self, chunk_ids: List[int], options: ChunkExpansionOptions) -> List[List[int]]:
         sequences = []
         for chunk_id in chunk_ids:
             chunk = self.chunk_map.get(chunk_id)
             if chunk is not None:
-                passage = self.get_complete_passage(chunk, punctuation_ids)
+                passage = self.get_complete_passage(chunk, options)
                 sequence = passage.tokenIds
             else:
                 sequence = []
             sequences.append(sequence)
         return sequences
 
-    def get_complete_passage(self, chunk: Chunk, punctuation_ids: Set[int]) -> PassageInfo:
-        # TODO assumes expansion of one chunk capacity to the left and right
+    def get_complete_passage(self, chunk: Chunk, options: ChunkExpansionOptions) -> PassageInfo:
         s_from, s_to = self._get_section_bounds(chunk.from_token_seq_id, chunk.to_token_seq_id)
-        prev_token_ids = self._get_prev_token_ids(chunk, s_from)
-        prev_token_ids = self._from_last_punctuation(prev_token_ids, punctuation_ids)
-        next_token_ids = self._get_next_token_ids(chunk, s_to)
-        next_token_ids = self._to_first_punctuation(next_token_ids, punctuation_ids)
+        mst = options.maxSideTokens
+        p_from, p_to = chunk.from_token_seq_id - mst, chunk.to_token_seq_id + mst,
+        p_from = max(p_from, s_from)
+        p_to = min(p_to, s_to)
+        prev_token_ids = self.get_subsequence(p_from, chunk.from_token_seq_id)
+        prev_token_ids = self._from_last_match(prev_token_ids, options.leftStopAfterTokenIds)
+        next_token_ids = self.get_subsequence(chunk.to_token_seq_id, p_to)
+        next_token_ids = self._to_first_match(next_token_ids, options.rightStopAtTokenIds)
         p_from = chunk.from_token_seq_id - len(prev_token_ids)
         p_to = chunk.to_token_seq_id + len(next_token_ids)
         expanded_seq = prev_token_ids + self.get_chunk_token_ids(chunk) + next_token_ids
         return PassageInfo(p_from, p_to, expanded_seq)
+
+    def get_subsequence(self, from_seq_id: int, to_seq_id: int):
+        first = self.first_token_seq_id
+        from_idx = from_seq_id - first
+        to_idx = to_seq_id - first
+        return self.token_ids[from_idx:to_idx]
+
+    @staticmethod
+    def _from_last_match(token_ids: List[int], sub_seqs: List[List[int]]):
+        nt = len(token_ids)
+        match_indexes = []
+        for sub_seq in sub_seqs:
+            ls = len(sub_seq)
+            if ls > 0:
+                for i in range(nt - ls, -1, -1):
+                    if token_ids[i:i + ls] == sub_seq:
+                        match_indexes.append((i, ls,))
+                        break
+        if len(match_indexes) == 0:
+            return token_ids
+        max_idx, max_len = max(match_indexes, key=lambda _t: _t[0])
+        return token_ids[max_idx + max_len:]
+
+    @staticmethod
+    def _to_first_match(token_ids: List[int], sub_seqs: List[List[int]]):
+        nt = len(token_ids)
+        match_indexes = []
+        for sub_seq in sub_seqs:
+            ls = len(sub_seq)
+            if ls > 0:
+                for i in range(0, nt - ls):
+                    if token_ids[i:i + ls] == sub_seq:
+                        match_indexes.append((i, ls,))
+                        break
+        if len(match_indexes) == 0:
+            return token_ids
+        min_idx, min_len = min(match_indexes, key=lambda _t: _t[0])
+        return token_ids[:min_idx + min_len]
 
     def get_queue_size(self):
         return len(self.chunks)

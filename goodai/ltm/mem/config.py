@@ -1,4 +1,40 @@
-from typing import Optional
+from typing import Optional, List
+
+
+class ChunkExpansionConfig:
+    def __init__(self, max_extra_side_tokens: int = 24,
+                 left_stop_after: List[str] = None, right_stop_at: List[str] = None):
+        if left_stop_after is None:
+            left_stop_after = ['.', '!', '?']
+        if right_stop_at is None:
+            right_stop_at = ['.', '!', '?']
+        self.max_extra_side_tokens = max_extra_side_tokens
+        self.left_stop_after = left_stop_after
+        self.right_stop_at = right_stop_at
+
+    @classmethod
+    def expand_to_sentence(cls, max_extra_side_tokens: int = 24):
+        instance = cls(max_extra_side_tokens=max_extra_side_tokens)
+        instance.left_stop_after = instance.right_stop_at = ['.', '!', '?']
+        return instance
+
+    @classmethod
+    def expand_to_line_break(cls, max_extra_side_tokens: int = 64):
+        instance = cls(max_extra_side_tokens=max_extra_side_tokens)
+        instance.left_stop_after = instance.right_stop_at = ['\n', '\r\n']
+        return instance
+
+    @classmethod
+    def expand_to_paragraph(cls, max_extra_side_tokens: int = 192):
+        instance = cls(max_extra_side_tokens=max_extra_side_tokens)
+        instance.left_stop_after = instance.right_stop_at = ['\n\n', '\r\n\r\n']
+        return instance
+
+    @classmethod
+    def expand_to_section(cls, max_extra_side_tokens: int = 1024):
+        instance = cls(max_extra_side_tokens=max_extra_side_tokens)
+        instance.left_stop_after = instance.right_stop_at = []
+        return instance
 
 
 class TextMemoryConfig:
@@ -37,10 +73,16 @@ class TextMemoryConfig:
     redundant if it overlaps with other passages that are a better match to a query.
     """
 
+    chunk_expansion_config: ChunkExpansionConfig
+    """
+    The chunk expansion configuration
+    """
+
     def __init__(self):
         self.max_query_length = 40  # Tokens
         self.chunk_capacity = 24  # Tokens
-        self.queue_capacity = 5000  # Chunks
+        self.queue_capacity = 64000  # Chunks
         self.reranking_k_factor = 10.0
         self.chunk_overlap_fraction = 0.5  # 0 to 0.5
         self.redundancy_overlap_threshold = 0.75
+        self.chunk_expansion_config = ChunkExpansionConfig(max_extra_side_tokens=self.chunk_capacity)
