@@ -108,6 +108,12 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
         if len(removed_indexes) > 0:
             self.vector_db.remove_ids(np.array(removed_indexes).astype(np.int64))
 
+    def add_separator(self):
+        self.chunk_queue.add_separator(self.pad_token_id)
+
+    def is_empty(self) -> bool:
+        return len(self.chunk_queue.token_ids) == 0
+
     def retrieve_all_text(self) -> str:
         token_ids = self.chunk_queue.get_latest_token_ids(max_num_tokens=None)
         return self.chunk_tokenizer.decode(token_ids, skip_special_tokens=True)

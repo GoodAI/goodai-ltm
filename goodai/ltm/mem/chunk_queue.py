@@ -1,5 +1,4 @@
-import math
-from abc import abstractmethod, ABC
+import bisect
 from dataclasses import dataclass
 from typing import List, Tuple, Set, Dict, Optional, Any
 
@@ -27,11 +26,11 @@ class ChunkQueue(ChunkMixin):
         self.capacity = queue_capacity
         self.chunk_capacity = chunk_capacity
         self.chunks: List[Chunk] = []
-        self.min_tokens_for_indexing = chunk_capacity // 2
         self.chunk_index_at_overlap = chunk_index_at_overlap
         self.current_chunk_id = 0
         self.first_token_seq_id = first_token_seq_id
-        self.token_ids = []
+        self.token_ids: List[int] = []
+        self.separator_seq_ids: List[int] = []
         self.chunk_map: Dict[int, Chunk] = dict()
 
     def _pop_chunk(self):
@@ -41,6 +40,7 @@ class ChunkQueue(ChunkMixin):
             if len(self.chunks) == 0:
                 assert len(self.chunk_map) == 0
                 self.token_ids = []
+                self.separator_seq_ids = []
                 self.first_token_seq_id = 0
             else:
                 new_first_chunk = self.chunks[0]
@@ -48,6 +48,8 @@ class ChunkQueue(ChunkMixin):
                 num_removed = new_first_token_seq_id - self.first_token_seq_id
                 self.token_ids = self.token_ids[num_removed:]
                 self.first_token_seq_id = new_first_token_seq_id
+                sii = bisect.bisect_left(self.separator_seq_ids, new_first_token_seq_id)
+                self.separator_seq_ids = self.separator_seq_ids[sii:]
         return chunk
 
     def get_all_chunks(self) -> List[Chunk]:
@@ -61,18 +63,29 @@ class ChunkQueue(ChunkMixin):
                 removed_chunks.append(removed_chunk)
         return removed_chunks
 
-    def add_chunk(self, metadata: Optional[Any]) -> Chunk:
+    def add_chunk(self, metadata: Optional[Any], starts_section: bool = False) -> Chunk:
         chunk_id = self.current_chunk_id
         last_chunk = self.chunks[-1] if len(self.chunks) >= 1 else None
         if last_chunk is None:
             from_token_seq_id = self.first_token_seq_id
         else:
-            from_token_seq_id = last_chunk.from_token_seq_id + self.chunk_index_at_overlap
+            offset = self.chunk_capacity if starts_section else self.chunk_index_at_overlap
+            from_token_seq_id = last_chunk.from_token_seq_id + offset
         chunk = Chunk(chunk_id, self.chunk_capacity, from_token_seq_id, metadata)
         self.current_chunk_id = chunk_id + 1
         self.chunks.append(chunk)
         self.chunk_map[chunk.chunk_id] = chunk
         return chunk
+
+    def add_separator(self, pad_token_id: int):
+        last_chunk = self.chunks[-1] if len(self.chunks) >= 1 else None
+        if last_chunk is not None:
+            room = last_chunk.get_room()
+            pad_seq = [pad_token_id] * room
+            self.add_sequence(pad_seq, metadata=None, _no_new_chunks=True)
+        # separator_seq_ids always assumed to be ordered
+        self.separator_seq_ids.append(self.first_token_seq_id + len(self.token_ids))
+        self.add_chunk(metadata=None, starts_section=True)
 
     def get_chunk(self, chunk_id: int) -> Chunk:
         return self.chunk_map.get(chunk_id)
@@ -88,22 +101,35 @@ class ChunkQueue(ChunkMixin):
     def get_next_token_sequence_id(self) -> int:
         return self.first_token_seq_id + len(self.token_ids)
 
-    def ensure_chunks_exist(self, metadata: Optional[Any]):
-        while len(self.chunks) < 2:
-            self.add_chunk(metadata)
-
-    def add_sequence(self, new_token_ids: List[int], metadata: Optional[Any]) -> List[Chunk]:
-        self.ensure_chunks_exist(metadata)
-        self.token_ids += new_token_ids
+    def add_sequence(self, new_token_ids: List[int], metadata: Optional[Any],
+                     _no_new_chunks: bool = False) -> List[Chunk]:
+        """
+        Adds tokens to the chunk queue.
+        :param new_token_ids: The sequence of token IDs to add
+        :param metadata: A metadata object
+        :param _no_new_chunks: If true, attempt should be made to add all tokens without adding new chunks
+        :return: Any chunks removed due to overflow.
+        """
+        self.token_ids.extend(new_token_ids)
         next_token_seq_id = len(self.token_ids) + self.first_token_seq_id
         start_num_chunks = len(self.chunks)
-        for c_idx in range(start_num_chunks - 2, start_num_chunks + len(new_token_ids) + 1):
-            while c_idx >= len(self.chunks):
-                self.add_chunk(metadata)
+        first_c_idx = max(0, start_num_chunks - 2)
+        for c_idx in range(first_c_idx, start_num_chunks + len(new_token_ids) + 1):
+            if _no_new_chunks:
+                if c_idx >= len(self.chunks):
+                    raise SystemError('No new chunks allowed, but at least one more is needed to complete operation')
+            else:
+                while c_idx >= len(self.chunks):
+                    self.add_chunk(metadata)
             chunk = self.chunks[c_idx]
             if chunk.to_token_seq_id < next_token_seq_id:
-                chunk.extend_by(min(next_token_seq_id - chunk.to_token_seq_id, chunk.get_room()))
-            if len(chunk) <= self.chunk_index_at_overlap and chunk.to_token_seq_id >= next_token_seq_id:
+                room = chunk.get_room()
+                if room > 0:
+                    chunk.extend_by(min(next_token_seq_id - chunk.to_token_seq_id, room))
+                    if metadata and (chunk.metadata is None or room > self.chunk_capacity // 2):
+                        chunk.metadata = metadata
+            if (_no_new_chunks or len(chunk) <= self.chunk_index_at_overlap) and \
+                    chunk.to_token_seq_id >= next_token_seq_id:
                 break
         return self.check_overflow()
 
@@ -113,7 +139,7 @@ class ChunkQueue(ChunkMixin):
         for i, chunk in enumerate(self.chunks):
             if not chunk.is_indexed():
                 token_ids = self.get_chunk_token_ids(chunk)
-                if len(token_ids) >= self.min_tokens_for_indexing or (i == 0 and len(token_ids) > 0):
+                if len(token_ids) > 0:
                     picked_buckets.append(chunk)
                     token_id_matrix.append(token_ids)
         return picked_buckets, token_id_matrix,
@@ -124,17 +150,23 @@ class ChunkQueue(ChunkMixin):
         to_index = chunk.to_token_seq_id - first_index
         return self.token_ids[from_index:to_index]
 
-    def _get_prev_token_ids(self, chunk: Chunk) -> Optional[List[int]]:
-        first_seq_id = self.first_token_seq_id
-        to_index = chunk.from_token_seq_id - first_seq_id
+    def _get_section_bounds(self, from_index: int, to_index: int) -> Tuple[int, int]:
+        ssi = bisect.bisect_right(self.separator_seq_ids, from_index)
+        ss_seq_id = self.separator_seq_ids[ssi - 1] if ssi >= 1 else self.first_token_seq_id
+        esi = bisect.bisect_left(self.separator_seq_ids, to_index)
+        es_seq_id = self.separator_seq_ids[esi] if esi < len(self.separator_seq_ids) \
+            else self.first_token_seq_id + len(self.token_ids)
+        return ss_seq_id, es_seq_id,
+
+    def _get_prev_token_ids(self, chunk: Chunk, section_from_seq_id: int) -> Optional[List[int]]:
+        to_index = chunk.from_token_seq_id - self.first_token_seq_id
         from_index = to_index - self.chunk_capacity
-        from_index = max(0, from_index)
+        from_index = max(section_from_seq_id - self.first_token_seq_id, from_index)
         return self.token_ids[from_index:to_index]
 
-    def _get_next_token_ids(self, chunk: Chunk) -> Optional[List[int]]:
-        first_seq_id = self.first_token_seq_id
-        from_index = chunk.to_token_seq_id - first_seq_id
-        to_index = from_index + self.chunk_capacity
+    def _get_next_token_ids(self, chunk: Chunk, section_to_seq_id: int) -> Optional[List[int]]:
+        from_index = chunk.to_token_seq_id - self.first_token_seq_id
+        to_index = min(section_to_seq_id - self.first_token_seq_id, from_index + self.chunk_capacity)
         return self.token_ids[from_index:to_index]
 
     def retrieve_complete_sequences(self, chunk_ids: List[int], punctuation_ids: Set[int]) -> List[List[int]]:
@@ -151,9 +183,10 @@ class ChunkQueue(ChunkMixin):
 
     def get_complete_passage(self, chunk: Chunk, punctuation_ids: Set[int]) -> PassageInfo:
         # TODO assumes expansion of one chunk capacity to the left and right
-        prev_token_ids = self._get_prev_token_ids(chunk)
+        s_from, s_to = self._get_section_bounds(chunk.from_token_seq_id, chunk.to_token_seq_id)
+        prev_token_ids = self._get_prev_token_ids(chunk, s_from)
         prev_token_ids = self._from_last_punctuation(prev_token_ids, punctuation_ids)
-        next_token_ids = self._get_next_token_ids(chunk)
+        next_token_ids = self._get_next_token_ids(chunk, s_to)
         next_token_ids = self._to_first_punctuation(next_token_ids, punctuation_ids)
         p_from = chunk.from_token_seq_id - len(prev_token_ids)
         p_to = chunk.to_token_seq_id + len(next_token_ids)

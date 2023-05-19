@@ -1,3 +1,4 @@
+import time
 from typing import Any, Optional
 
 
@@ -9,6 +10,7 @@ class Chunk:
         self.from_token_seq_id = from_token_seq_id
         self.to_token_seq_id = from_token_seq_id
         self.indexed: bool = False
+        self.timestamp: float = time.time()
 
     def __len__(self):
         return self.to_token_seq_id - self.from_token_seq_id
