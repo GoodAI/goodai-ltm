@@ -5,6 +5,7 @@ from typing import List, Tuple, Dict, Optional, Any, Set
 from transformers import PreTrainedTokenizer
 
 from goodai.ltm.mem.chunk import Chunk
+from goodai.ltm.mem.config import ChunkExpansionConfig, ChunkExpansionLimitType
 
 
 @dataclass
@@ -27,17 +28,12 @@ class ChunkExpansionOptions:
                    rightStopAtTokenIds=token_ids)
 
     @classmethod
-    def from_text(cls, tokenizer: PreTrainedTokenizer, max_side_tokens: int,
-                  left_stop_after: List[str], right_stop_at: List[str]):
-        left_tokenization = tokenizer.batch_encode_plus(left_stop_after, add_special_tokens=False,
-                                                        return_attention_mask=False)
-        left_token_ids = left_tokenization['input_ids']
-        right_tokenization = tokenizer.batch_encode_plus(right_stop_at, add_special_tokens=False,
-                                                         return_attention_mask=False)
-        right_token_ids = right_tokenization['input_ids']
-        return cls(maxSideTokens=max_side_tokens,
-                   leftStopAfterTokenIds=left_token_ids,
-                   rightStopAtTokenIds=right_token_ids)
+    def from_config(cls, tokenizer: PreTrainedTokenizer, config: ChunkExpansionConfig):
+        celt = config.limit_type
+        limit_token_ids = celt.get_token_ids(tokenizer)
+        return cls(maxSideTokens=config.max_extra_side_tokens,
+                   leftStopAfterTokenIds=limit_token_ids,
+                   rightStopAtTokenIds=limit_token_ids)
 
 
 class ChunkQueue:

@@ -1,40 +1,68 @@
-from typing import Optional, List
+from enum import Enum
+from typing import Optional, List, Any
+
+from transformers import PreTrainedTokenizer
+
+
+class ChunkExpansionLimitType(Enum):
+    SENTENCE = 0,
+    LINE = 1,
+    PARAGRAPH = 2,
+    SECTION = 3
+
+    @staticmethod
+    def batch_encode(tokenizer: PreTrainedTokenizer, texts: List[str]):
+        tok = tokenizer.batch_encode_plus(texts, add_special_tokens=False, return_attention_mask=False)
+        return tok['input_ids']
+
+    @staticmethod
+    def distinct(a_list: List[List[Any]]) -> List[List[Any]]:
+        tuples = [tuple(x) for x in a_list]
+        tuples = list(set(tuples))
+        return [list(x) for x in tuples]
+
+    def get_token_ids(self, tokenizer: PreTrainedTokenizer) -> List[List[int]]:
+        if self == self.SENTENCE:
+            return self.batch_encode(tokenizer, ['.', '?', '!', '???', '!!!'])
+        elif self == self.LINE:
+            cr_id = tokenizer.encode('\r', add_special_tokens=False)
+            nl_id = tokenizer.encode('\n', add_special_tokens=False)
+            result = self.batch_encode(tokenizer, ['\n', '\r\n']) + \
+                [cr_id + nl_id]
+            return self.distinct(result)
+        elif self == self.PARAGRAPH:
+            cr_id = tokenizer.encode('\r', add_special_tokens=False)
+            nl_id = tokenizer.encode('\n', add_special_tokens=False)
+            result = self.batch_encode(tokenizer, ['\n\n', '\r\n\r\n']) + \
+                [nl_id + nl_id] + [cr_id + nl_id + cr_id + nl_id]
+            return self.distinct(result)
+        elif self == self.SECTION:
+            return []
+        else:
+            raise ValueError(f'Unhandled limit type: {self}')
 
 
 class ChunkExpansionConfig:
     def __init__(self, max_extra_side_tokens: int = 24,
-                 left_stop_after: List[str] = None, right_stop_at: List[str] = None):
-        if left_stop_after is None:
-            left_stop_after = ['.', '!', '?']
-        if right_stop_at is None:
-            right_stop_at = ['.', '!', '?']
+                 limit_type: ChunkExpansionLimitType = ChunkExpansionLimitType.SENTENCE):
+        self.limit_type = limit_type
         self.max_extra_side_tokens = max_extra_side_tokens
-        self.left_stop_after = left_stop_after
-        self.right_stop_at = right_stop_at
 
     @classmethod
     def expand_to_sentence(cls, max_extra_side_tokens: int = 24):
-        instance = cls(max_extra_side_tokens=max_extra_side_tokens)
-        instance.left_stop_after = instance.right_stop_at = ['.', '!', '?']
-        return instance
+        return cls(max_extra_side_tokens=max_extra_side_tokens, limit_type=ChunkExpansionLimitType.SENTENCE)
 
     @classmethod
     def expand_to_line_break(cls, max_extra_side_tokens: int = 64):
-        instance = cls(max_extra_side_tokens=max_extra_side_tokens)
-        instance.left_stop_after = instance.right_stop_at = ['\n', '\r\n']
-        return instance
+        return cls(max_extra_side_tokens=max_extra_side_tokens, limit_type=ChunkExpansionLimitType.LINE)
 
     @classmethod
     def expand_to_paragraph(cls, max_extra_side_tokens: int = 192):
-        instance = cls(max_extra_side_tokens=max_extra_side_tokens)
-        instance.left_stop_after = instance.right_stop_at = ['\n\n', '\r\n\r\n']
-        return instance
+        return cls(max_extra_side_tokens=max_extra_side_tokens, limit_type=ChunkExpansionLimitType.PARAGRAPH)
 
     @classmethod
     def expand_to_section(cls, max_extra_side_tokens: int = 1024):
-        instance = cls(max_extra_side_tokens=max_extra_side_tokens)
-        instance.left_stop_after = instance.right_stop_at = []
-        return instance
+        return cls(max_extra_side_tokens=max_extra_side_tokens, limit_type=ChunkExpansionLimitType.SECTION)
 
 
 class TextMemoryConfig:

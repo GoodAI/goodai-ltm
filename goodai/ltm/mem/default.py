@@ -27,7 +27,6 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
                  query_rewrite_model: Optional[BaseRewriteModel] = None,
                  memory_rewrite_model: Optional[BaseRewriteModel] = None
                  ):
-        cec = config.chunk_expansion_config
         cc = config.chunk_capacity
         cof = config.chunk_overlap_fraction
         if cof < 0 or cof > 0.5:
@@ -44,15 +43,14 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
         self.punctuation_ids = get_sentence_punctuation_ids(self.chunk_tokenizer, include_line_break=False)
         self.query_rewrite_model = query_rewrite_model
         self.memory_rewrite_model = memory_rewrite_model
-        self.ce_options = ChunkExpansionOptions.from_text(tokenizer, max_side_tokens=cec.max_extra_side_tokens,
-                                                          left_stop_after=cec.left_stop_after,
-                                                          right_stop_at=cec.right_stop_at)
+        self.ce_options = ChunkExpansionOptions.from_config(tokenizer, config.chunk_expansion_config)
         has_matching_model = self.matching_model is not None
         super().__init__(vector_db_type, self.chunk_tokenizer, has_matching_model,
                          self.emb_model.get_num_storage_embeddings(),
                          self.emb_model.get_embedding_dim(), config.chunk_capacity,
                          config.reranking_k_factor, config.max_query_length,
-                         config.chunk_overlap_fraction, config.redundancy_overlap_threshold, device)
+                         config.chunk_overlap_fraction, config.redundancy_overlap_threshold,
+                         self.ce_options, device)
 
     def get_tokenizer(self):
         return self.chunk_tokenizer
