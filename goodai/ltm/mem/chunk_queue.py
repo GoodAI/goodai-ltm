@@ -5,7 +5,7 @@ from typing import List, Tuple, Dict, Optional, Any, Set
 from transformers import PreTrainedTokenizer
 
 from goodai.ltm.mem.chunk import Chunk
-from goodai.ltm.mem.config import ChunkExpansionConfig, ChunkExpansionLimitType
+from goodai.ltm.mem.config import ChunkExpansionConfig
 
 
 @dataclass
