@@ -13,7 +13,7 @@ from transformers import PreTrainedTokenizer
 
 from goodai.ltm.mem.base import BaseTextMemory, RetrievedMemory
 from goodai.ltm.mem.chunk import Chunk
-from goodai.ltm.mem.chunk_queue import PassageInfo
+from goodai.ltm.mem.chunk_queue import PassageInfo, ChunkExpansionOptions
 from goodai.ltm.mem.simple_vector_db import SimpleVectorDb
 
 _vector_db_type = Union[faiss.Index, SimpleVectorDb]
@@ -113,7 +113,8 @@ class BaseTextMemoryFoundation(BaseTextMemory):
                  num_storage_embeddings: int, emb_dim: int,
                  chunk_capacity: int, reranking_k_factor: float,
                  max_query_length: Optional[int], overlap_fraction: float,
-                 overlap_threshold: float,device: torch.device):
+                 overlap_threshold: float, chunk_expansion_options: ChunkExpansionOptions,
+                 device: torch.device):
         super().__init__()
         if overlap_fraction < 0 or overlap_fraction > 0.5:
             raise ValueError(f'Invalid chunk overlap fraction: {overlap_fraction}')
@@ -121,6 +122,7 @@ class BaseTextMemoryFoundation(BaseTextMemory):
             raise ValueError(f'Invalid redundancy overlap threshold: {overlap_threshold}')
         if reranking_k_factor < 1:
             raise ValueError('reranking_k_factor cannot be less than 1')
+        self.chunk_expansion_options = chunk_expansion_options
         self.chunk_capacity = chunk_capacity
         self.overlap_threshold = overlap_threshold
         self.overlap_fraction = overlap_fraction
@@ -299,9 +301,8 @@ class BaseTextMemoryFoundation(BaseTextMemory):
             expected_key_db_top_k = round(expected_key_db_top_k * self.reranking_k_factor)
 
         # Extra items retrieved, anticipating possible overlaps
-        # TODO assumes chunk expansion is to at most 1 chunk on each side
         cc = self.chunk_capacity
-        max_extra_passage_len = cc * 2
+        max_extra_passage_len = self.chunk_expansion_options.maxSideTokens * 2
         num_possible_side_chunks = round((max_extra_passage_len / cc) / (1 - self.overlap_fraction))
         expansion_top_k = 1 + (expected_key_db_top_k - 1) * (1 + num_possible_side_chunks)
 

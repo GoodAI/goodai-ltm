@@ -1,4 +1,68 @@
-from typing import Optional
+from enum import Enum
+from typing import Optional, List, Any
+
+from transformers import PreTrainedTokenizer
+
+
+class ChunkExpansionLimitType(Enum):
+    SENTENCE = 0,
+    LINE = 1,
+    PARAGRAPH = 2,
+    SECTION = 3
+
+    @staticmethod
+    def batch_encode(tokenizer: PreTrainedTokenizer, texts: List[str]):
+        tok = tokenizer.batch_encode_plus(texts, add_special_tokens=False, return_attention_mask=False)
+        return tok['input_ids']
+
+    @staticmethod
+    def distinct(a_list: List[List[Any]]) -> List[List[Any]]:
+        tuples = [tuple(x) for x in a_list]
+        tuples = list(set(tuples))
+        return [list(x) for x in tuples]
+
+    def get_token_ids(self, tokenizer: PreTrainedTokenizer) -> List[List[int]]:
+        if self == self.SENTENCE:
+            return self.batch_encode(tokenizer, ['.', '?', '!', '???', '!!!'])
+        elif self == self.LINE:
+            cr_id = tokenizer.encode('\r', add_special_tokens=False)
+            nl_id = tokenizer.encode('\n', add_special_tokens=False)
+            result = self.batch_encode(tokenizer, ['\n', '\r\n']) + \
+                [cr_id + nl_id]
+            return self.distinct(result)
+        elif self == self.PARAGRAPH:
+            cr_id = tokenizer.encode('\r', add_special_tokens=False)
+            nl_id = tokenizer.encode('\n', add_special_tokens=False)
+            result = self.batch_encode(tokenizer, ['\n\n', '\r\n\r\n']) + \
+                [nl_id + nl_id] + [cr_id + nl_id + cr_id + nl_id]
+            return self.distinct(result)
+        elif self == self.SECTION:
+            return []
+        else:
+            raise ValueError(f'Unhandled limit type: {self}')
+
+
+class ChunkExpansionConfig:
+    def __init__(self, max_extra_side_tokens: int = 24,
+                 limit_type: ChunkExpansionLimitType = ChunkExpansionLimitType.SENTENCE):
+        self.limit_type = limit_type
+        self.max_extra_side_tokens = max_extra_side_tokens
+
+    @classmethod
+    def expand_to_sentence(cls, max_extra_side_tokens: int = 24):
+        return cls(max_extra_side_tokens=max_extra_side_tokens, limit_type=ChunkExpansionLimitType.SENTENCE)
+
+    @classmethod
+    def expand_to_line_break(cls, max_extra_side_tokens: int = 64):
+        return cls(max_extra_side_tokens=max_extra_side_tokens, limit_type=ChunkExpansionLimitType.LINE)
+
+    @classmethod
+    def expand_to_paragraph(cls, max_extra_side_tokens: int = 192):
+        return cls(max_extra_side_tokens=max_extra_side_tokens, limit_type=ChunkExpansionLimitType.PARAGRAPH)
+
+    @classmethod
+    def expand_to_section(cls, max_extra_side_tokens: int = 1024):
+        return cls(max_extra_side_tokens=max_extra_side_tokens, limit_type=ChunkExpansionLimitType.SECTION)
 
 
 class TextMemoryConfig:
@@ -37,10 +101,16 @@ class TextMemoryConfig:
     redundant if it overlaps with other passages that are a better match to a query.
     """
 
+    chunk_expansion_config: ChunkExpansionConfig
+    """
+    The chunk expansion configuration
+    """
+
     def __init__(self):
         self.max_query_length = 40  # Tokens
         self.chunk_capacity = 24  # Tokens
-        self.queue_capacity = 5000  # Chunks
+        self.queue_capacity = 64000  # Chunks
         self.reranking_k_factor = 10.0
         self.chunk_overlap_fraction = 0.5  # 0 to 0.5
         self.redundancy_overlap_threshold = 0.75
+        self.chunk_expansion_config = ChunkExpansionConfig(max_extra_side_tokens=self.chunk_capacity)

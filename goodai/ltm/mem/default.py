@@ -12,7 +12,7 @@ from goodai.ltm.mem.base import RetrievedMemory
 from goodai.ltm.mem.chunk import Chunk
 from goodai.ltm.mem.rewrite_model import BaseRewriteModel
 from goodai.ltm.reranking.base import BaseTextMatchingModel
-from goodai.ltm.mem.chunk_queue import ChunkQueue, PassageInfo
+from goodai.ltm.mem.chunk_queue import ChunkQueue, PassageInfo, ChunkExpansionOptions
 from goodai.ltm.mem.config import TextMemoryConfig
 from goodai.ltm.mem.mem_foundation import BaseTextMemoryFoundation, VectorDbType
 from goodai.ltm.mem.simple_vector_db import SimpleVectorDb
@@ -43,12 +43,14 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
         self.punctuation_ids = get_sentence_punctuation_ids(self.chunk_tokenizer, include_line_break=False)
         self.query_rewrite_model = query_rewrite_model
         self.memory_rewrite_model = memory_rewrite_model
+        self.ce_options = ChunkExpansionOptions.from_config(tokenizer, config.chunk_expansion_config)
         has_matching_model = self.matching_model is not None
         super().__init__(vector_db_type, self.chunk_tokenizer, has_matching_model,
                          self.emb_model.get_num_storage_embeddings(),
                          self.emb_model.get_embedding_dim(), config.chunk_capacity,
                          config.reranking_k_factor, config.max_query_length,
-                         config.chunk_overlap_fraction, config.redundancy_overlap_threshold, device)
+                         config.chunk_overlap_fraction, config.redundancy_overlap_threshold,
+                         self.ce_options, device)
 
     def get_tokenizer(self):
         return self.chunk_tokenizer
@@ -70,7 +72,7 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
         return self.chunk_tokenizer.decode(token_ids, skip_special_tokens=True)
 
     def get_complete_passage(self, chunk: Chunk) -> PassageInfo:
-        return self.chunk_queue.get_complete_passage(chunk, self.punctuation_ids)
+        return self.chunk_queue.get_complete_passage(chunk, self.ce_options)
 
     def get_chunk(self, chunk_id: int) -> Chunk:
         return self.chunk_queue.get_chunk(chunk_id)
