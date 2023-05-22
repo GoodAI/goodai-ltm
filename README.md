@@ -24,6 +24,27 @@ query-passage matching after retrieval.
 The present emphasis on dialog is also a limitation: The memory is not currently optimized for other uses, such as 
 retrieving source code. See the Future plans section for features that are on our todo list.
 
+## Comparison to other solutions
+
+There are a number of solutions available for developers who want to combine LLMs with long term memory retrieval.  
+
+Among the alternatives are
+* Chroma
+* Vector databases in LangChain
+* LlamaIndex 
+* Other vector databases
+
+Like GoodAI-LTM, Chroma, LangChain and LlamaIndex offer transparent tokenization, embedding and vector storage.
+
+In addition, GoodAI-LTM provides transparent chunking. Chunking is not provided in Chroma and requires a 
+separate utility class in LangChain.
+
+The library comes with additional features - query and memory rewriting, passage reranking, and custom embeddings - 
+that can improve performance for some use cases.
+
+One of the main advantages of GoodAI-LTM is that it combines a very simple interface to get you started quickly with advanced capabilities 
+that let you optimize performance for your application.
+
 ## Installation
 
     pip install goodai-ltm
