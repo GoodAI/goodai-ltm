@@ -26,11 +26,21 @@ retrieving source code. See the Future plans section for features that are on ou
 
 ## Comparison to other solutions
 
-Compared to Langchain, ...
+There are a number of solutions available for developers who want to combine LLMs with long term memory retrieval.  
 
-Compared to Chroma, ...
+Among the alternatives are
+* Chroma
+* Vector databases in LangChain
+* LlamaIndex 
+* Other vector databases
 
-Compared to vector databases in general, ...
+Like GoodAI-LTM, Chroma, LangChain and LlamaIndex offer transparent tokenization, embedding and vector storage.
+
+In addition, GoodAI-LTM provides transparent chunking. Chunking is not provided in Chroma and requires a 
+separate utility class in LangChain.
+
+GoodAI-LTM comes with additional features - query and memory rewriting, passage reranking, and custom embeddings - 
+that can improve performance for some use cases.
 
 ## Installation
 
