@@ -362,6 +362,9 @@ with backstories and allows them to accumulate  experience during game play.
 
 [![AI-game](game-screenshot-25.png)](https://www.youtube.com/watch?v=xkn0H_iWDEQ)
 
+Internally, we integrate the library with its C# port which allows us to split the library functionality between
+server and client more easily. The C# part of the library has not been made public yet.
+
 ## Future plans
 
 We will continue to improve GoodAI-LTM. Possible next steps include
