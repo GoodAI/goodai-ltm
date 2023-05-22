@@ -39,8 +39,11 @@ Like GoodAI-LTM, Chroma, LangChain and LlamaIndex offer transparent tokenization
 In addition, GoodAI-LTM provides transparent chunking. Chunking is not provided in Chroma and requires a 
 separate utility class in LangChain.
 
-GoodAI-LTM comes with additional features - query and memory rewriting, passage reranking, and custom embeddings - 
+The library comes with additional features - query and memory rewriting, passage reranking, and custom embeddings - 
 that can improve performance for some use cases.
+
+GoodAI-LTM combines a very simple interface to get you started quickly with advanced capabilities 
+that let you optimize performance for your application.
 
 ## Installation
 
