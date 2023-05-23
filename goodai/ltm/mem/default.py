@@ -8,7 +8,7 @@ from transformers import PreTrainedTokenizer
 
 from goodai.helpers.tokenizer_helper import get_pad_token_id, get_sentence_punctuation_ids
 from goodai.ltm.embeddings.base import BaseTextEmbeddingModel
-from goodai.ltm.mem.base import RetrievedMemory
+from goodai.ltm.mem.base import BaseReranker, BaseImportanceModel
 from goodai.ltm.mem.chunk import Chunk
 from goodai.ltm.mem.rewrite_model import BaseRewriteModel
 from goodai.ltm.reranking.base import BaseTextMatchingModel
@@ -25,7 +25,9 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
                  emb_model: BaseTextEmbeddingModel, matching_model: Optional[BaseTextMatchingModel],
                  device: torch.device, config: TextMemoryConfig,
                  query_rewrite_model: Optional[BaseRewriteModel] = None,
-                 memory_rewrite_model: Optional[BaseRewriteModel] = None
+                 memory_rewrite_model: Optional[BaseRewriteModel] = None,
+                 reranker: Optional[BaseReranker] = None,
+                 importance_model: Optional[BaseImportanceModel] = None,
                  ):
         cc = config.chunk_capacity
         cof = config.chunk_overlap_fraction
@@ -43,14 +45,21 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
         self.punctuation_ids = get_sentence_punctuation_ids(self.chunk_tokenizer, include_line_break=False)
         self.query_rewrite_model = query_rewrite_model
         self.memory_rewrite_model = memory_rewrite_model
+        self.importance_model = importance_model
+        self.reranker = reranker
         self.ce_options = ChunkExpansionOptions.from_config(tokenizer, config.chunk_expansion_config)
         has_matching_model = self.matching_model is not None
         super().__init__(vector_db_type, self.chunk_tokenizer, has_matching_model,
                          self.emb_model.get_num_storage_embeddings(),
-                         self.emb_model.get_embedding_dim(), config.chunk_capacity,
+                         self.emb_model.get_embedding_dim(),
+                         config.chunk_capacity,
                          config.reranking_k_factor, config.max_query_length,
+                         query_rewrite_model, reranker,
                          config.chunk_overlap_fraction, config.redundancy_overlap_threshold,
                          self.ce_options, device)
+
+    def has_importance_model(self) -> bool:
+        return self.importance_model is not None
 
     def get_tokenizer(self):
         return self.chunk_tokenizer
@@ -77,14 +86,6 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
     def get_chunk(self, chunk_id: int) -> Chunk:
         return self.chunk_queue.get_chunk(chunk_id)
 
-    def retrieve_multiple(self, queries: List[str], k: int = 1, rewrite: bool = False,
-                          show_progress_bar: bool = False, **kwargs) -> List[List[RetrievedMemory]]:
-        if rewrite and not self.query_rewrite_model:
-            raise ValueError("For query rewriting, a rewriting model must be provided")
-        if rewrite and self.query_rewrite_model:
-            queries = [self.query_rewrite_model.rewrite_query(q) for q in queries]
-        return super().retrieve_multiple(queries, k, rewrite, show_progress_bar, **kwargs)
-
     def retrieve_chunk_sequences(self, chunks: List[Chunk]):
         return self.chunk_queue.retrieve_chunk_sequences_given_chunks(chunks)
 
@@ -102,9 +103,12 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
             raise ValueError("For memory rewriting, a rewriting model must be provided")
         if rewrite and self.memory_rewrite_model:
             text = self.memory_rewrite_model.rewrite_memory(text, rewrite_context)
-
+        importance = None
+        if self.importance_model:
+            importance = self.importance_model.get_importance(text)
         token_ids = self.chunk_tokenizer.encode(text, add_special_tokens=False)
-        removed_buckets = self.chunk_queue.add_sequence(token_ids, metadata)
+        removed_buckets = self.chunk_queue.add_sequence(token_ids, metadata=metadata,
+                                                        importance=importance)
         self._ensure_keys_added(show_progress_bar=show_progress_bar)
         removed_indexes = [rb.chunk_id for rb in removed_buckets]
         if len(removed_indexes) > 0:
@@ -142,8 +146,8 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
             sk_batch = emb_model.encode_corpus(text_batch, convert_to_tensor=True,
                                                show_progress_bar=False, batch_size=batch_size)
             if sk_batch.size(0) != len(text_batch):
-                raise SystemError(f'Number of storage embeddings returned by embedding model is {sk_batch.size(0)}, '
-                                  f'while the number of encoded texts is {len(text_batch)}')
+                raise RuntimeError(f'Number of storage embeddings returned by embedding model is {sk_batch.size(0)}, '
+                                   f'while the number of encoded texts is {len(text_batch)}')
             sk_list.append(sk_batch.detach())
         if len(sk_list) > 0:
             sk_all = torch.cat(sk_list)

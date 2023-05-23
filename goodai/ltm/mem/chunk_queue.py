@@ -86,7 +86,7 @@ class ChunkQueue:
                 removed_chunks.append(removed_chunk)
         return removed_chunks
 
-    def add_chunk(self, metadata: Optional[Any], starts_section: bool = False) -> Chunk:
+    def add_chunk(self, metadata: Optional[Any], importance: Optional[float], starts_section: bool = False) -> Chunk:
         chunk_id = self.current_chunk_id
         last_chunk = self.chunks[-1] if len(self.chunks) >= 1 else None
         if last_chunk is None:
@@ -94,7 +94,7 @@ class ChunkQueue:
         else:
             offset = self.chunk_capacity if starts_section else self.chunk_index_at_overlap
             from_token_seq_id = last_chunk.from_token_seq_id + offset
-        chunk = Chunk(chunk_id, self.chunk_capacity, from_token_seq_id, metadata)
+        chunk = Chunk(chunk_id, self.chunk_capacity, from_token_seq_id, metadata, importance)
         self.current_chunk_id = chunk_id + 1
         self.chunks.append(chunk)
         self.chunk_map[chunk.chunk_id] = chunk
@@ -105,10 +105,10 @@ class ChunkQueue:
         if last_chunk is not None:
             room = last_chunk.get_room()
             pad_seq = [pad_token_id] * room
-            self.add_sequence(pad_seq, metadata=None, _no_new_chunks=True)
+            self.add_sequence(pad_seq, metadata=None, importance=None, _no_new_chunks=True)
         # separator_seq_ids always assumed to be ordered
         self.separator_seq_ids.append(self.first_token_seq_id + len(self.token_ids))
-        self.add_chunk(metadata=None, starts_section=True)
+        self.add_chunk(metadata=None, importance=None, starts_section=True)
 
     def get_chunk(self, chunk_id: int) -> Chunk:
         return self.chunk_map.get(chunk_id)
@@ -125,9 +125,11 @@ class ChunkQueue:
         return self.first_token_seq_id + len(self.token_ids)
 
     def add_sequence(self, new_token_ids: List[int], metadata: Optional[Any],
+                     importance: Optional[float] = None,
                      _no_new_chunks: bool = False) -> List[Chunk]:
         """
         Adds tokens to the chunk queue.
+        :param importance: An optional importance value for the tokens
         :param new_token_ids: The sequence of token IDs to add
         :param metadata: A metadata object
         :param _no_new_chunks: If true, attempt should be made to add all tokens without adding new chunks
@@ -140,17 +142,20 @@ class ChunkQueue:
         for c_idx in range(first_c_idx, start_num_chunks + len(new_token_ids) + 1):
             if _no_new_chunks:
                 if c_idx >= len(self.chunks):
-                    raise SystemError('No new chunks allowed, but at least one more is needed to complete operation')
+                    raise RuntimeError('No new chunks allowed, but at least one more is needed to complete operation')
             else:
                 while c_idx >= len(self.chunks):
-                    self.add_chunk(metadata)
+                    self.add_chunk(metadata, importance)
             chunk = self.chunks[c_idx]
             if chunk.to_token_seq_id < next_token_seq_id:
                 room = chunk.get_room()
                 if room > 0:
                     chunk.extend_by(min(next_token_seq_id - chunk.to_token_seq_id, room))
-                    if metadata and (chunk.metadata is None or room > self.chunk_capacity // 2):
+                    much_room = room > self.chunk_capacity // 2
+                    if metadata and (chunk.metadata is None or much_room):
                         chunk.metadata = metadata
+                    if importance is not None and (chunk.importance is None or much_room):
+                        chunk.importance = importance
             if (_no_new_chunks or len(chunk) <= self.chunk_index_at_overlap) and \
                     chunk.to_token_seq_id >= next_token_seq_id:
                 break

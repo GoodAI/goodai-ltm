@@ -12,10 +12,10 @@ class CloudStorage:
         self.bucket_name = bucket_name
         aws_key_id = os.environ.get('AWS_ACCESS_KEY_ID')
         if aws_key_id is None:
-            raise SystemError('AWS_ACCESS_KEY_ID needs to be set')
+            raise RuntimeError('AWS_ACCESS_KEY_ID needs to be set')
         aws_secret_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
         if aws_secret_key is None:
-            raise SystemError('AWS_SECRET_ACCESS_KEY needs to be set')
+            raise RuntimeError('AWS_SECRET_ACCESS_KEY needs to be set')
         self.client = boto3.client(
             's3',
             aws_access_key_id=aws_key_id,

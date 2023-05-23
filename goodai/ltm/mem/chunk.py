@@ -3,7 +3,9 @@ from typing import Any, Optional
 
 
 class Chunk:
-    def __init__(self, chunk_id: int, capacity: int, from_token_seq_id: int, metadata: Optional[dict]):
+    def __init__(self, chunk_id: int, capacity: int, from_token_seq_id: int, metadata: Optional[dict],
+                 importance: Optional[float]):
+        self.importance = importance
         self.metadata = metadata
         self.chunk_id = chunk_id
         self.capacity = capacity

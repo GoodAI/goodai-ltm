@@ -2,35 +2,64 @@ import io
 import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, List, Optional
+from typing import List, Optional
 
 
 @dataclass
 class RetrievedMemory:
     passage: str
     """
-    The (expanded) passage text
+    The text of the retrieved passages, or expanded chunk.
     """
 
     timestamp: float
     """
-    The timestamp of the memory (seconds since Epoch)
+    The timestamp of the memory (seconds since Epoch).
     """
 
     distance: float
     """
-    A distance metric between the retrieved passage and the query
+    A distance metric between the retrieved passage and the query.
     """
 
-    confidence: Optional[float]
+    relevance: float
     """
-    A confidence metric between 0 and 1. Not all memories support this, so it may be None
+    A metric between 0 and 1 that indicates how relevant to the query 
+    the retrieved memory is. It may be derived from the distance or 
+    the confidence, if available.
     """
 
-    metadata: Optional[dict]
+    confidence: Optional[float] = None
     """
-    Metadata associated with the retrieved text
+    A confidence metric between 0 and 1. Not all memory implementations 
+    support this, so it may be None.
     """
+
+    importance: Optional[float] = None
+    """
+    An importance score assigned to the retrieved memory by the importance model.
+    If an importance model is not available, this property will be None.
+    """
+
+    metadata: Optional[dict] = None
+    """
+    Metadata associated with the retrieved text.
+    """
+
+
+class BaseReranker(ABC):
+    """
+    Abstract base class for custom rerankers.
+    """
+    @abstractmethod
+    def rerank(self, r_memories: List[RetrievedMemory], mem: 'BaseTextMemory') -> List[RetrievedMemory]:
+        pass
+
+
+class BaseImportanceModel(ABC):
+    @abstractmethod
+    def get_importance(self, mem_text: str):
+        pass
 
 
 class BaseTextMemory(ABC):
@@ -99,3 +128,6 @@ class BaseTextMemory(ABC):
         """
         pass
 
+    @abstractmethod
+    def has_importance_model(self) -> bool:
+        pass
