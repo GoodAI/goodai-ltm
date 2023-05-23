@@ -2,6 +2,7 @@ import abc
 import enum
 import io
 import json
+import math
 import sys
 from dataclasses import dataclass
 from typing import List, Union, Set, Optional, Tuple
@@ -114,7 +115,7 @@ class BaseTextMemoryFoundation(BaseTextMemory):
                  chunk_capacity: int, reranking_k_factor: float,
                  max_query_length: Optional[int], overlap_fraction: float,
                  overlap_threshold: float, chunk_expansion_options: ChunkExpansionOptions,
-                 device: torch.device):
+                 device: torch.device, max_expansion_top_k_factor: int = 200):
         super().__init__()
         if overlap_fraction < 0 or overlap_fraction > 0.5:
             raise ValueError(f'Invalid chunk overlap fraction: {overlap_fraction}')
@@ -122,6 +123,14 @@ class BaseTextMemoryFoundation(BaseTextMemory):
             raise ValueError(f'Invalid redundancy overlap threshold: {overlap_threshold}')
         if reranking_k_factor < 1:
             raise ValueError('reranking_k_factor cannot be less than 1')
+        max_st = chunk_expansion_options.maxSideTokens
+        max_added_chunks = max_st * 2 / chunk_capacity
+        max_chunks_overlap = (max_added_chunks + 2) / (1 - overlap_fraction)
+        self.expansion_top_k_factor = overlap_threshold + (1 - overlap_threshold) * (1 + max_chunks_overlap)
+        if self.expansion_top_k_factor > max_expansion_top_k_factor:
+            raise ValueError('Excessive chunk expansion configuration. Increase the chunk capacity or the redundancy '
+                             'overlap threshold, or decrease the maximum extra side tokens or the chunk '
+                             'overlap fraction.')
         self.chunk_expansion_options = chunk_expansion_options
         self.chunk_capacity = chunk_capacity
         self.overlap_threshold = overlap_threshold
@@ -301,10 +310,7 @@ class BaseTextMemoryFoundation(BaseTextMemory):
             expected_key_db_top_k = round(expected_key_db_top_k * self.reranking_k_factor)
 
         # Extra items retrieved, anticipating possible overlaps
-        cc = self.chunk_capacity
-        max_extra_passage_len = self.chunk_expansion_options.maxSideTokens * 2
-        num_possible_side_chunks = round((max_extra_passage_len / cc) / (1 - self.overlap_fraction))
-        expansion_top_k = 1 + (expected_key_db_top_k - 1) * (1 + num_possible_side_chunks)
+        expansion_top_k = 1 + math.ceil((expected_key_db_top_k - 1) * self.expansion_top_k_factor)
 
         # The vector_db can return multiple entries with the same ID if chunks are associated
         # with multiple embeddings

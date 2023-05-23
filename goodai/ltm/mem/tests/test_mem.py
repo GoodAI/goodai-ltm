@@ -7,7 +7,7 @@ from transformers import AutoTokenizer
 from goodai.ltm.embeddings.auto import AutoTextEmbeddingModel
 from goodai.ltm.eval.metrics import get_correctness_score
 from goodai.ltm.mem.auto import AutoTextMemory
-from goodai.ltm.mem.config import TextMemoryConfig, ChunkExpansionConfig
+from goodai.ltm.mem.config import TextMemoryConfig, ChunkExpansionConfig, ChunkExpansionLimitType
 from goodai.ltm.reranking.base import BaseTextMatchingModel
 
 
@@ -208,3 +208,13 @@ class TestMem(unittest.TestCase):
         r1 = mem.retrieve("Other than water vapor, what are other greenhouse gases?", k=1)[0]
         self.assertTrue(r1.passage.strip().startswith('Earth has a dynamic atmosphere'))
         self.assertTrue(r1.passage.strip().endswith("components such as nitrogen to cycle."))
+
+    def test_excessive_chunk_expansion(self):
+        cec = ChunkExpansionConfig(2048, limit_type=ChunkExpansionLimitType.SECTION)
+        config = TextMemoryConfig()
+        config.chunk_capacity = 12
+        config.chunk_overlap_fraction = 0.5
+        config.redundancy_overlap_threshold = 0.5
+        config.chunk_expansion_config = cec
+        with self.assertRaises(ValueError):
+            AutoTextMemory.create(emb_model=self._lr_emb_model, config=config)
