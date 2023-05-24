@@ -3,7 +3,9 @@ import logging
 import math
 import time
 from typing import List
-from goodai.ltm.mem.base import BaseReranker, RetrievedMemory, BaseTextMemory
+from goodai.ltm.mem.base import BaseReranker, RetrievedMemory, BaseTextMemory, BaseImportanceModel
+from goodai.text_gen.base import BaseTextGenerationModel
+from goodai.text_gen.openai_tg import OpenAICompletionModel
 
 
 class DecayType(enum.Enum):
@@ -98,3 +100,28 @@ class StanfordReranker(BaseReranker):
             scored_list.append((score, m))
         scored_list.sort(key=lambda _t: _t[0], reverse=True)
         return [m for _, m in scored_list]
+
+
+class StanfordImportanceModel(BaseImportanceModel):
+    def __init__(self, text_gen_model: BaseTextGenerationModel = None, prompt_template: str = None):
+        if text_gen_model is None:
+            text_gen_model = OpenAICompletionModel('text-davinci-003')
+        if prompt_template is None:
+            # Prompt from https://arxiv.org/pdf/2304.03442.pdf.
+            prompt_template = "On the scale of 1 to 10, where 1 is purely mundane (e.g., brushing teeth, " \
+                     "making bed) and 10 is extremely poignant (e.g., a break up, college acceptance), " \
+                     "rate the likely poignancy of the following piece of memory.\r\n" \
+                     "Memory: {mem_text}\r\nRating: "
+        self.prompt_template = prompt_template
+        self.text_gen_model = text_gen_model
+
+    def get_importance(self, mem_text: str, min_value=1.0, max_value=10.0) -> float:
+        prompt = self.prompt_template.format({'mem_text': mem_text})
+        response = self.text_gen_model.generate(prompt)
+        try:
+            response_number = float(response.strip())
+            response_number = max(min_value, min(max_value, response_number))
+            return (response_number - min_value) / (max_value - min_value)
+        except ValueError:
+            logging.warning(f'Response from text generation model ["{response}"] could not be converted to a number.')
+            return 0
