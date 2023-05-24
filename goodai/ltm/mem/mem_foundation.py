@@ -281,7 +281,6 @@ class BaseTextMemoryFoundation(BaseTextMemory):
             row_r_chunks = RetrievedChunk.remove_duplicates_and_overlaps(row_r_chunks, self.overlap_threshold,
                                                                          reranking_top_k)
             # At this point there are at most reranking_top_k chunks per row
-            # TODO custom reranker would go here
             result.append(self._retrieve_for_processed_r_chunks(row_r_chunks, k=k))
         return result
 
