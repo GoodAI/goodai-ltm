@@ -7,6 +7,7 @@ from transformers import AutoTokenizer
 from goodai.ltm.embeddings.auto import AutoTextEmbeddingModel
 from goodai.ltm.eval.metrics import get_correctness_score
 from goodai.ltm.mem.auto import AutoTextMemory
+from goodai.ltm.mem.base import BaseReranker, RetrievedMemory, BaseTextMemory, BaseImportanceModel
 from goodai.ltm.mem.config import TextMemoryConfig, ChunkExpansionConfig, ChunkExpansionLimitType
 from goodai.ltm.reranking.base import BaseTextMatchingModel
 
@@ -232,3 +233,49 @@ class TestMem(unittest.TestCase):
         config.chunk_expansion_config = cec
         with self.assertRaises(ValueError):
             AutoTextMemory.create(emb_model=self._lr_emb_model, config=config)
+
+    def test_custom_reranker(self):
+        class _LocalReranker(BaseReranker):
+            def rerank(self, _r_memories: List[RetrievedMemory], _mem: BaseTextMemory) -> List[RetrievedMemory]:
+                result = list(_r_memories)
+                result.sort(key=lambda _m: _m.relevance)
+                return result
+
+        mem = AutoTextMemory.create(emb_model=self._lr_emb_model, reranker=_LocalReranker())
+        mem.add_text(self._text)
+        r_memories = mem.retrieve('Is water vapor widely present in the atmosphere?', k=5)
+        self.assertIn('Water vapor is widely present', r_memories[-1].passage.strip())
+
+    def test_custom_importance_model(self):
+        class _LocalImportanceModel(BaseImportanceModel):
+            def get_importance(self, mem_text: str):
+                if 'kayaks' in mem_text.lower():
+                    return 0.25
+                elif 'vader' in mem_text.lower():
+                    return 0.50
+                else:
+                    return 0
+
+        facts = [
+            'Cane toads have a life expectancy of 10 to 15 years in the wild.',
+            'Kayaks are used to transport people in water.',
+            'Darth Vader is portrayed as a man who always appears in black full-body armor and a mask.',
+            'Tony Bennett had four children.'
+        ]
+        config = TextMemoryConfig()
+        config.chunk_capacity = 128
+        mem = AutoTextMemory.create(emb_model=self._lr_emb_model, importance_model=_LocalImportanceModel(),
+                                    config=config)
+        for i, fact in enumerate(facts):
+            mem.add_text(fact, metadata={'index': i})
+            mem.add_separator()
+
+        r_memories = mem.retrieve('Generic question about anything.', k=5)
+        for m in r_memories:
+            p = m.passage.lower()
+            if 'kayaks' in p:
+                self.assertAlmostEqual(m.importance, 0.25)
+            elif 'vader' in p:
+                self.assertAlmostEqual(m.importance, 0.50)
+            else:
+                self.assertAlmostEqual(m.importance, 0)

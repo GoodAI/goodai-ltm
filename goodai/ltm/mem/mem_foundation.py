@@ -198,12 +198,13 @@ class BaseTextMemoryFoundation(BaseTextMemory):
 
     def dump(self, stream: io.TextIOBase = sys.stdout):
         chunks = self.get_all_chunks()
-        stream.write('| Id | Metadata | Content |\n')
-        stream.write('| ----- | -------- | ------- |\n')
+        stream.write('| Id | Metadata | Importance | Content |\n')
+        stream.write('| ----- | -------- | ---------- | ------- |\n')
         for chunk in chunks:
             chunk_text = self.get_chunk_text(chunk)
             ct_js = json.dumps(chunk_text)
-            stream.write(f'| {chunk.chunk_id} | {chunk.metadata} | {ct_js} |')
+            importance_text = 'None' if chunk.importance is None else f'{chunk.importance:.2g}'
+            stream.write(f'| {chunk.chunk_id} | {chunk.metadata} | | {importance_text} | {ct_js} |')
             stream.write('\n')
         stream.flush()
 
