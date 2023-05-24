@@ -14,7 +14,7 @@ from goodai.ltm.reranking.base import BaseTextMatchingModel
 class TestMem(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls._lr_emb_model = AutoTextEmbeddingModel.from_pretrained('em-MiniLM-p1-01')
+        cls._lr_emb_model = AutoTextEmbeddingModel.shared_pretrained('em-MiniLM-p1-01')
         cls._text = "Earth has a dynamic atmosphere, which sustains Earth's surface conditions and protects " \
                     "it from most meteoroids and UV-light at entry. It has a composition of primarily nitrogen " \
                     "and oxygen. Water vapor is widely present in the atmosphere, forming clouds that cover most " \
@@ -76,6 +76,19 @@ class TestMem(unittest.TestCase):
         mems = []
         for i in range(100):
             mems.append(AutoTextMemory.create())
+
+    def test_multi_creation_with_name(self):
+        # Should be able to create many default instances without running out of memory
+        mems = []
+        for i in range(100):
+            mems.append(AutoTextMemory.create(emb_model='em-MiniLM-p1-01'))
+
+    def test_multi_creation_with_qpm_model(self):
+        # Should be able to create many default instances without running out of memory
+        mems = []
+        for i in range(100):
+            mems.append(AutoTextMemory.create(emb_model='em-MiniLM-p1-01',
+                                              matching_model='em:em-MiniLM-p1-01'))
 
     def test_create_after_delete(self):
         mem1 = AutoTextMemory.create()

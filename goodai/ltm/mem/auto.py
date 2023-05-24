@@ -70,18 +70,11 @@ class AutoTextMemory:
         if device is None:
             device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
         if emb_model is None:
-            global _default_emb_model_wr
-
-            if _default_emb_model_wr:
-                emb_model = _default_emb_model_wr()
-            if emb_model is None:
-                emb_model = AutoTextEmbeddingModel.from_pretrained('em-distilroberta-p1-01',
-                                                                   device=device)
-                _default_emb_model_wr = weakref.ref(emb_model)
-        elif isinstance(emb_model, str):
-            emb_model = AutoTextEmbeddingModel.from_pretrained(emb_model)
+            emb_model = 'em-distilroberta-p1-01'
+        if isinstance(emb_model, str):
+            emb_model = AutoTextEmbeddingModel.shared_pretrained(emb_model)
         if isinstance(matching_model, str):
-            matching_model = AutoTextMatchingModel.from_pretrained(matching_model)
+            matching_model = AutoTextMatchingModel.shared_pretrained(matching_model)
         if config is None:
             config = TextMemoryConfig()
         return DefaultTextMemory(vector_db_type, tokenizer, emb_model, matching_model,

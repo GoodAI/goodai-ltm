@@ -16,6 +16,7 @@ if __name__ == '__main__':
     config = TextMemoryConfig()
     config.chunk_expansion_config = ChunkExpansionConfig.for_line_break()
     config.redundancy_overlap_threshold = 0.5
+    config.reranking_k_factor = 10
     mem = AutoTextMemory.create(reranker=reranker, importance_model=importance_model,
                                 config=config)
     mem.add_text('Archie went to the well, where Jake is.\n')
