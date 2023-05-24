@@ -7,7 +7,7 @@ from typing import Union, Optional
 from transformers import AutoTokenizer, PreTrainedTokenizer
 from goodai.ltm.embeddings.auto import AutoTextEmbeddingModel
 from goodai.ltm.embeddings.base import BaseTextEmbeddingModel
-from goodai.ltm.mem.base import BaseTextMemory
+from goodai.ltm.mem.base import BaseTextMemory, BaseReranker, BaseImportanceModel
 from goodai.ltm.mem.config import TextMemoryConfig
 from goodai.ltm.mem.default import DefaultTextMemory
 from goodai.ltm.mem.mem_foundation import VectorDbType
@@ -36,6 +36,8 @@ class AutoTextMemory:
                matching_model: Union[BaseTextMatchingModel, Optional[str]] = None,
                query_rewrite_model: BaseRewriteModel = None,
                memory_rewrite_model: BaseRewriteModel = None,
+               reranker: BaseReranker = None,
+               importance_model: BaseImportanceModel = None,
                device: Union[torch.device, str] = None,
                config: TextMemoryConfig = None
                ) -> BaseTextMemory:
@@ -48,6 +50,9 @@ class AutoTextMemory:
         :param matching_model: An optional query-passage matching model.
         :param query_rewrite_model: The query rewrite model.
         :param memory_rewrite_model: The memory rewrite model.
+        :param reranker: A custom reranker.
+        :param importance_model: A model that assigns an importance value to stored memories.
+        It may be required by some rerankers.
         :param device: The Pytorch device.
         :param config: The memory configuration.
         :return: An instance of BaseTextMemory.
@@ -82,4 +87,6 @@ class AutoTextMemory:
         return DefaultTextMemory(vector_db_type, tokenizer, emb_model, matching_model,
                                  device=device, config=config,
                                  query_rewrite_model=query_rewrite_model,
-                                 memory_rewrite_model=memory_rewrite_model)
+                                 memory_rewrite_model=memory_rewrite_model,
+                                 reranker=reranker,
+                                 importance_model=importance_model)

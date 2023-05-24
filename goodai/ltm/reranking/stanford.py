@@ -9,8 +9,8 @@ from goodai.text_gen.openai_tg import OpenAICompletionModel
 
 
 class DecayType(enum.Enum):
-    EXPONENTIAL = 0,
-    INVERSE = 1,
+    EXPONENTIAL = 0
+    INVERSE = 1
 
 
 class StanfordReranker(BaseReranker):
@@ -65,7 +65,7 @@ class StanfordReranker(BaseReranker):
         if self.multiplicative:
             if recency < 0:
                 raise RuntimeError(f'Invalid recency: {recency}')
-            if self.use_importance and importance < 0:
+            if self.use_importance and (importance is None or importance < 0):
                 raise RuntimeError(f'Invalid importance: {importance}')
             if relevance < 0:
                 raise RuntimeError(f'Invalid relevance: {relevance}')
@@ -119,12 +119,13 @@ class StanfordImportanceModel(BaseImportanceModel):
         self.text_gen_model = text_gen_model
 
     def get_importance(self, mem_text: str, min_value=1.0, max_value=10.0) -> float:
-        prompt = self.prompt_template.format({'mem_text': mem_text})
+        template_params = {'mem_text': mem_text}
+        prompt = self.prompt_template.format(**template_params)
         response = self.text_gen_model.generate(prompt)
         try:
             response_number = float(response.strip())
             response_number = max(min_value, min(max_value, response_number))
             return (response_number - min_value) / (max_value - min_value)
         except ValueError:
-            logging.warning(f'Response from text generation model ["{response}"] could not be converted to a number.')
+            logging.warning(f'Response from text generation model ("{response}") could not be converted to a number.')
             return 0

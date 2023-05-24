@@ -155,7 +155,7 @@ class TestMem(unittest.TestCase):
                 "components such as nitrogen to cycle."
 
         config = TextMemoryConfig()
-        config.chunk_expansion_config = ChunkExpansionConfig.expand_to_paragraph()
+        config.chunk_expansion_config = ChunkExpansionConfig.for_paragraph()
         mem = AutoTextMemory.create(emb_model=self._lr_emb_model, config=config)
         mem.add_text(_text)
         r1 = mem.retrieve("What is the composition of Earth's atmosphere?", k=1)[0]
@@ -182,7 +182,8 @@ class TestMem(unittest.TestCase):
                 "allowing components such as nitrogen to cycle."
 
         config = TextMemoryConfig()
-        config.chunk_expansion_config = ChunkExpansionConfig.expand_to_line_break()
+        config.chunk_expansion_config = ChunkExpansionConfig.for_line_break()
+        config.chunk_expansion_config.min_extra_side_tokens = 0
         mem = AutoTextMemory.create(emb_model=self._lr_emb_model, config=config)
         mem.add_text(_text)
         r1 = mem.retrieve("Other than water vapor, what are other greenhouse gases?", k=1)[0]
@@ -194,7 +195,7 @@ class TestMem(unittest.TestCase):
 
     def test_expansion_to_sections(self):
         config = TextMemoryConfig()
-        config.chunk_expansion_config = ChunkExpansionConfig.expand_to_section()
+        config.chunk_expansion_config = ChunkExpansionConfig.for_section()
         mem = AutoTextMemory.create(emb_model=self._lr_emb_model, config=config)
         facts = [
             'Cane toads have a life expectancy of 10 to 15 years in the wild.',

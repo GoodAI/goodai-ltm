@@ -17,6 +17,7 @@ class PassageInfo:
 
 @dataclass
 class ChunkExpansionOptions:
+    minSideTokens: int
     maxSideTokens: int
     leftStopAfterTokenIds: List[List[int]]
     rightStopAtTokenIds: List[List[int]]
@@ -24,14 +25,16 @@ class ChunkExpansionOptions:
     @classmethod
     def default(cls, max_side_tokens: int, punctuation_ids: Set[int]):
         token_ids = [[tid] for tid in punctuation_ids]
-        return cls(maxSideTokens=max_side_tokens, leftStopAfterTokenIds=token_ids,
+        return cls(minSideTokens=0, maxSideTokens=max_side_tokens,
+                   leftStopAfterTokenIds=token_ids,
                    rightStopAtTokenIds=token_ids)
 
     @classmethod
     def from_config(cls, tokenizer: PreTrainedTokenizer, config: ChunkExpansionConfig):
         celt = config.limit_type
         limit_token_ids = celt.get_token_ids(tokenizer)
-        return cls(maxSideTokens=config.max_extra_side_tokens,
+        return cls(minSideTokens=config.min_extra_side_tokens,
+                   maxSideTokens=config.max_extra_side_tokens,
                    leftStopAfterTokenIds=limit_token_ids,
                    rightStopAtTokenIds=limit_token_ids)
 
@@ -211,17 +214,20 @@ class ChunkQueue:
 
     def get_complete_passage(self, chunk: Chunk, options: ChunkExpansionOptions) -> PassageInfo:
         s_from, s_to = self._get_section_bounds(chunk.from_token_seq_id, chunk.to_token_seq_id)
-        mst = options.maxSideTokens
-        p_from, p_to = chunk.from_token_seq_id - mst, chunk.to_token_seq_id + mst,
-        p_from = max(p_from, s_from)
-        p_to = min(p_to, s_to)
-        prev_token_ids = self.get_subsequence(p_from, chunk.from_token_seq_id)
+        min_st = options.minSideTokens
+        min_p_from, min_p_to = chunk.from_token_seq_id - min_st, chunk.to_token_seq_id + min_st,
+        min_p_from, min_p_to = max(min_p_from, s_from), min(min_p_to, s_to)
+        max_st = options.maxSideTokens
+        max_p_from, max_p_to = chunk.from_token_seq_id - max_st, chunk.to_token_seq_id + max_st,
+        max_p_from, max_p_to = max(max_p_from, s_from), min(max_p_to, s_to)
+        central_seq = self.get_subsequence(min_p_from, min_p_to)
+        prev_token_ids = self.get_subsequence(max_p_from, min_p_from)
         prev_token_ids = self._from_last_match(prev_token_ids, options.leftStopAfterTokenIds)
-        next_token_ids = self.get_subsequence(chunk.to_token_seq_id, p_to)
+        next_token_ids = self.get_subsequence(min_p_to, max_p_to)
         next_token_ids = self._to_first_match(next_token_ids, options.rightStopAtTokenIds)
-        p_from = chunk.from_token_seq_id - len(prev_token_ids)
-        p_to = chunk.to_token_seq_id + len(next_token_ids)
-        expanded_seq = prev_token_ids + self.get_chunk_token_ids(chunk) + next_token_ids
+        p_from = min_p_from - len(prev_token_ids)
+        p_to = min_p_to + len(next_token_ids)
+        expanded_seq = prev_token_ids + central_seq + next_token_ids
         return PassageInfo(p_from, p_to, expanded_seq)
 
     def get_subsequence(self, from_seq_id: int, to_seq_id: int):

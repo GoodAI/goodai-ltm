@@ -127,6 +127,9 @@ class BaseTextMemoryFoundation(BaseTextMemory):
         if reranking_k_factor < 1:
             raise ValueError('reranking_k_factor cannot be less than 1')
         max_st = chunk_expansion_options.maxSideTokens
+        if max_st < chunk_expansion_options.minSideTokens:
+            raise ValueError('Invalid chunk expansion configuration: The maximum number of extra side tokens '
+                             'cannot be less than the minimum number.')
         max_added_chunks = max_st * 2 / chunk_capacity
         max_chunks_overlap = (max_added_chunks + 2) / (1 - overlap_fraction)
         self.expansion_top_k_factor = overlap_threshold + (1 - overlap_threshold) * (1 + max_chunks_overlap)
