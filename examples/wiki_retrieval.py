@@ -8,7 +8,7 @@ from goodai.ltm.mem.mem_foundation import VectorDbType
 # in the LTM, tagged with the article title
 
 if __name__ == '__main__':
-    mem = AutoTextMemory.create(emb_model='em-distilroberta-p5-01', vector_db_type=VectorDbType.SIMPLE)
+    mem = AutoTextMemory.create(emb_model='em-distilroberta-p5-01')
     wiki_wiki = wikipediaapi.Wikipedia('en')
     titles = [
         'Earth',
