@@ -2,11 +2,13 @@ from goodai.ltm.embeddings.auto import AutoTextEmbeddingModel
 from goodai.ltm.mem.auto import AutoTextMemory
 import wikipediaapi
 
+from goodai.ltm.mem.mem_foundation import VectorDbType
+
 # This example retrieves articles from wikipedia and stores them
 # in the LTM, tagged with the article title
 
 if __name__ == '__main__':
-    mem = AutoTextMemory.create(emb_model='em-distilroberta-p5-01')
+    mem = AutoTextMemory.create(emb_model='em-distilroberta-p5-01', vector_db_type=VectorDbType.SIMPLE)
     wiki_wiki = wikipediaapi.Wikipedia('en')
     titles = [
         'Earth',
@@ -34,7 +36,7 @@ if __name__ == '__main__':
             for i, r_memory in enumerate(r_memories):
                 m = r_memory.metadata
                 title = '' if m is None else m['title']
-                print(f'Memory #{i+1} (title={title}, distance={r_memory.distance:.3g}):')
+                print(f'Memory #{i+1} (title={title}, relevance={r_memory.relevance:.3g}):')
                 print(r_memory.passage)
     finally:
         # Workaround for exception in wiki_wiki destructor

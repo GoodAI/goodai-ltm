@@ -208,9 +208,10 @@ class BaseTextMemoryFoundation(BaseTextMemory):
     def _distance_to_relevance(distance: float, confidence: Optional[float]) -> float:
         if confidence is not None:
             return confidence
-        # Assuming embeddings are always unit vectors, so distance goes
-        # from 0 to 2
-        return 1 - distance / 2.0
+        # Assuming embeddings are always unit vectors.
+        # Also assuming vector DB (like FAISS) returns squared Euclidean distance.
+        # So distance can go from 0 to 4.
+        return 1 - distance / 4.0
 
     def _retrieve_for_processed_r_chunks(self, processed_r_chunks: List[RetrievedChunk], k: int) -> \
             List[RetrievedMemory]:

@@ -33,9 +33,9 @@ class SimpleVectorDb:
         # all_vectors: (m, emb_size,)
         diff_sq = (vectors[:, None, :] - self.all_vectors[None, :, :]) ** 2
         # diff_sq: (n, m, emb_size,)
-        mean_diff_sq = np.mean(diff_sq, axis=2)
+        all_sq_distances = np.sum(diff_sq, axis=2)
         # mean_diff_sq: (n, m,)
-        sort_indexes = np.argsort(mean_diff_sq, axis=1)
+        sort_indexes = np.argsort(all_sq_distances, axis=1)
         # sort_indexes: (n, m,)
         select_indexes = sort_indexes[:, :k]
         flat_select_indexes = select_indexes.flatten()
@@ -44,7 +44,7 @@ class SimpleVectorDb:
         result_size, num_result_ids = select_indexes.shape
         result_range = np.arange(0, result_size)
         rep_range = np.repeat(result_range, num_result_ids)
-        result_distances = mean_diff_sq[rep_range, flat_select_indexes]
+        result_distances = all_sq_distances[rep_range, flat_select_indexes]
         result_distances = np.reshape(result_distances, select_indexes.shape)
         result_ids = np.reshape(flat_result_ids, select_indexes.shape)
         placeholder_dist[:, :result_distances.shape[1]] = result_distances
