@@ -336,7 +336,7 @@ class BaseTextMemoryFoundation(BaseTextMemory):
                                f'while the number of queries is {n_queries}')
         rk_np = rk.view(batch_size, emb_size).detach().cpu().numpy()
         reranking_top_k = k
-        if self.has_match_prob_model:
+        if self.has_match_prob_model or self.reranker is not None:
             reranking_top_k = round(reranking_top_k * self.reranking_k_factor)
 
         # Extra items retrieved, anticipating possible overlaps
