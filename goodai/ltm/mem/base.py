@@ -57,6 +57,10 @@ class BaseReranker(ABC):
 
 
 class BaseImportanceModel(ABC):
+    """
+    Abstract base class for models that set the importance property of stored memories.
+    """
+
     @abstractmethod
     def get_importance(self, mem_text: str):
         pass
