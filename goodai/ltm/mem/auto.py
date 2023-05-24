@@ -15,7 +15,6 @@ from goodai.ltm.mem.rewrite_model import BaseRewriteModel
 from goodai.ltm.reranking.auto import AutoTextMatchingModel
 from goodai.ltm.reranking.base import BaseTextMatchingModel
 
-_default_emb_model_wr: Optional[weakref.ref] = None
 _default_tokenizer_wr: Optional[weakref.ref] = None
 
 
