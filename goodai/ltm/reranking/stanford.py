@@ -2,7 +2,7 @@ import enum
 import logging
 import math
 import time
-from typing import List
+from typing import List, Optional
 from goodai.ltm.mem.base import BaseReranker, RetrievedMemory, BaseTextMemory, BaseImportanceModel
 from goodai.text_gen.base import BaseTextGenerationModel
 from goodai.text_gen.openai_tg import OpenAICompletionModel
@@ -17,6 +17,7 @@ class StanfordReranker(BaseReranker):
     def __init__(self, half_life: float,
                  multiplicative: bool = False,
                  decay_type: DecayType = DecayType.EXPONENTIAL,
+                 use_importance: bool = True,
                  alpha_recency: float = 1.0, alpha_importance: float = 1.0,
                  alpha_relevance: float = 1.0):
         """
@@ -29,7 +30,9 @@ class StanfordReranker(BaseReranker):
         :param alpha_recency: The weight of the recency score.
         :param alpha_importance: The weight of the importance score.
         :param alpha_relevance: The weight of the relevance score.
+        :param use_importance: Whether the memory's importance metric should be used.
         """
+        self.use_importance = use_importance
         self.multiplicative = multiplicative
         self.alpha_relevance = alpha_relevance
         self.alpha_importance = alpha_importance
@@ -58,33 +61,33 @@ class StanfordReranker(BaseReranker):
         else:
             raise ValueError(f'Unrecognized decay type: {dt}')
 
-    def _get_score(self, recency: float, importance: float, relevance: float, eps=1e-20):
+    def _get_score(self, recency: float, importance: Optional[float], relevance: float, eps=1e-20):
         if self.multiplicative:
             if recency < 0:
                 raise RuntimeError(f'Invalid recency: {recency}')
-            if importance < 0:
+            if self.use_importance and importance < 0:
                 raise RuntimeError(f'Invalid importance: {importance}')
             if relevance < 0:
                 raise RuntimeError(f'Invalid relevance: {relevance}')
             recency_value = math.log(recency + eps)
-            importance_value = math.log(importance + eps)
+            importance_value = math.log(importance + eps) if self.use_importance else None
             relevance_value = math.log(relevance + eps)
         else:
             recency_value = recency
             importance_value = importance
             relevance_value = relevance
-        return recency_value * self.alpha_recency + \
-            importance_value * self.alpha_importance + \
+        score = importance_value * self.alpha_importance if self.use_importance else 0
+        return score + recency_value * self.alpha_recency + \
             relevance_value * self.alpha_relevance
 
     def rerank(self, r_memories: List[RetrievedMemory], mem: BaseTextMemory) -> List[RetrievedMemory]:
-        if not mem.has_importance_model():
+        if self.use_importance and not mem.has_importance_model():
             raise RuntimeError('This reranker requires a memory with an importance model')
         scored_list = []
         current_time = time.time()
         for m in r_memories:
             importance = m.importance
-            if importance is None:
+            if importance is None and self.use_importance:
                 if not self.warned_importance_none:
                     logging.warning('Importance value is None.')
                     self.warned_importance_none = True
@@ -105,7 +108,7 @@ class StanfordReranker(BaseReranker):
 class StanfordImportanceModel(BaseImportanceModel):
     def __init__(self, text_gen_model: BaseTextGenerationModel = None, prompt_template: str = None):
         if text_gen_model is None:
-            text_gen_model = OpenAICompletionModel('text-davinci-003')
+            text_gen_model = OpenAICompletionModel('text-davinci-003', max_tokens=2)
         if prompt_template is None:
             # Prompt from https://arxiv.org/pdf/2304.03442.pdf.
             prompt_template = "On the scale of 1 to 10, where 1 is purely mundane (e.g., brushing teeth, " \
