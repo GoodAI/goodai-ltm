@@ -9,7 +9,7 @@ from typing import List, Optional
 class RetrievedMemory:
     passage: str
     """
-    The text of the retrieved passages, or expanded chunk.
+    The text of the retrieved passage, or expanded chunk.
     """
 
     timestamp: float
