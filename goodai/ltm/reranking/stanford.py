@@ -2,7 +2,7 @@ import enum
 import logging
 import math
 import time
-from typing import List, Optional
+from typing import List, Optional, Callable
 from goodai.ltm.mem.base import BaseReranker, RetrievedMemory, BaseTextMemory, BaseImportanceModel
 from goodai.text_gen.base import BaseTextGenerationModel
 from goodai.text_gen.openai_tg import OpenAICompletionModel
@@ -19,7 +19,8 @@ class StanfordReranker(BaseReranker):
                  decay_type: DecayType = DecayType.EXPONENTIAL,
                  use_importance: bool = True,
                  alpha_recency: float = 1.0, alpha_importance: float = 1.0,
-                 alpha_relevance: float = 1.0):
+                 alpha_relevance: float = 1.0,
+                 time_fn: Callable[[], float] = None):
         """
         Constructs a StanfordReranker, per https://arxiv.org/pdf/2304.03442.pdf.
         :param half_life: When the elapsed time reaches this value, recency is 0.5,
@@ -31,7 +32,10 @@ class StanfordReranker(BaseReranker):
         :param alpha_importance: The weight of the importance score.
         :param alpha_relevance: The weight of the relevance score.
         :param use_importance: Whether the memory's importance metric should be used.
+        :param time_fn: An optional timestamp function to use instead of time.time().
         """
+        if time_fn is None:
+            time_fn = time.time
         self.use_importance = use_importance
         self.multiplicative = multiplicative
         self.alpha_relevance = alpha_relevance
@@ -41,6 +45,7 @@ class StanfordReranker(BaseReranker):
         self.decay_coefficient = self._decay_coefficient(decay_type, half_life)
         self.warned_importance_none = False
         self.warned_bad_elapsed = False
+        self.time_fn = time_fn
 
     @staticmethod
     def _decay_coefficient(decay_type: DecayType, half_life: float):
@@ -84,7 +89,7 @@ class StanfordReranker(BaseReranker):
         if self.use_importance and not mem.has_importance_model():
             raise RuntimeError('This reranker requires a memory with an importance model')
         scored_list = []
-        current_time = time.time()
+        current_time = self.time_fn()
         for m in r_memories:
             importance = m.importance
             if importance is None and self.use_importance:
@@ -106,7 +111,8 @@ class StanfordReranker(BaseReranker):
 
 
 class StanfordImportanceModel(BaseImportanceModel):
-    def __init__(self, text_gen_model: BaseTextGenerationModel = None, prompt_template: str = None):
+    def __init__(self, text_gen_model: BaseTextGenerationModel = None, prompt_template: str = None,
+                 max_prompt_chars: int = 20000):
         if text_gen_model is None:
             text_gen_model = OpenAICompletionModel('text-davinci-003', max_tokens=2)
         if prompt_template is None:
@@ -117,10 +123,13 @@ class StanfordImportanceModel(BaseImportanceModel):
                      "Memory: {mem_text}\r\nRating: "
         self.prompt_template = prompt_template
         self.text_gen_model = text_gen_model
+        self.max_prompt_chars = max_prompt_chars
 
     def get_importance(self, mem_text: str, min_value=1.0, max_value=10.0) -> float:
         template_params = {'mem_text': mem_text}
         prompt = self.prompt_template.format(**template_params)
+        if len(prompt) > self.max_prompt_chars:
+            raise ValueError(f'Prompt is too large: {len(prompt)} characters.')
         response = self.text_gen_model.generate(prompt)
         try:
             response_number = float(response.strip())

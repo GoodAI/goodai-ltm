@@ -73,7 +73,8 @@ class BaseTextMemory(ABC):
 
     @abstractmethod
     def add_text(self, text: str, metadata: Optional[dict] = None, rewrite: bool = False,
-                 rewrite_context: Optional[str] = None, show_progress_bar: bool = False):
+                 rewrite_context: Optional[str] = None, show_progress_bar: bool = False,
+                 timestamp: Optional[float] = None):
         """
         Adds text to the memory.
         :param show_progress_bar: Whether a progress bar should be shown
@@ -81,6 +82,7 @@ class BaseTextMemory(ABC):
         :param metadata: An optional dictionary with metadata
         :param rewrite: Whether the text should be rewritten by an LLM
         :param rewrite_context: The context provided to the LLM for rewriting the text
+        :param timestamp: A custom timestamp for the memory to use instead of time.time()
         """
         pass
 

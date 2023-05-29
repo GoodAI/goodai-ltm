@@ -1,4 +1,5 @@
 import bisect
+import time
 from dataclasses import dataclass
 from typing import List, Tuple, Dict, Optional, Any, Set
 
@@ -89,7 +90,7 @@ class ChunkQueue:
                 removed_chunks.append(removed_chunk)
         return removed_chunks
 
-    def add_chunk(self, metadata: Optional[Any], importance: Optional[float], starts_section: bool = False) -> Chunk:
+    def add_chunk(self, metadata: Optional[Any], importance: Optional[float], timestamp: float, starts_section: bool = False) -> Chunk:
         chunk_id = self.current_chunk_id
         last_chunk = self.chunks[-1] if len(self.chunks) >= 1 else None
         if last_chunk is None:
@@ -97,13 +98,13 @@ class ChunkQueue:
         else:
             offset = self.chunk_capacity if starts_section else self.chunk_index_at_overlap
             from_token_seq_id = last_chunk.from_token_seq_id + offset
-        chunk = Chunk(chunk_id, self.chunk_capacity, from_token_seq_id, metadata, importance)
+        chunk = Chunk(chunk_id, self.chunk_capacity, from_token_seq_id, metadata, importance, timestamp)
         self.current_chunk_id = chunk_id + 1
         self.chunks.append(chunk)
         self.chunk_map[chunk.chunk_id] = chunk
         return chunk
 
-    def add_separator(self, pad_token_id: int):
+    def add_separator(self, pad_token_id: int, timestamp: Optional[float] = None):
         last_chunk = self.chunks[-1] if len(self.chunks) >= 1 else None
         if last_chunk is not None:
             room = last_chunk.get_room()
@@ -111,7 +112,9 @@ class ChunkQueue:
             self.add_sequence(pad_seq, metadata=None, importance=None, _no_new_chunks=True)
         # separator_seq_ids always assumed to be ordered
         self.separator_seq_ids.append(self.first_token_seq_id + len(self.token_ids))
-        self.add_chunk(metadata=None, importance=None, starts_section=True)
+        if timestamp is None:
+            timestamp = time.time()
+        self.add_chunk(metadata=None, importance=None, starts_section=True, timestamp=timestamp)
 
     def get_chunk(self, chunk_id: int) -> Chunk:
         return self.chunk_map.get(chunk_id)
@@ -128,16 +131,19 @@ class ChunkQueue:
         return self.first_token_seq_id + len(self.token_ids)
 
     def add_sequence(self, new_token_ids: List[int], metadata: Optional[Any],
-                     importance: Optional[float] = None,
+                     importance: Optional[float] = None, timestamp: Optional[float] = None,
                      _no_new_chunks: bool = False) -> List[Chunk]:
         """
         Adds tokens to the chunk queue.
-        :param importance: An optional importance value for the tokens
         :param new_token_ids: The sequence of token IDs to add
         :param metadata: A metadata object
+        :param importance: An optional importance value for the tokens
+        :param timestamp: The timestamp of the stored tokens
         :param _no_new_chunks: If true, attempt should be made to add all tokens without adding new chunks
         :return: Any chunks removed due to overflow.
         """
+        if timestamp is None:
+            timestamp = time.time()
         self.token_ids.extend(new_token_ids)
         next_token_seq_id = len(self.token_ids) + self.first_token_seq_id
         start_num_chunks = len(self.chunks)
@@ -148,7 +154,7 @@ class ChunkQueue:
                     raise RuntimeError('No new chunks allowed, but at least one more is needed to complete operation')
             else:
                 while c_idx >= len(self.chunks):
-                    self.add_chunk(metadata, importance)
+                    self.add_chunk(metadata, importance, timestamp=timestamp)
             chunk = self.chunks[c_idx]
             if chunk.to_token_seq_id < next_token_seq_id:
                 room = chunk.get_room()
@@ -159,6 +165,8 @@ class ChunkQueue:
                         chunk.metadata = metadata
                     if importance is not None and (chunk.importance is None or much_room):
                         chunk.importance = importance
+                    if room == self.chunk_capacity:
+                        chunk.timestamp = timestamp
             if (_no_new_chunks or len(chunk) <= self.chunk_index_at_overlap) and \
                     chunk.to_token_seq_id >= next_token_seq_id:
                 break

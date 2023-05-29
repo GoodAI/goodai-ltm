@@ -4,7 +4,7 @@ from typing import Any, Optional
 
 class Chunk:
     def __init__(self, chunk_id: int, capacity: int, from_token_seq_id: int, metadata: Optional[dict],
-                 importance: Optional[float]):
+                 importance: Optional[float], timestamp: float):
         self.importance = importance
         self.metadata = metadata
         self.chunk_id = chunk_id
@@ -12,7 +12,7 @@ class Chunk:
         self.from_token_seq_id = from_token_seq_id
         self.to_token_seq_id = from_token_seq_id
         self.indexed: bool = False
-        self.timestamp: float = time.time()
+        self.timestamp: float = timestamp
 
     def __len__(self):
         return self.to_token_seq_id - self.from_token_seq_id

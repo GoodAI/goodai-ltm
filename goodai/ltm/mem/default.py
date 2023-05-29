@@ -98,7 +98,8 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
                                            batch_size=batch_size)
 
     def add_text(self, text: str, metadata: Optional[Any] = None, rewrite: bool = False,
-                 rewrite_context: Optional[str] = None, show_progress_bar: bool = False):
+                 rewrite_context: Optional[str] = None, show_progress_bar: bool = False,
+                 timestamp: Optional[float] = None):
         if rewrite and not self.memory_rewrite_model:
             raise ValueError("For memory rewriting, a rewriting model must be provided")
         if rewrite and self.memory_rewrite_model:
@@ -108,7 +109,8 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
             importance = self.importance_model.get_importance(text)
         token_ids = self.chunk_tokenizer.encode(text, add_special_tokens=False)
         removed_buckets = self.chunk_queue.add_sequence(token_ids, metadata=metadata,
-                                                        importance=importance)
+                                                        importance=importance,
+                                                        timestamp=timestamp)
         self._ensure_keys_added(show_progress_bar=show_progress_bar)
         removed_indexes = [rb.chunk_id for rb in removed_buckets]
         if len(removed_indexes) > 0:

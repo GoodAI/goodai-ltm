@@ -146,12 +146,13 @@ class TestMem(unittest.TestCase):
         config.chunk_capacity = 128
         mem = AutoTextMemory.create(emb_model=self._lr_emb_model, config=config)
         for i, fact in enumerate(facts):
-            mem.add_text(fact, metadata={'index': i})
+            mem.add_text(fact, metadata={'index': i}, timestamp=i + 5)
             mem.add_separator()
         for i, query in enumerate(facts):
             r_memories = mem.retrieve(query, k=1)
             self.assertEqual(query.strip(), r_memories[0].passage.strip())
             self.assertEqual(i, r_memories[0].metadata['index'])
+            self.assertAlmostEqual(i + 5, r_memories[0].timestamp)
 
     def test_expansion_to_paragraph(self):
         _text = "Earth has a dynamic atmosphere, which sustains Earth's surface conditions and protects " \
