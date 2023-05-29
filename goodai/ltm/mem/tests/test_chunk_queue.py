@@ -180,3 +180,17 @@ class TestChunkQueue(unittest.TestCase):
         self.assertTrue(_chunk_queue.separator_seq_ids[-1] <= _chunk_queue.first_token_seq_id +
                         len(_chunk_queue.token_ids))
 
+    def test_flush(self):
+        chunk_capacity = 5
+        queue_capacity = 10
+        chunk_index_at_overlap = chunk_capacity // 2
+        _chunk_queue = ChunkQueue(queue_capacity, chunk_capacity, chunk_index_at_overlap, first_token_seq_id=220)
+        for i in range(100):
+            _chunk_queue.add_sequence([1, 2, 3], None)
+            _chunk_queue.add_separator(0)
+        _chunk_queue.flush()
+        self.assertTrue(len(_chunk_queue.separator_seq_ids) == 0)
+        self.assertTrue(len(_chunk_queue.chunks) == 0)
+        self.assertTrue(len(_chunk_queue.token_ids) == 0)
+        self.assertTrue(len(_chunk_queue.chunk_map) == 0)
+        self.assertTrue(_chunk_queue.first_token_seq_id == 0)

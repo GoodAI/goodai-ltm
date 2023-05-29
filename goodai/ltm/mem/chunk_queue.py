@@ -303,6 +303,7 @@ class ChunkQueue:
     def flush(self):
         self.chunks = []
         self.token_ids = []
+        self.separator_seq_ids = []
         self.first_token_seq_id = 0
         self.current_chunk_id = 0
         self.chunk_map.clear()
