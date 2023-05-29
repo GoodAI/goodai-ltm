@@ -1,8 +1,10 @@
 import pickle
 from typing import Union
+from weakref import WeakValueDictionary
+
 import torch
 
-from goodai.helpers.file_helper import open_url_as_file, unpickle_downloaded_url
+from goodai.helpers.file_helper import unpickle_downloaded_url
 from goodai.ltm.embeddings.auto import AutoTextEmbeddingModel
 from goodai.ltm.reranking.base import BaseTextMatchingModel
 from goodai.ltm.reranking.default import DefaultRerankingCrossEncoder
@@ -20,6 +22,17 @@ class AutoTextMatchingModel:
     """
     Factory class for text matching models.
     """
+
+    @staticmethod
+    def shared_pretrained(name: str, device: Union[str, torch.device] = None):
+        if device is None:
+            device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
+        key = f'{name}|{device}'
+        model = AutoTextMatchingModel.model_cache.get(key)
+        if model is None:
+            model = AutoTextMatchingModel.from_pretrained(name, device)
+            AutoTextMatchingModel.model_cache[key] = model
+        return model
 
     @staticmethod
     def from_pretrained(name: str, device: Union[torch.device, str] = None) -> BaseTextMatchingModel:
@@ -42,7 +55,10 @@ class AutoTextMatchingModel:
         if model_type == 'st':
             return SentenceTransformerTextMatchingModel(model_name)
         elif model_type == 'em':
-            emb_model = AutoTextEmbeddingModel.from_pretrained(model_name, device=device)
+            emb_model = AutoTextEmbeddingModel.shared_pretrained(model_name, device=device)
             return EmbeddingBasedMatchingModel(emb_model, _default_dist_param)
         else:
             raise ValueError(f'Unknown model type: {model_type}')
+
+
+AutoTextMatchingModel.model_cache = WeakValueDictionary()

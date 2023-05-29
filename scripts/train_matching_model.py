@@ -81,7 +81,7 @@ def run(model_name: str, batch_size: int, num_epochs: int,
         )
         bucket_name = os.environ.get('AWS_BUCKET')
         if bucket_name is None:
-            raise SystemError('AWS_BUCKET needs to be set to save models')
+            raise RuntimeError('AWS_BUCKET needs to be set to save models')
         print('Saving model...')
         storage = CloudStorage.get_instance(bucket_name)
         model_id = uuid.uuid4().hex

@@ -43,25 +43,28 @@ class ChunkExpansionLimitType(Enum):
 
 
 class ChunkExpansionConfig:
-    def __init__(self, max_extra_side_tokens: int = 24,
+    def __init__(self, min_extra_side_tokens: int = 0, max_extra_side_tokens: int = 24,
                  limit_type: ChunkExpansionLimitType = ChunkExpansionLimitType.SENTENCE):
         self.limit_type = limit_type
+        self.min_extra_side_tokens = min_extra_side_tokens
         self.max_extra_side_tokens = max_extra_side_tokens
 
     @classmethod
-    def expand_to_sentence(cls, max_extra_side_tokens: int = 24):
+    def for_sentence(cls, max_extra_side_tokens: int = 24):
         return cls(max_extra_side_tokens=max_extra_side_tokens, limit_type=ChunkExpansionLimitType.SENTENCE)
 
     @classmethod
-    def expand_to_line_break(cls, max_extra_side_tokens: int = 64):
-        return cls(max_extra_side_tokens=max_extra_side_tokens, limit_type=ChunkExpansionLimitType.LINE)
+    def for_line_break(cls, min_extra_side_tokens: int = 16, max_extra_side_tokens: int = 64):
+        return cls(min_extra_side_tokens=min_extra_side_tokens,
+                   max_extra_side_tokens=max_extra_side_tokens,
+                   limit_type=ChunkExpansionLimitType.LINE)
 
     @classmethod
-    def expand_to_paragraph(cls, max_extra_side_tokens: int = 192):
+    def for_paragraph(cls, max_extra_side_tokens: int = 192):
         return cls(max_extra_side_tokens=max_extra_side_tokens, limit_type=ChunkExpansionLimitType.PARAGRAPH)
 
     @classmethod
-    def expand_to_section(cls, max_extra_side_tokens: int = 1024):
+    def for_section(cls, max_extra_side_tokens: int = 1024):
         return cls(max_extra_side_tokens=max_extra_side_tokens, limit_type=ChunkExpansionLimitType.SECTION)
 
 
@@ -78,7 +81,7 @@ class TextMemoryConfig:
 
     reranking_k_factor: float
     """
-    When a reranking mechanism is available, the value of k passed to the query function is
+    When a reranking mechanism is available, the value of k passed to the retrieval function is
     multiplied by reranking_k_factor and the resulting number of chunks is retrieved from
     the chunk store before applying the reranking procedure.
     """
@@ -103,7 +106,7 @@ class TextMemoryConfig:
 
     chunk_expansion_config: ChunkExpansionConfig
     """
-    The chunk expansion configuration
+    The chunk expansion configuration.
     """
 
     def __init__(self):

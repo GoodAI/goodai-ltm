@@ -1,4 +1,5 @@
 import bisect
+import time
 from dataclasses import dataclass
 from typing import List, Tuple, Dict, Optional, Any, Set
 
@@ -17,6 +18,7 @@ class PassageInfo:
 
 @dataclass
 class ChunkExpansionOptions:
+    minSideTokens: int
     maxSideTokens: int
     leftStopAfterTokenIds: List[List[int]]
     rightStopAtTokenIds: List[List[int]]
@@ -24,14 +26,16 @@ class ChunkExpansionOptions:
     @classmethod
     def default(cls, max_side_tokens: int, punctuation_ids: Set[int]):
         token_ids = [[tid] for tid in punctuation_ids]
-        return cls(maxSideTokens=max_side_tokens, leftStopAfterTokenIds=token_ids,
+        return cls(minSideTokens=0, maxSideTokens=max_side_tokens,
+                   leftStopAfterTokenIds=token_ids,
                    rightStopAtTokenIds=token_ids)
 
     @classmethod
     def from_config(cls, tokenizer: PreTrainedTokenizer, config: ChunkExpansionConfig):
         celt = config.limit_type
         limit_token_ids = celt.get_token_ids(tokenizer)
-        return cls(maxSideTokens=config.max_extra_side_tokens,
+        return cls(minSideTokens=config.min_extra_side_tokens,
+                   maxSideTokens=config.max_extra_side_tokens,
                    leftStopAfterTokenIds=limit_token_ids,
                    rightStopAtTokenIds=limit_token_ids)
 
@@ -86,7 +90,7 @@ class ChunkQueue:
                 removed_chunks.append(removed_chunk)
         return removed_chunks
 
-    def add_chunk(self, metadata: Optional[Any], starts_section: bool = False) -> Chunk:
+    def add_chunk(self, metadata: Optional[Any], importance: Optional[float], timestamp: float, starts_section: bool = False) -> Chunk:
         chunk_id = self.current_chunk_id
         last_chunk = self.chunks[-1] if len(self.chunks) >= 1 else None
         if last_chunk is None:
@@ -94,21 +98,23 @@ class ChunkQueue:
         else:
             offset = self.chunk_capacity if starts_section else self.chunk_index_at_overlap
             from_token_seq_id = last_chunk.from_token_seq_id + offset
-        chunk = Chunk(chunk_id, self.chunk_capacity, from_token_seq_id, metadata)
+        chunk = Chunk(chunk_id, self.chunk_capacity, from_token_seq_id, metadata, importance, timestamp)
         self.current_chunk_id = chunk_id + 1
         self.chunks.append(chunk)
         self.chunk_map[chunk.chunk_id] = chunk
         return chunk
 
-    def add_separator(self, pad_token_id: int):
+    def add_separator(self, pad_token_id: int, timestamp: Optional[float] = None):
         last_chunk = self.chunks[-1] if len(self.chunks) >= 1 else None
         if last_chunk is not None:
             room = last_chunk.get_room()
             pad_seq = [pad_token_id] * room
-            self.add_sequence(pad_seq, metadata=None, _no_new_chunks=True)
+            self.add_sequence(pad_seq, metadata=None, importance=None, _no_new_chunks=True)
         # separator_seq_ids always assumed to be ordered
         self.separator_seq_ids.append(self.first_token_seq_id + len(self.token_ids))
-        self.add_chunk(metadata=None, starts_section=True)
+        if timestamp is None:
+            timestamp = time.time()
+        self.add_chunk(metadata=None, importance=None, starts_section=True, timestamp=timestamp)
 
     def get_chunk(self, chunk_id: int) -> Chunk:
         return self.chunk_map.get(chunk_id)
@@ -125,14 +131,19 @@ class ChunkQueue:
         return self.first_token_seq_id + len(self.token_ids)
 
     def add_sequence(self, new_token_ids: List[int], metadata: Optional[Any],
+                     importance: Optional[float] = None, timestamp: Optional[float] = None,
                      _no_new_chunks: bool = False) -> List[Chunk]:
         """
         Adds tokens to the chunk queue.
         :param new_token_ids: The sequence of token IDs to add
         :param metadata: A metadata object
+        :param importance: An optional importance value for the tokens
+        :param timestamp: The timestamp of the stored tokens
         :param _no_new_chunks: If true, attempt should be made to add all tokens without adding new chunks
         :return: Any chunks removed due to overflow.
         """
+        if timestamp is None:
+            timestamp = time.time()
         self.token_ids.extend(new_token_ids)
         next_token_seq_id = len(self.token_ids) + self.first_token_seq_id
         start_num_chunks = len(self.chunks)
@@ -140,17 +151,22 @@ class ChunkQueue:
         for c_idx in range(first_c_idx, start_num_chunks + len(new_token_ids) + 1):
             if _no_new_chunks:
                 if c_idx >= len(self.chunks):
-                    raise SystemError('No new chunks allowed, but at least one more is needed to complete operation')
+                    raise RuntimeError('No new chunks allowed, but at least one more is needed to complete operation')
             else:
                 while c_idx >= len(self.chunks):
-                    self.add_chunk(metadata)
+                    self.add_chunk(metadata, importance, timestamp=timestamp)
             chunk = self.chunks[c_idx]
             if chunk.to_token_seq_id < next_token_seq_id:
                 room = chunk.get_room()
                 if room > 0:
                     chunk.extend_by(min(next_token_seq_id - chunk.to_token_seq_id, room))
-                    if metadata and (chunk.metadata is None or room > self.chunk_capacity // 2):
+                    much_room = room > self.chunk_capacity // 2
+                    if metadata and (chunk.metadata is None or much_room):
                         chunk.metadata = metadata
+                    if importance is not None and (chunk.importance is None or much_room):
+                        chunk.importance = importance
+                    if room == self.chunk_capacity:
+                        chunk.timestamp = timestamp
             if (_no_new_chunks or len(chunk) <= self.chunk_index_at_overlap) and \
                     chunk.to_token_seq_id >= next_token_seq_id:
                 break
@@ -206,17 +222,20 @@ class ChunkQueue:
 
     def get_complete_passage(self, chunk: Chunk, options: ChunkExpansionOptions) -> PassageInfo:
         s_from, s_to = self._get_section_bounds(chunk.from_token_seq_id, chunk.to_token_seq_id)
-        mst = options.maxSideTokens
-        p_from, p_to = chunk.from_token_seq_id - mst, chunk.to_token_seq_id + mst,
-        p_from = max(p_from, s_from)
-        p_to = min(p_to, s_to)
-        prev_token_ids = self.get_subsequence(p_from, chunk.from_token_seq_id)
+        min_st = options.minSideTokens
+        min_p_from, min_p_to = chunk.from_token_seq_id - min_st, chunk.to_token_seq_id + min_st,
+        min_p_from, min_p_to = max(min_p_from, s_from), min(min_p_to, s_to)
+        max_st = options.maxSideTokens
+        max_p_from, max_p_to = chunk.from_token_seq_id - max_st, chunk.to_token_seq_id + max_st,
+        max_p_from, max_p_to = max(max_p_from, s_from), min(max_p_to, s_to)
+        central_seq = self.get_subsequence(min_p_from, min_p_to)
+        prev_token_ids = self.get_subsequence(max_p_from, min_p_from)
         prev_token_ids = self._from_last_match(prev_token_ids, options.leftStopAfterTokenIds)
-        next_token_ids = self.get_subsequence(chunk.to_token_seq_id, p_to)
+        next_token_ids = self.get_subsequence(min_p_to, max_p_to)
         next_token_ids = self._to_first_match(next_token_ids, options.rightStopAtTokenIds)
-        p_from = chunk.from_token_seq_id - len(prev_token_ids)
-        p_to = chunk.to_token_seq_id + len(next_token_ids)
-        expanded_seq = prev_token_ids + self.get_chunk_token_ids(chunk) + next_token_ids
+        p_from = min_p_from - len(prev_token_ids)
+        p_to = min_p_to + len(next_token_ids)
+        expanded_seq = prev_token_ids + central_seq + next_token_ids
         return PassageInfo(p_from, p_to, expanded_seq)
 
     def get_subsequence(self, from_seq_id: int, to_seq_id: int):

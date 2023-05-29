@@ -7,14 +7,15 @@ from transformers import AutoTokenizer
 from goodai.ltm.embeddings.auto import AutoTextEmbeddingModel
 from goodai.ltm.eval.metrics import get_correctness_score
 from goodai.ltm.mem.auto import AutoTextMemory
-from goodai.ltm.mem.config import TextMemoryConfig, ChunkExpansionConfig
+from goodai.ltm.mem.base import BaseReranker, RetrievedMemory, BaseTextMemory, BaseImportanceModel
+from goodai.ltm.mem.config import TextMemoryConfig, ChunkExpansionConfig, ChunkExpansionLimitType
 from goodai.ltm.reranking.base import BaseTextMatchingModel
 
 
 class TestMem(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls._lr_emb_model = AutoTextEmbeddingModel.from_pretrained('em-MiniLM-p1-01')
+        cls._lr_emb_model = AutoTextEmbeddingModel.shared_pretrained('em-MiniLM-p1-01')
         cls._text = "Earth has a dynamic atmosphere, which sustains Earth's surface conditions and protects " \
                     "it from most meteoroids and UV-light at entry. It has a composition of primarily nitrogen " \
                     "and oxygen. Water vapor is widely present in the atmosphere, forming clouds that cover most " \
@@ -77,6 +78,19 @@ class TestMem(unittest.TestCase):
         for i in range(100):
             mems.append(AutoTextMemory.create())
 
+    def test_multi_creation_with_name(self):
+        # Should be able to create many default instances without running out of memory
+        mems = []
+        for i in range(100):
+            mems.append(AutoTextMemory.create(emb_model='em-MiniLM-p1-01'))
+
+    def test_multi_creation_with_qpm_model(self):
+        # Should be able to create many default instances without running out of memory
+        mems = []
+        for i in range(100):
+            mems.append(AutoTextMemory.create(emb_model='em-MiniLM-p1-01',
+                                              matching_model='em:em-MiniLM-p1-01'))
+
     def test_create_after_delete(self):
         mem1 = AutoTextMemory.create()
         mem1.add_text('foobar')
@@ -132,12 +146,13 @@ class TestMem(unittest.TestCase):
         config.chunk_capacity = 128
         mem = AutoTextMemory.create(emb_model=self._lr_emb_model, config=config)
         for i, fact in enumerate(facts):
-            mem.add_text(fact, metadata={'index': i})
+            mem.add_text(fact, metadata={'index': i}, timestamp=i + 5)
             mem.add_separator()
         for i, query in enumerate(facts):
             r_memories = mem.retrieve(query, k=1)
             self.assertEqual(query.strip(), r_memories[0].passage.strip())
             self.assertEqual(i, r_memories[0].metadata['index'])
+            self.assertAlmostEqual(i + 5, r_memories[0].timestamp)
 
     def test_expansion_to_paragraph(self):
         _text = "Earth has a dynamic atmosphere, which sustains Earth's surface conditions and protects " \
@@ -155,7 +170,7 @@ class TestMem(unittest.TestCase):
                 "components such as nitrogen to cycle."
 
         config = TextMemoryConfig()
-        config.chunk_expansion_config = ChunkExpansionConfig.expand_to_paragraph()
+        config.chunk_expansion_config = ChunkExpansionConfig.for_paragraph()
         mem = AutoTextMemory.create(emb_model=self._lr_emb_model, config=config)
         mem.add_text(_text)
         r1 = mem.retrieve("What is the composition of Earth's atmosphere?", k=1)[0]
@@ -182,7 +197,8 @@ class TestMem(unittest.TestCase):
                 "allowing components such as nitrogen to cycle."
 
         config = TextMemoryConfig()
-        config.chunk_expansion_config = ChunkExpansionConfig.expand_to_line_break()
+        config.chunk_expansion_config = ChunkExpansionConfig.for_line_break()
+        config.chunk_expansion_config.min_extra_side_tokens = 0
         mem = AutoTextMemory.create(emb_model=self._lr_emb_model, config=config)
         mem.add_text(_text)
         r1 = mem.retrieve("Other than water vapor, what are other greenhouse gases?", k=1)[0]
@@ -194,7 +210,7 @@ class TestMem(unittest.TestCase):
 
     def test_expansion_to_sections(self):
         config = TextMemoryConfig()
-        config.chunk_expansion_config = ChunkExpansionConfig.expand_to_section()
+        config.chunk_expansion_config = ChunkExpansionConfig.for_section()
         mem = AutoTextMemory.create(emb_model=self._lr_emb_model, config=config)
         facts = [
             'Cane toads have a life expectancy of 10 to 15 years in the wild.',
@@ -208,3 +224,59 @@ class TestMem(unittest.TestCase):
         r1 = mem.retrieve("Other than water vapor, what are other greenhouse gases?", k=1)[0]
         self.assertTrue(r1.passage.strip().startswith('Earth has a dynamic atmosphere'))
         self.assertTrue(r1.passage.strip().endswith("components such as nitrogen to cycle."))
+
+    def test_excessive_chunk_expansion(self):
+        cec = ChunkExpansionConfig(2048, limit_type=ChunkExpansionLimitType.SECTION)
+        config = TextMemoryConfig()
+        config.chunk_capacity = 12
+        config.chunk_overlap_fraction = 0.5
+        config.redundancy_overlap_threshold = 0.5
+        config.chunk_expansion_config = cec
+        with self.assertRaises(ValueError):
+            AutoTextMemory.create(emb_model=self._lr_emb_model, config=config)
+
+    def test_custom_reranker(self):
+        class _LocalReranker(BaseReranker):
+            def rerank(self, _r_memories: List[RetrievedMemory], _mem: BaseTextMemory) -> List[RetrievedMemory]:
+                result = list(_r_memories)
+                result.sort(key=lambda _m: _m.relevance)
+                return result
+
+        mem = AutoTextMemory.create(emb_model=self._lr_emb_model, reranker=_LocalReranker())
+        mem.add_text(self._text)
+        r_memories = mem.retrieve('Is water vapor widely present in the atmosphere?', k=5)
+        self.assertIn('Water vapor is widely present', r_memories[-1].passage.strip())
+
+    def test_custom_importance_model(self):
+        class _LocalImportanceModel(BaseImportanceModel):
+            def get_importance(self, mem_text: str):
+                if 'kayaks' in mem_text.lower():
+                    return 0.25
+                elif 'vader' in mem_text.lower():
+                    return 0.50
+                else:
+                    return 0
+
+        facts = [
+            'Cane toads have a life expectancy of 10 to 15 years in the wild.',
+            'Kayaks are used to transport people in water.',
+            'Darth Vader is portrayed as a man who always appears in black full-body armor and a mask.',
+            'Tony Bennett had four children.'
+        ]
+        config = TextMemoryConfig()
+        config.chunk_capacity = 128
+        mem = AutoTextMemory.create(emb_model=self._lr_emb_model, importance_model=_LocalImportanceModel(),
+                                    config=config)
+        for i, fact in enumerate(facts):
+            mem.add_text(fact, metadata={'index': i})
+            mem.add_separator()
+
+        r_memories = mem.retrieve('Generic question about anything.', k=5)
+        for m in r_memories:
+            p = m.passage.lower()
+            if 'kayaks' in p:
+                self.assertAlmostEqual(m.importance, 0.25)
+            elif 'vader' in p:
+                self.assertAlmostEqual(m.importance, 0.50)
+            else:
+                self.assertAlmostEqual(m.importance, 0)

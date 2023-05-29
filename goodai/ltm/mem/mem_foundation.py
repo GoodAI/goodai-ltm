@@ -2,6 +2,7 @@ import abc
 import enum
 import io
 import json
+import math
 import sys
 from dataclasses import dataclass
 from typing import List, Union, Set, Optional, Tuple
@@ -11,9 +12,10 @@ import numpy as np
 import torch
 from transformers import PreTrainedTokenizer
 
-from goodai.ltm.mem.base import BaseTextMemory, RetrievedMemory
+from goodai.ltm.mem.base import BaseTextMemory, RetrievedMemory, BaseReranker
 from goodai.ltm.mem.chunk import Chunk
 from goodai.ltm.mem.chunk_queue import PassageInfo, ChunkExpansionOptions
+from goodai.ltm.mem.rewrite_model import BaseRewriteModel
 from goodai.ltm.mem.simple_vector_db import SimpleVectorDb
 
 _vector_db_type = Union[faiss.Index, SimpleVectorDb]
@@ -112,9 +114,11 @@ class BaseTextMemoryFoundation(BaseTextMemory):
     def __init__(self, vector_db_type: VectorDbType, tokenizer: PreTrainedTokenizer, has_match_prob_model: bool,
                  num_storage_embeddings: int, emb_dim: int,
                  chunk_capacity: int, reranking_k_factor: float,
-                 max_query_length: Optional[int], overlap_fraction: float,
+                 max_query_length: Optional[int],
+                 query_rewrite_model: BaseRewriteModel, reranker: BaseReranker,
+                 overlap_fraction: float,
                  overlap_threshold: float, chunk_expansion_options: ChunkExpansionOptions,
-                 device: torch.device):
+                 device: torch.device, max_expansion_top_k_factor: int = 200):
         super().__init__()
         if overlap_fraction < 0 or overlap_fraction > 0.5:
             raise ValueError(f'Invalid chunk overlap fraction: {overlap_fraction}')
@@ -122,6 +126,17 @@ class BaseTextMemoryFoundation(BaseTextMemory):
             raise ValueError(f'Invalid redundancy overlap threshold: {overlap_threshold}')
         if reranking_k_factor < 1:
             raise ValueError('reranking_k_factor cannot be less than 1')
+        max_st = chunk_expansion_options.maxSideTokens
+        if max_st < chunk_expansion_options.minSideTokens:
+            raise ValueError('Invalid chunk expansion configuration: The maximum number of extra side tokens '
+                             'cannot be less than the minimum number.')
+        max_added_chunks = max_st * 2 / chunk_capacity
+        max_chunks_overlap = (max_added_chunks + 2) / (1 - overlap_fraction)
+        self.expansion_top_k_factor = overlap_threshold + (1 - overlap_threshold) * (1 + max_chunks_overlap)
+        if self.expansion_top_k_factor > max_expansion_top_k_factor:
+            raise ValueError('Excessive chunk expansion configuration. Increase the chunk capacity or the redundancy '
+                             'overlap threshold, or decrease the maximum extra side tokens or the chunk '
+                             'overlap fraction.')
         self.chunk_expansion_options = chunk_expansion_options
         self.chunk_capacity = chunk_capacity
         self.overlap_threshold = overlap_threshold
@@ -130,9 +145,12 @@ class BaseTextMemoryFoundation(BaseTextMemory):
         self.reranking_k_factor = reranking_k_factor
         self.num_storage_embeddings = num_storage_embeddings
         self.has_match_prob_model = has_match_prob_model
+        self.emb_dim = emb_dim
         self.vector_db = self.create_vector_db(vector_db_type, emb_dim)
         self.device = device
         self.chunk_tokenizer = tokenizer
+        self.query_rewrite_model = query_rewrite_model
+        self.reranker = reranker
 
     @staticmethod
     def create_vector_db(vector_db_type: VectorDbType, emb_dim: int) -> _vector_db_type:
@@ -180,34 +198,52 @@ class BaseTextMemoryFoundation(BaseTextMemory):
 
     def dump(self, stream: io.TextIOBase = sys.stdout):
         chunks = self.get_all_chunks()
-        stream.write('| Id | Metadata | Content |\n')
-        stream.write('| ----- | -------- | ------- |\n')
+        stream.write('| Id | Metadata | Importance | Content |\n')
+        stream.write('| ----- | -------- | ---------- | ------- |\n')
         for chunk in chunks:
             chunk_text = self.get_chunk_text(chunk)
             ct_js = json.dumps(chunk_text)
-            stream.write(f'| {chunk.chunk_id} | {chunk.metadata} | {ct_js} |')
+            importance_text = 'None' if chunk.importance is None else f'{chunk.importance:.2g}'
+            stream.write(f'| {chunk.chunk_id} | {chunk.metadata} | | {importance_text} | {ct_js} |')
             stream.write('\n')
         stream.flush()
 
+    @staticmethod
+    def _distance_to_relevance(distance: float, confidence: Optional[float]) -> float:
+        if confidence is not None:
+            return confidence
+        # Assuming embeddings are always unit vectors.
+        # Also assuming vector DB (like FAISS) returns squared Euclidean distance.
+        # So distance can go from 0 to 4.
+        return 1 - distance / 4.0
+
     def _retrieve_for_processed_r_chunks(self, processed_r_chunks: List[RetrievedChunk], k: int) -> \
             List[RetrievedMemory]:
+        if not self.reranker:
+            processed_r_chunks = processed_r_chunks[:k]
         has_pm = self.has_match_prob_model
-        processed_r_chunks = processed_r_chunks[:k]
         sequences = [r_chunk.passage.tokenIds for r_chunk in processed_r_chunks]
         retrieved_texts = self.chunk_tokenizer.batch_decode(sequences, skip_special_tokens=True)
         result = []
         for r_chunk, r_text in zip(processed_r_chunks, retrieved_texts):
             confidence = r_chunk.confidence
-            metadata = r_chunk.chunk.metadata
+            chunk = r_chunk.chunk
+            metadata = chunk.metadata
+            importance = chunk.importance
+            distance = r_chunk.distance
+            relevance = self._distance_to_relevance(distance, confidence)
             if not has_pm:
                 confidence = None
-            result.append(RetrievedMemory(passage=r_text.strip(), timestamp=r_chunk.chunk.timestamp,
-                                          distance=r_chunk.distance, confidence=confidence,
-                                          metadata=metadata))
+            result.append(RetrievedMemory(passage=r_text.strip(), timestamp=chunk.timestamp,
+                                          distance=distance, relevance=relevance, confidence=confidence,
+                                          metadata=metadata, importance=importance))
+        if self.reranker:
+            result = self.reranker.rerank(result, self)
+            result = result[:k]
         return result
 
     def _multi_retrieve_for_r_chunks(self, queries: List[str], prelim_r_chunks: List[List[RetrievedChunk]],
-                                     expected_key_db_top_k: int, k: int,
+                                     reranking_top_k: int, k: int,
                                      show_progress_bar: bool = False) -> List[List[RetrievedMemory]]:
         # At this point:
         # - No chunks are None
@@ -220,7 +256,7 @@ class BaseTextMemoryFoundation(BaseTextMemory):
             reduced_r_chunks = []
             for i, (query, row_r_chunks) in enumerate(zip(queries, prelim_r_chunks)):
                 row_reduced_r_chunks = RetrievedChunk.reduce(row_r_chunks, self.overlap_threshold,
-                                                             expected_key_db_top_k)
+                                                             reranking_top_k)
                 reduced_r_chunks.append(row_reduced_r_chunks)
                 prelim_chunks = [r_chunk.chunk for r_chunk in row_reduced_r_chunks]
                 chunk_sequences: List[List[int]] = self.retrieve_chunk_sequences(prelim_chunks)
@@ -243,14 +279,13 @@ class BaseTextMemoryFoundation(BaseTextMemory):
         for row_r_chunks in processed_r_chunks:
             # Removal of overlapping passages
             row_r_chunks = RetrievedChunk.remove_duplicates_and_overlaps(row_r_chunks, self.overlap_threshold,
-                                                                         expected_key_db_top_k)
-            # At this point there are at most expected_key_db_top_k chunks per row
-            # TODO custom reranker would go here
+                                                                         reranking_top_k)
+            # At this point there are at most reranking_top_k chunks per row
             result.append(self._retrieve_for_processed_r_chunks(row_r_chunks, k=k))
         return result
 
     def _multi_retrieve(self, queries: List[str], distances: np.ndarray, indexes: np.ndarray,
-                        expected_key_db_top_k: int, expansion_top_k: int, k: int,
+                        reranking_top_k: int, expansion_top_k: int, k: int,
                         show_progress_bar: bool = False) -> List[List[RetrievedMemory]]:
         # len(queries) == batch_size
         # distances, indexes: (batch_size, downstream_top_k)
@@ -278,33 +313,34 @@ class BaseTextMemoryFoundation(BaseTextMemory):
                             for chunk, passage, (distance, _) in
                             zip(row_chunks, row_passages, distinct_d_i)]
             prelim_r_chunks.append(row_r_chunks)
-        return self._multi_retrieve_for_r_chunks(queries, prelim_r_chunks, expected_key_db_top_k, k,
+        return self._multi_retrieve_for_r_chunks(queries, prelim_r_chunks, reranking_top_k, k,
                                                  show_progress_bar=show_progress_bar)
 
     def retrieve_multiple(self, queries: List[str], k: int, rewrite: bool = False, show_progress_bar: bool = False,
                           **kwargs) -> List[List[RetrievedMemory]]:
         if k <= 0:
             raise ValueError('k must be greater than zero')
+        if rewrite and not self.query_rewrite_model:
+            raise ValueError("For query rewriting, a rewriting model must be provided")
+        if rewrite and self.query_rewrite_model:
+            queries = [self.query_rewrite_model.rewrite_query(q) for q in queries]
         if self.max_query_length is not None:
             queries = self._truncate_queries(queries, self.max_query_length)
         rk = self.get_retrieval_key_for_text(queries, show_progress_bar=show_progress_bar)
         batch_size, num_rk, emb_size = rk.size(0), rk.size(1), rk.size(2),
         if num_rk != 1:
-            raise ValueError('Memory does not support multiple retrieval embeddings')
+            raise RuntimeError('Memory does not support multiple retrieval embeddings')
         n_queries = len(queries)
         if batch_size != n_queries:
-            raise SystemError(f'Batch returned by embeddings model is of shape {rk.shape} '
-                              f'while the number of queries is {n_queries}')
+            raise RuntimeError(f'Batch returned by embeddings model is of shape {rk.shape} '
+                               f'while the number of queries is {n_queries}')
         rk_np = rk.view(batch_size, emb_size).detach().cpu().numpy()
-        expected_key_db_top_k = k
-        if self.has_match_prob_model:
-            expected_key_db_top_k = round(expected_key_db_top_k * self.reranking_k_factor)
+        reranking_top_k = k
+        if self.has_match_prob_model or self.reranker is not None:
+            reranking_top_k = round(reranking_top_k * self.reranking_k_factor)
 
         # Extra items retrieved, anticipating possible overlaps
-        cc = self.chunk_capacity
-        max_extra_passage_len = self.chunk_expansion_options.maxSideTokens * 2
-        num_possible_side_chunks = round((max_extra_passage_len / cc) / (1 - self.overlap_fraction))
-        expansion_top_k = 1 + (expected_key_db_top_k - 1) * (1 + num_possible_side_chunks)
+        expansion_top_k = 1 + math.ceil((reranking_top_k - 1) * self.expansion_top_k_factor)
 
         # The vector_db can return multiple entries with the same ID if chunks are associated
         # with multiple embeddings
@@ -315,7 +351,7 @@ class BaseTextMemoryFoundation(BaseTextMemory):
 
         # Assumes vector_db returns ordered results
         assert distances.shape[0] == indexes.shape[0] == batch_size
-        return self._multi_retrieve(queries, distances, indexes, expected_key_db_top_k, expansion_top_k, k,
+        return self._multi_retrieve(queries, distances, indexes, reranking_top_k, expansion_top_k, k,
                                     show_progress_bar=show_progress_bar)
 
     def _truncate_queries(self, queries: List[str], max_query_length: int):
