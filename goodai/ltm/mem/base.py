@@ -14,7 +14,8 @@ class RetrievedMemory:
 
     timestamp: float
     """
-    The timestamp of the memory (seconds since Epoch).
+    The timestamp of the memory. By default, this is seconds since Epoch. The user
+    may provide custom timestamps when adding text to the memory object.
     """
 
     distance: float
