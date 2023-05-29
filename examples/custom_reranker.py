@@ -12,14 +12,16 @@ _time = 0
 
 
 def custom_timestamp() -> float:
+    # This function is used instead of time.time() for memory timestamps.
+    # Note that the StanfordReranker needs a time_fn parameter to use this.
     global _time
     _time += 1
     return _time
 
 
 if __name__ == '__main__':
-    # Note: For purposes of the example, the half_life is only 0.3 seconds,
-    # but it should normally be measured in hours.
+    # Note: For purposes of the example, the half_life is only 1.0 custom units,
+    # but it should normally be measured in hours or days.
     reranker = StanfordReranker(half_life=1.0, use_importance=_use_importance_model,
                                 time_fn=custom_timestamp)
     importance_model = StanfordImportanceModel() if _use_importance_model else None
