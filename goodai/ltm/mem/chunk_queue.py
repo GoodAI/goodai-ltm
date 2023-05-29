@@ -5,7 +5,7 @@ from typing import List, Tuple, Dict, Optional, Any, Set
 
 from transformers import PreTrainedTokenizer
 
-from goodai.ltm.mem.chunk import Chunk
+from goodai.ltm.mem.chunk import Chunk, TextKeyType
 from goodai.ltm.mem.config import ChunkExpansionConfig
 
 
@@ -55,10 +55,12 @@ class ChunkQueue:
         self.chunks: List[Chunk] = []
         self.chunk_index_at_overlap = chunk_index_at_overlap
         self.current_chunk_id = 0
+        self.current_text_key = 0
         self.first_token_seq_id = first_token_seq_id
         self.token_ids: List[int] = []
         self.separator_seq_ids: List[int] = []
         self.chunk_map: Dict[int, Chunk] = dict()
+        self.sequence_map: Dict[TextKeyType, Tuple[int, int]] = dict()
 
     def _pop_chunk(self):
         chunk = self.chunks.pop(0)
@@ -68,6 +70,7 @@ class ChunkQueue:
                 assert len(self.chunk_map) == 0
                 self.token_ids = []
                 self.separator_seq_ids = []
+                self.sequence_map.clear()
                 self.first_token_seq_id = 0
             else:
                 new_first_chunk = self.chunks[0]
@@ -77,6 +80,8 @@ class ChunkQueue:
                 self.first_token_seq_id = new_first_token_seq_id
                 sii = bisect.bisect_left(self.separator_seq_ids, new_first_token_seq_id)
                 self.separator_seq_ids = self.separator_seq_ids[sii:]
+                for text_key in chunk.associated_keys:
+                    del self.sequence_map[text_key]
         return chunk
 
     def get_all_chunks(self) -> List[Chunk]:
@@ -90,7 +95,8 @@ class ChunkQueue:
                 removed_chunks.append(removed_chunk)
         return removed_chunks
 
-    def add_chunk(self, metadata: Optional[Any], importance: Optional[float], timestamp: float, starts_section: bool = False) -> Chunk:
+    def add_chunk(self, metadata: Optional[Any], importance: Optional[float], timestamp: float,
+                  starts_section: bool = False) -> Chunk:
         chunk_id = self.current_chunk_id
         last_chunk = self.chunks[-1] if len(self.chunks) >= 1 else None
         if last_chunk is None:
@@ -130,6 +136,10 @@ class ChunkQueue:
     def get_next_token_sequence_id(self) -> int:
         return self.first_token_seq_id + len(self.token_ids)
 
+    def _new_text_key(self) -> TextKeyType:
+        self.current_text_key += 1
+        return self.current_text_key
+
     def add_sequence(self, new_token_ids: List[int], metadata: Optional[Any],
                      importance: Optional[float] = None, timestamp: Optional[float] = None,
                      _no_new_chunks: bool = False) -> List[Chunk]:
@@ -144,10 +154,13 @@ class ChunkQueue:
         """
         if timestamp is None:
             timestamp = time.time()
+        text_key = self._new_text_key()
+        prev_token_seq_id = len(self.token_ids)
         self.token_ids.extend(new_token_ids)
         next_token_seq_id = len(self.token_ids) + self.first_token_seq_id
         start_num_chunks = len(self.chunks)
         first_c_idx = max(0, start_num_chunks - 2)
+        key_registered = False
         for c_idx in range(first_c_idx, start_num_chunks + len(new_token_ids) + 1):
             if _no_new_chunks:
                 if c_idx >= len(self.chunks):
@@ -159,6 +172,8 @@ class ChunkQueue:
             if chunk.to_token_seq_id < next_token_seq_id:
                 room = chunk.get_room()
                 if room > 0:
+                    chunk.add_key(text_key)
+                    key_registered = True
                     chunk.extend_by(min(next_token_seq_id - chunk.to_token_seq_id, room))
                     much_room = room > self.chunk_capacity // 2
                     if metadata and (chunk.metadata is None or much_room):
@@ -170,6 +185,8 @@ class ChunkQueue:
             if (_no_new_chunks or len(chunk) <= self.chunk_index_at_overlap) and \
                     chunk.to_token_seq_id >= next_token_seq_id:
                 break
+        if key_registered:
+            self.sequence_map[text_key] = (prev_token_seq_id, next_token_seq_id,)
         return self.check_overflow()
 
     def get_chunks_for_indexing(self) -> Tuple[List[Chunk], List[List[int]]]:
