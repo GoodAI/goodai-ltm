@@ -36,6 +36,10 @@ class Chunk:
             raise ValueError(f'capacity={self.capacity} would be exceeded')
         self.to_token_seq_id += num_tokens
 
+    def shift(self, offset: int):
+        self.from_token_seq_id += offset
+        self.to_token_seq_id += offset
+
     def is_indexed(self) -> bool:
         return self.indexed
 

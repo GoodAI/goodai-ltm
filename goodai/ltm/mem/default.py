@@ -9,7 +9,7 @@ from transformers import PreTrainedTokenizer
 from goodai.helpers.tokenizer_helper import get_pad_token_id, get_sentence_punctuation_ids
 from goodai.ltm.embeddings.base import BaseTextEmbeddingModel
 from goodai.ltm.mem.base import BaseReranker, BaseImportanceModel
-from goodai.ltm.mem.chunk import Chunk
+from goodai.ltm.mem.chunk import Chunk, TextKeyType
 from goodai.ltm.mem.rewrite_model import BaseRewriteModel
 from goodai.ltm.reranking.base import BaseTextMatchingModel
 from goodai.ltm.mem.chunk_queue import ChunkQueue, PassageInfo, ChunkExpansionOptions
@@ -99,7 +99,7 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
 
     def add_text(self, text: str, metadata: Optional[Any] = None, rewrite: bool = False,
                  rewrite_context: Optional[str] = None, show_progress_bar: bool = False,
-                 timestamp: Optional[float] = None):
+                 timestamp: Optional[float] = None) -> TextKeyType:
         if rewrite and not self.memory_rewrite_model:
             raise ValueError("For memory rewriting, a rewriting model must be provided")
         if rewrite and self.memory_rewrite_model:
@@ -108,13 +108,14 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
         if self.importance_model:
             importance = self.importance_model.get_importance(text)
         token_ids = self.chunk_tokenizer.encode(text, add_special_tokens=False)
-        removed_buckets = self.chunk_queue.add_sequence(token_ids, metadata=metadata,
-                                                        importance=importance,
-                                                        timestamp=timestamp)
+        removed_buckets, text_key = self.chunk_queue.add_sequence(token_ids, metadata=metadata,
+                                                                  importance=importance,
+                                                                  timestamp=timestamp)
         self._ensure_keys_added(show_progress_bar=show_progress_bar)
         removed_indexes = [rb.chunk_id for rb in removed_buckets]
         if len(removed_indexes) > 0:
             self.vector_db.remove_ids(np.array(removed_indexes).astype(np.int64))
+        return text_key
 
     def add_separator(self):
         self.chunk_queue.add_separator(self.pad_token_id)

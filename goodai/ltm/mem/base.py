@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import List, Optional
 
+from goodai.ltm.mem.chunk import TextKeyType
+
 
 @dataclass
 class RetrievedMemory:
@@ -75,7 +77,7 @@ class BaseTextMemory(ABC):
     @abstractmethod
     def add_text(self, text: str, metadata: Optional[dict] = None, rewrite: bool = False,
                  rewrite_context: Optional[str] = None, show_progress_bar: bool = False,
-                 timestamp: Optional[float] = None):
+                 timestamp: Optional[float] = None) -> TextKeyType:
         """
         Adds text to the memory.
         :param show_progress_bar: Whether a progress bar should be shown
@@ -84,6 +86,7 @@ class BaseTextMemory(ABC):
         :param rewrite: Whether the text should be rewritten by an LLM
         :param rewrite_context: The context provided to the LLM for rewriting the text
         :param timestamp: A custom timestamp for the memory to use instead of time.time()
+        :returns A unique key associated with the text that was added to the memory.
         """
         pass
 
