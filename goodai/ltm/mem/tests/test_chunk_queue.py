@@ -163,7 +163,7 @@ class TestChunkQueue(unittest.TestCase):
         result = _chunk_queue.retrieve_complete_sequences(chunk_ids, ce_options)
 
         self.assertEqual(3, len(result)), f'got {len(result)} sequences'
-        expected = [[7, 8, 9, 10, 11, 12, 0, 0, 0], [10, 8, 12, 14, 11, 12, 0, 0, 0], [3, 8, 21, 13, 12, 9, 0, 0, 0]]
+        expected = [[7, 8, 9, 10, 11, 12], [10, 8, 12, 14, 11, 12], [3, 8, 21, 13, 12, 9]]
         for e_seq, r_seq in zip(expected, result):
             self.assertEqual(e_seq, r_seq)
 
@@ -240,15 +240,15 @@ class TestChunkQueue(unittest.TestCase):
         _, k3 = _chunk_queue.add_sequence([7, 8, 9], None)
 
         chunk_sequences = _chunk_queue.get_chunk_sequences()
-        expected_cs_1 = [[1, 2, 3, 4, 5], [3, 4, 5, 6, 0], [5, 6, 0, 0, 0], [7, 8, 9], [9]]
+        expected_cs_1 = [[1, 2, 3, 4, 5], [3, 4, 5, 6], [5, 6], [7, 8, 9], [9]]
         self.assertEqual(expected_cs_1, chunk_sequences)
 
         _chunk_queue.replace_sequence(k3, [11, 12, 11, 12, 11])
 
         chunk_sequences = _chunk_queue.get_chunk_sequences()
         expected_cs_2 = [[1, 2, 3, 4, 5],
-                         [3, 4, 5, 6, 0],
-                         [5, 6, 0, 0, 0],
+                         [3, 4, 5, 6],
+                         [5, 6],
                          [11, 12, 11, 12, 11],
                          [11, 12, 11],
                          [11]]
@@ -258,7 +258,7 @@ class TestChunkQueue(unittest.TestCase):
         punctuation_ids = {90}
         ce_options = ChunkExpansionOptions.default(chunk_capacity, punctuation_ids)
         result = _chunk_queue.retrieve_complete_sequences(chunk_ids, ce_options)
-        expected_result = [[1, 2, 3, 4, 5, 6, 0, 0, 0], [11, 12, 11, 12, 11]]
+        expected_result = [[1, 2, 3, 4, 5, 6], [11, 12, 11, 12, 11]]
         self.assertEqual(expected_result, result)
 
     def test_replacement_4(self):
@@ -271,19 +271,25 @@ class TestChunkQueue(unittest.TestCase):
         _, k3 = _chunk_queue.add_sequence([7, 8, 9], None)
 
         chunk_sequences = _chunk_queue.get_chunk_sequences()
-        expected_cs_1 = [[1, 2, 3, 4, 5], [3, 4, 5, 6, 0], [5, 6, 0, 0, 0], [7, 8, 9], [9]]
+        expected_cs_1 = [[1, 2, 3, 4, 5], [3, 4, 5, 6], [5, 6], [7, 8, 9], [9]]
         self.assertEqual(expected_cs_1, chunk_sequences)
 
         _chunk_queue.replace_sequence(k2, [11, 12, 13, 14, 15, 11, 12, 13, 14, 15])
         chunk_sequences = _chunk_queue.get_chunk_sequences()
-        expected_cs_2 = [[1, 2, 3, 11, 12], [3, 11, 12, 13, 14], [12, 13, 14, 15, 11],
-                         [14, 15, 11, 12, 13], [11, 12, 13, 14, 15], [13, 14, 15, 0, 0],
-                         [15, 0, 0, 0], [0, 0], [7, 8, 9], [9]]
+        expected_cs_2 = [[1, 2, 3, 11, 12],
+                         [3, 11, 12, 13, 14],
+                         [12, 13, 14, 15, 11],
+                         [14, 15, 11, 12, 13],
+                         [11, 12, 13, 14, 15],
+                         [13, 14, 15],
+                         [15],
+                         [7, 8, 9],
+                         [9]]
         self.assertEqual(expected_cs_2, chunk_sequences)
 
         chunk_ids = [_chunk_queue.chunks[-4].chunk_id]
         ce_options = ChunkExpansionOptions(minSideTokens=0, maxSideTokens=100, leftStopAfterTokenIds=[],
                                            rightStopAtTokenIds=[])
         result = _chunk_queue.retrieve_complete_sequences(chunk_ids, ce_options)
-        expected_result = [[1, 2, 3, 11, 12, 13, 14, 15, 11, 12, 13, 14, 15, 0, 0, 0]]
+        expected_result = [[1, 2, 3, 11, 12, 13, 14, 15, 11, 12, 13, 14, 15]]
         self.assertEqual(expected_result, result)

@@ -1,4 +1,5 @@
 import abc
+import copy
 import enum
 import io
 import json
@@ -235,7 +236,9 @@ class BaseTextMemoryFoundation(BaseTextMemory):
             if not has_pm:
                 confidence = None
             result.append(RetrievedMemory(passage=r_text.strip(), timestamp=chunk.timestamp,
-                                          distance=distance, relevance=relevance, confidence=confidence,
+                                          distance=distance, relevance=relevance,
+                                          textKeys=list(chunk.associated_keys),
+                                          confidence=confidence,
                                           metadata=metadata, importance=importance))
         if self.reranker:
             result = self.reranker.rerank(result, self)

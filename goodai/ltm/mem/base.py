@@ -32,6 +32,12 @@ class RetrievedMemory:
     the confidence, if available.
     """
 
+    textKeys: List[TextKeyType]
+    """
+    Text keys associated with the matching chunk. These are the keys
+    returned when add_text() is called.
+    """
+
     confidence: Optional[float] = None
     """
     A confidence metric between 0 and 1. Not all memory implementations 

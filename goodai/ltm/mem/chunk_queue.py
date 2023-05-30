@@ -149,7 +149,9 @@ class ChunkQueue:
 
     def _update_sequence_map(self, text_key: TextKeyType, new_to_seq_id: int, shift_offset: int):
         # TODO not super efficient
-        old_bounds = self.sequence_map[text_key]
+        old_bounds = self.sequence_map.get(text_key)
+        if old_bounds is None:
+            return
         from_seq_id, old_to_seq_id = old_bounds
 
         def _shift(b_from_id: int, b_to_id: int):
@@ -165,7 +167,7 @@ class ChunkQueue:
         old_ids = self.separator_seq_ids
         if len(old_ids) > 0:
             idx1 = bisect.bisect_right(old_ids, remove_from_id)
-            idx2 = bisect.bisect_right(old_ids, remove_to_id)
+            idx2 = bisect.bisect_left(old_ids, remove_to_id)
             self.separator_seq_ids = old_ids[:idx1] + \
                 (np.array(old_ids[idx2:], dtype=int) + shift_offset).tolist()
 
@@ -173,7 +175,7 @@ class ChunkQueue:
         old_ids = self.separator_seq_ids
         if len(old_ids) > 0:
             idx1 = bisect.bisect_right(old_ids, seq_from_id)
-            idx2 = bisect.bisect_right(old_ids, seq_to_id)
+            idx2 = bisect.bisect_left(old_ids, seq_to_id)
             return old_ids[:idx1], old_ids[idx2:],
         else:
             return [], [],
@@ -187,11 +189,9 @@ class ChunkQueue:
         return False
 
     def add_separator(self, pad_token_id: int, timestamp: Optional[float] = None):
-        self._pad_last_chunk(pad_token_id)
+        # self._pad_last_chunk(pad_token_id)
         # separator_seq_ids always assumed to be ordered
         self.separator_seq_ids.append(self.first_token_seq_id + len(self.token_ids))
-        if timestamp is None:
-            timestamp = time.time()
 
     def add_sequence(self, new_token_ids: List[int], metadata: Optional[Any],
                      importance: Optional[float] = None, timestamp: Optional[float] = None,
