@@ -103,14 +103,16 @@ class ChunkQueue:
         return removed_chunks
 
     def add_chunk(self, metadata: Optional[Any], importance: Optional[float], timestamp: float,
-                  starts_section: bool = False) -> Chunk:
+                  starts_section: bool = False, section_seq_id: Optional[int] = None) -> Chunk:
         chunk_id = self.current_chunk_id
         last_chunk = self.chunks[-1] if len(self.chunks) >= 1 else None
         if last_chunk is None:
             from_token_seq_id = self.first_token_seq_id
+        elif starts_section:
+            assert section_seq_id is not None
+            from_token_seq_id = section_seq_id
         else:
-            offset = self.chunk_capacity if starts_section else self.chunk_index_at_overlap
-            from_token_seq_id = last_chunk.from_token_seq_id + offset
+            from_token_seq_id = last_chunk.from_token_seq_id + self.chunk_index_at_overlap
         chunk = Chunk(chunk_id, self.chunk_capacity, from_token_seq_id, metadata, importance, timestamp)
         self.current_chunk_id = chunk_id + 1
         self.chunks.append(chunk)
@@ -162,10 +164,27 @@ class ChunkQueue:
     def _update_separator_ids(self, remove_from_id: int, remove_to_id: int, shift_offset: int):
         old_ids = self.separator_seq_ids
         if len(old_ids) > 0:
-            idx1 = bisect.bisect_left(old_ids, remove_from_id)
-            idx2 = bisect.bisect_left(old_ids, remove_to_id)
+            idx1 = bisect.bisect_right(old_ids, remove_from_id)
+            idx2 = bisect.bisect_right(old_ids, remove_to_id)
             self.separator_seq_ids = old_ids[:idx1] + \
-                (np.array(old_ids[idx2:], dtype=np.int) + shift_offset).tolist()
+                (np.array(old_ids[idx2:], dtype=int) + shift_offset).tolist()
+
+    def _split_separators(self, seq_from_id: int, seq_to_id: int) -> Tuple[List[int], List[int]]:
+        old_ids = self.separator_seq_ids
+        if len(old_ids) > 0:
+            idx1 = bisect.bisect_right(old_ids, seq_from_id)
+            idx2 = bisect.bisect_right(old_ids, seq_to_id)
+            return old_ids[:idx1], old_ids[idx2:],
+        else:
+            return [], [],
+
+    def _is_start_section(self):
+        sep_ids = self.separator_seq_ids
+        if len(sep_ids) > 0:
+            last_sep_id = sep_ids[-1]
+            if len(self.token_ids) + self.first_token_seq_id == last_sep_id:
+                return True
+        return False
 
     def add_separator(self, pad_token_id: int, timestamp: Optional[float] = None):
         self._pad_last_chunk(pad_token_id)
@@ -173,12 +192,12 @@ class ChunkQueue:
         self.separator_seq_ids.append(self.first_token_seq_id + len(self.token_ids))
         if timestamp is None:
             timestamp = time.time()
-        self.add_chunk(metadata=None, importance=None, starts_section=True, timestamp=timestamp)
 
     def add_sequence(self, new_token_ids: List[int], metadata: Optional[Any],
                      importance: Optional[float] = None, timestamp: Optional[float] = None,
                      _no_new_chunks: bool = False,
-                     _no_text_key: bool = False) -> Tuple[List[Chunk], TextKeyType]:
+                     _no_text_key: bool = False,
+                     _text_key: TextKeyType = None) -> Tuple[List[Chunk], TextKeyType]:
         """
         Adds tokens to the chunk queue.
         :param new_token_ids: The sequence of token IDs to add
@@ -187,24 +206,32 @@ class ChunkQueue:
         :param timestamp: The timestamp of the stored tokens
         :param _no_new_chunks: If true, attempt should be made to add all tokens without adding new chunks
         :param _no_text_key: Whether associating text with a key should be prevented.
+        :param _text_key: A text key to be used instead of a generated one.
         :return: Any chunks removed due to overflow.
         """
+        if len(new_token_ids) == 0:
+            return [], _text_key,
         if timestamp is None:
             timestamp = time.time()
-        text_key = None if _no_text_key else self._new_text_key()
-        prev_token_seq_id = len(self.token_ids)
+        text_key = None if _no_text_key else (_text_key if _text_key is not None else self._new_text_key())
+        first_id = self.first_token_seq_id
+        prev_token_seq_id = len(self.token_ids) + first_id
+        starts_section = self._is_start_section()
         self.token_ids.extend(new_token_ids)
-        next_token_seq_id = len(self.token_ids) + self.first_token_seq_id
+        next_token_seq_id = len(self.token_ids) + first_id
         start_num_chunks = len(self.chunks)
-        first_c_idx = max(0, start_num_chunks - 2)
+        first_c_idx = max(0, start_num_chunks if starts_section else start_num_chunks - 2)
         key_registered = False
+        new_chunk_starts_section = starts_section
         for c_idx in range(first_c_idx, start_num_chunks + len(new_token_ids) + 1):
             if _no_new_chunks:
                 if c_idx >= len(self.chunks):
                     raise RuntimeError('No new chunks allowed, but at least one more is needed to complete operation')
             else:
                 while c_idx >= len(self.chunks):
-                    self.add_chunk(metadata, importance, timestamp=timestamp)
+                    self.add_chunk(metadata, importance, timestamp=timestamp, starts_section=new_chunk_starts_section,
+                                   section_seq_id=prev_token_seq_id)
+                    new_chunk_starts_section = False
             chunk = self.chunks[c_idx]
             if chunk.to_token_seq_id < next_token_seq_id:
                 room = chunk.get_room()
@@ -244,7 +271,7 @@ class ChunkQueue:
         else:
             left_extras_token_ids = []
             head_token_ids = self.token_ids[:tail_id_from - first_id]
-            chunk_params = dict()
+            chunk_params = dict(metadata=None)
         return head_token_ids, left_extras_token_ids, chunk_params,
 
     def _split_right(self, shifted_chunks: List[Chunk], head_id_to: int):
@@ -264,7 +291,7 @@ class ChunkQueue:
         else:
             right_extras_token_ids = []
             shifted_token_ids = self.token_ids[head_id_to:]
-            chunk_params = dict()
+            chunk_params = dict(metadata=None)
         return shifted_token_ids, right_extras_token_ids, chunk_params,
 
     def _resolve_discarded_chunks(self, discarded_chunks: List[Chunk], text_key: TextKeyType,
@@ -303,13 +330,16 @@ class ChunkQueue:
         shifted_token_ids, right_extras_token_ids, right_params = self._split_right(shifted_chunks, old_seq_id_to)
         # Find out which tokens will be left out after the last head chunk, before the new sequence
         head_token_ids, left_extras_token_ids, left_params = self._split_left(head_chunks, seq_id_from)
-        # Truncate chunks and token IDs
+        # Split separator IDs
+        head_sep_ids, shifted_sep_ids = self._split_separators(seq_id_from, old_seq_id_to)
+        # Truncate chunks, token IDs and separators
         self.token_ids = head_token_ids
         self.chunks = head_chunks
+        self.separator_seq_ids = head_sep_ids
         # Add new token sequence to truncated queues
         self.add_sequence(left_extras_token_ids, _no_text_key=True, **left_params)
         self.add_sequence(new_token_ids, metadata=metadata, importance=importance,
-                          timestamp=timestamp, _no_text_key=True)
+                          timestamp=timestamp)
         self.add_sequence(right_extras_token_ids, _no_text_key=True, **right_params)
         # Calculate the shift offset
         shift_offset = new_seq_id_to - old_seq_id_to
@@ -320,6 +350,8 @@ class ChunkQueue:
         # Extend the token IDs queue and the chunk queue
         self.token_ids.extend(shifted_token_ids)
         self.chunks.extend(shifted_chunks)
+        self.separator_seq_ids.extend(shifted_sep_ids)
+        # This call updates separator seq IDs according to the shift offset
         dc1 = self._resolve_discarded_chunks(discarded_chunks, text_key,
                                              seq_id_from, old_seq_id_to, new_seq_id_to,
                                              shift_offset)

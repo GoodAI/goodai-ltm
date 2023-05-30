@@ -194,3 +194,70 @@ class TestChunkQueue(unittest.TestCase):
         self.assertTrue(len(_chunk_queue.token_ids) == 0)
         self.assertTrue(len(_chunk_queue.chunk_map) == 0)
         self.assertTrue(_chunk_queue.first_token_seq_id == 0)
+
+    def test_replacement_1(self):
+        chunk_capacity = 5
+        chunk_index_at_overlap = chunk_capacity // 2
+        _chunk_queue = ChunkQueue(25, chunk_capacity, chunk_index_at_overlap, first_token_seq_id=73)
+        _, k1 = _chunk_queue.add_sequence([1, 2, 3], None)
+        _, k2 = _chunk_queue.add_sequence([4, 5, 6], None)
+        _, k3 = _chunk_queue.add_sequence([7, 8, 9], None)
+
+        chunk_sequences = _chunk_queue.get_chunk_sequences()
+        expected_cs_1 = [[1, 2, 3, 4, 5], [3, 4, 5, 6, 7], [5, 6, 7, 8, 9], [7, 8, 9], [9]]
+        self.assertEqual(expected_cs_1, chunk_sequences)
+
+        _chunk_queue.replace_sequence(k2, [8, 9, 10, 9])
+        chunk_sequences = _chunk_queue.get_chunk_sequences()
+        expected_cs_2 = [[1, 2, 3, 8, 9], [3, 8, 9, 10, 9], [9, 10, 9], [9], [7, 8, 9], [9]]
+        self.assertEqual(expected_cs_2, chunk_sequences)
+
+    def test_replacement_2(self):
+        chunk_capacity = 5
+        chunk_index_at_overlap = chunk_capacity // 2
+        _chunk_queue = ChunkQueue(25, chunk_capacity, chunk_index_at_overlap, first_token_seq_id=73)
+        _chunk_queue.add_separator(pad_token_id=0)
+        _, k1 = _chunk_queue.add_sequence([1, 2, 3], None)
+        _, k2 = _chunk_queue.add_sequence([4, 5, 6], None)
+        _, k3 = _chunk_queue.add_sequence([7, 8, 9], None)
+
+        chunk_sequences = _chunk_queue.get_chunk_sequences()
+        expected_cs_1 = [[1, 2, 3, 4, 5], [3, 4, 5, 6, 7], [5, 6, 7, 8, 9], [7, 8, 9], [9]]
+        self.assertEqual(expected_cs_1, chunk_sequences)
+
+        _chunk_queue.replace_sequence(k1, [])
+        chunk_sequences = _chunk_queue.get_chunk_sequences()
+        expected_cs_2 = [[4], [5, 6, 7, 8, 9], [7, 8, 9], [9]]
+        self.assertEqual(expected_cs_2, chunk_sequences)
+
+    def test_replacement_3(self):
+        chunk_capacity = 5
+        chunk_index_at_overlap = chunk_capacity // 2
+        _chunk_queue = ChunkQueue(25, chunk_capacity, chunk_index_at_overlap, first_token_seq_id=43)
+        _, k1 = _chunk_queue.add_sequence([1, 2, 3], None)
+        _, k2 = _chunk_queue.add_sequence([4, 5, 6], None)
+        _chunk_queue.add_separator(pad_token_id=0)
+        _, k3 = _chunk_queue.add_sequence([7, 8, 9], None)
+
+        chunk_sequences = _chunk_queue.get_chunk_sequences()
+        expected_cs_1 = [[1, 2, 3, 4, 5], [3, 4, 5, 6, 0], [5, 6, 0, 0, 0], [7, 8, 9], [9]]
+        self.assertEqual(expected_cs_1, chunk_sequences)
+
+        _chunk_queue.replace_sequence(k3, [11, 12, 11, 12, 11])
+
+        chunk_sequences = _chunk_queue.get_chunk_sequences()
+        expected_cs_2 = [[1, 2, 3, 4, 5],
+                         [3, 4, 5, 6, 0],
+                         [5, 6, 0, 0, 0],
+                         [11, 12, 11, 12, 11],
+                         [11, 12, 11],
+                         [11]]
+        self.assertEqual(expected_cs_2, chunk_sequences)
+
+        chunk_ids = [_chunk_queue.chunks[-4].chunk_id, _chunk_queue.chunks[-1].chunk_id]
+        punctuation_ids = {90}
+        ce_options = ChunkExpansionOptions.default(chunk_capacity, punctuation_ids)
+        result = _chunk_queue.retrieve_complete_sequences(chunk_ids, ce_options)
+        expected_result = [[1, 2, 3, 4, 5, 6, 0, 0, 0], [11, 12, 11, 12, 11]]
+        self.assertEqual(expected_result, result)
+
