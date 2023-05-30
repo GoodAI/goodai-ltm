@@ -1,5 +1,5 @@
 import math
-from typing import List, Union, Any, Optional, Tuple
+from typing import List, Union, Any, Optional, Tuple, Callable
 import numpy as np
 import torch
 from faiss import Index
@@ -97,9 +97,9 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
         return self.matching_model.predict(sentences, show_progress_bar=show_progress_bar,
                                            batch_size=batch_size)
 
-    def add_text(self, text: str, metadata: Optional[Any] = None, rewrite: bool = False,
-                 rewrite_context: Optional[str] = None, show_progress_bar: bool = False,
-                 timestamp: Optional[float] = None) -> TextKeyType:
+    def _replace_or_add_text(self, cq_fn: Callable, text: str, metadata: Optional[Any] = None, rewrite: bool = False,
+                             rewrite_context: Optional[str] = None, show_progress_bar: bool = False,
+                             timestamp: Optional[float] = None, text_key: TextKeyType = None):
         if rewrite and not self.memory_rewrite_model:
             raise ValueError("For memory rewriting, a rewriting model must be provided")
         if rewrite and self.memory_rewrite_model:
@@ -108,14 +108,39 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
         if self.importance_model:
             importance = self.importance_model.get_importance(text)
         token_ids = self.chunk_tokenizer.encode(text, add_special_tokens=False)
-        removed_buckets, text_key = self.chunk_queue.add_sequence(token_ids, metadata=metadata,
-                                                                  importance=importance,
-                                                                  timestamp=timestamp)
+        cq_params = dict(
+            new_token_ids=token_ids,
+            metadata=metadata,
+            importance=importance,
+            timestamp=timestamp,
+        )
+        if text_key is not None:
+            cq_params['text_key'] = text_key
+        removed_chunks, text_key = cq_fn(**cq_params)
         self._ensure_keys_added(show_progress_bar=show_progress_bar)
-        removed_indexes = [rb.chunk_id for rb in removed_buckets]
-        if len(removed_indexes) > 0:
-            self.vector_db.remove_ids(np.array(removed_indexes).astype(np.int64))
+        removed_chunk_ids = [rb.chunk_id for rb in removed_chunks]
+        if len(removed_chunk_ids) > 0:
+            self.vector_db.remove_ids(np.array(removed_chunk_ids).astype(np.int64))
         return text_key
+
+    def add_text(self, text: str, metadata: Optional[dict] = None, rewrite: bool = False,
+                 rewrite_context: Optional[str] = None, show_progress_bar: bool = False,
+                 timestamp: Optional[float] = None) -> TextKeyType:
+        return self._replace_or_add_text(self.chunk_queue.add_sequence,
+                                         text=text, metadata=metadata, rewrite=rewrite,
+                                         rewrite_context=rewrite_context, show_progress_bar=show_progress_bar,
+                                         timestamp=timestamp)
+
+    def replace_text(self, text_key: TextKeyType, text: str, metadata: Optional[dict] = None,
+                     rewrite: bool = False, rewrite_context: Optional[str] = None,
+                     show_progress_bar: bool = False, timestamp: Optional[float] = None) -> TextKeyType:
+        return self._replace_or_add_text(self.chunk_queue.replace_sequence,
+                                         text=text, metadata=metadata, rewrite=rewrite,
+                                         rewrite_context=rewrite_context, show_progress_bar=show_progress_bar,
+                                         timestamp=timestamp, text_key=text_key)
+
+    def delete_text(self, text_key: TextKeyType, show_progress_bar: bool = False) -> TextKeyType:
+        return self.replace_text(text_key, "", show_progress_bar=show_progress_bar)
 
     def add_separator(self):
         self.chunk_queue.add_separator(self.pad_token_id)

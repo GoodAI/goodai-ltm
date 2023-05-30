@@ -68,10 +68,7 @@ class ChunkQueue:
         self.chunk_map.pop(chunk.chunk_id)
         if len(self.chunks) == 0:
             assert len(self.chunk_map) == 0
-            self.token_ids = []
-            self.separator_seq_ids = []
-            self.sequence_map.clear()
-            self.first_token_seq_id = 0
+            self.flush()
         else:
             new_first_chunk = self.chunks[0]
             new_first_token_seq_id = new_first_chunk.from_token_seq_id
@@ -255,9 +252,8 @@ class ChunkQueue:
         if len(shifted_chunks) > 0:
             first_shifted_chunk = shifted_chunks[0]
             first_shifted_chunk_from = first_shifted_chunk.from_token_seq_id
-            first_shifted_chunk_overlap = self.chunk_capacity - self.chunk_index_at_overlap
             right_extras_from = head_id_to - first_id
-            right_extras_to = first_shifted_chunk_from + first_shifted_chunk_overlap - first_id
+            right_extras_to = first_shifted_chunk_from - first_id
             right_extras_token_ids = self.token_ids[right_extras_from:right_extras_to]
             shifted_token_ids = self.token_ids[right_extras_to:]
             chunk_params = dict(
@@ -285,11 +281,11 @@ class ChunkQueue:
 
     def replace_sequence(self, text_key: TextKeyType, new_token_ids: List[int],
                          metadata: Optional[dict] = None, importance: Optional[float] = None,
-                         timestamp: Optional[float] = None) -> List[Chunk]:
+                         timestamp: Optional[float] = None) -> Tuple[List[Chunk], TextKeyType]:
         old_bounds = self.sequence_map.get(text_key)
         if old_bounds is None:
             logging.warning(f'Subsequence with key {text_key} not found.')
-            return []
+            return [], text_key,
         seq_id_from, old_seq_id_to = old_bounds
         new_seq_id_to = seq_id_from + len(new_token_ids)
         discarded_chunks = []
@@ -297,7 +293,7 @@ class ChunkQueue:
         head_chunks = []
         for chunk in self.chunks:
             if chunk.to_token_seq_id > seq_id_from:
-                if chunk.from_token_seq_id >= new_seq_id_to:
+                if chunk.from_token_seq_id >= old_seq_id_to:
                     shifted_chunks.append(chunk)
                 else:
                     discarded_chunks.append(chunk)
@@ -324,9 +320,11 @@ class ChunkQueue:
         # Extend the token IDs queue and the chunk queue
         self.token_ids.extend(shifted_token_ids)
         self.chunks.extend(shifted_chunks)
-        return self._resolve_discarded_chunks(discarded_chunks, text_key,
-                                              seq_id_from, old_seq_id_to, new_seq_id_to,
-                                              shift_offset)
+        dc1 = self._resolve_discarded_chunks(discarded_chunks, text_key,
+                                             seq_id_from, old_seq_id_to, new_seq_id_to,
+                                             shift_offset)
+        dc2 = self.check_overflow()
+        return dc1 + dc2, text_key,
 
     def get_chunks_for_indexing(self) -> Tuple[List[Chunk], List[List[int]]]:
         # TODO not super efficient
