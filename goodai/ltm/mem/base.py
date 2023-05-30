@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import List, Optional
 
+from goodai.ltm.mem.chunk import TextKeyType
+
 
 @dataclass
 class RetrievedMemory:
@@ -28,6 +30,12 @@ class RetrievedMemory:
     A metric between 0 and 1 that indicates how relevant to the query 
     the retrieved memory is. It may be derived from the distance or 
     the confidence, if available.
+    """
+
+    textKeys: List[TextKeyType]
+    """
+    Text keys associated with the matching chunk. These are the keys
+    returned when add_text() is called.
     """
 
     confidence: Optional[float] = None
@@ -75,7 +83,7 @@ class BaseTextMemory(ABC):
     @abstractmethod
     def add_text(self, text: str, metadata: Optional[dict] = None, rewrite: bool = False,
                  rewrite_context: Optional[str] = None, show_progress_bar: bool = False,
-                 timestamp: Optional[float] = None):
+                 timestamp: Optional[float] = None) -> TextKeyType:
         """
         Adds text to the memory.
         :param show_progress_bar: Whether a progress bar should be shown
@@ -84,6 +92,34 @@ class BaseTextMemory(ABC):
         :param rewrite: Whether the text should be rewritten by an LLM
         :param rewrite_context: The context provided to the LLM for rewriting the text
         :param timestamp: A custom timestamp for the memory to use instead of time.time()
+        :return: A unique key associated with the text that was added to the memory.
+        """
+        pass
+
+    @abstractmethod
+    def replace_text(self, text_key: TextKeyType, text: str, metadata: Optional[dict] = None,
+                     rewrite: bool = False, rewrite_context: Optional[str] = None,
+                     show_progress_bar: bool = False, timestamp: Optional[float] = None) -> TextKeyType:
+        """
+        Replaces text stored in the memory.
+        :param text_key: A key previously returned by the add_text() method.
+        :param text: The new text.
+        :param metadata: Any metadata associated with the new text.
+        :param rewrite: Whether the text should be rewritten by an LLM.
+        :param rewrite_context: The context passed to the LLM to inform the rewrite.
+        :param show_progress_bar: Whether a progress bar should be shown.
+        :param timestamp: The timestamp associated with the new text.
+        :return: The text key.
+        """
+        pass
+
+    @abstractmethod
+    def delete_text(self, text_key: TextKeyType, show_progress_bar: bool = False) -> TextKeyType:
+        """
+        Deletes text stored in the meory.
+        :param text_key: A key previously returned by the add_text() method.
+        :param show_progress_bar: Whether a progress bar should be shown.
+        :return: The text key.
         """
         pass
 

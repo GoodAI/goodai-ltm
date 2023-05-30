@@ -1,11 +1,13 @@
 import bisect
+import logging
 import time
 from dataclasses import dataclass
 from typing import List, Tuple, Dict, Optional, Any, Set
 
+import numpy as np
 from transformers import PreTrainedTokenizer
 
-from goodai.ltm.mem.chunk import Chunk
+from goodai.ltm.mem.chunk import Chunk, TextKeyType
 from goodai.ltm.mem.config import ChunkExpansionConfig
 
 
@@ -55,28 +57,38 @@ class ChunkQueue:
         self.chunks: List[Chunk] = []
         self.chunk_index_at_overlap = chunk_index_at_overlap
         self.current_chunk_id = 0
+        self.current_text_key = 0
         self.first_token_seq_id = first_token_seq_id
         self.token_ids: List[int] = []
         self.separator_seq_ids: List[int] = []
         self.chunk_map: Dict[int, Chunk] = dict()
+        self.sequence_map: Dict[TextKeyType, Tuple[int, int]] = dict()
 
-    def _pop_chunk(self):
-        chunk = self.chunks.pop(0)
-        if chunk is not None:
-            self.chunk_map.pop(chunk.chunk_id)
-            if len(self.chunks) == 0:
-                assert len(self.chunk_map) == 0
-                self.token_ids = []
-                self.separator_seq_ids = []
-                self.first_token_seq_id = 0
-            else:
-                new_first_chunk = self.chunks[0]
-                new_first_token_seq_id = new_first_chunk.from_token_seq_id
-                num_removed = new_first_token_seq_id - self.first_token_seq_id
+    def _removed_chunk_cleanup(self, chunk: Chunk):
+        self.chunk_map.pop(chunk.chunk_id)
+        if len(self.chunks) == 0:
+            assert len(self.chunk_map) == 0
+            self.flush()
+        else:
+            new_first_chunk = self.chunks[0]
+            new_first_token_seq_id = new_first_chunk.from_token_seq_id
+            num_removed = new_first_token_seq_id - self.first_token_seq_id
+            if num_removed != 0:
                 self.token_ids = self.token_ids[num_removed:]
                 self.first_token_seq_id = new_first_token_seq_id
                 sii = bisect.bisect_left(self.separator_seq_ids, new_first_token_seq_id)
                 self.separator_seq_ids = self.separator_seq_ids[sii:]
+                for text_key in chunk.associated_keys:
+                    text_bounds = self.sequence_map.get(text_key)
+                    if text_bounds is not None:
+                        _, text_to = text_bounds
+                        if text_to <= new_first_token_seq_id:
+                            del self.sequence_map[text_key]
+
+    def _pop_chunk(self):
+        chunk = self.chunks.pop(0)
+        if chunk is not None:
+            self._removed_chunk_cleanup(chunk)
         return chunk
 
     def get_all_chunks(self) -> List[Chunk]:
@@ -90,31 +102,22 @@ class ChunkQueue:
                 removed_chunks.append(removed_chunk)
         return removed_chunks
 
-    def add_chunk(self, metadata: Optional[Any], importance: Optional[float], timestamp: float, starts_section: bool = False) -> Chunk:
+    def add_chunk(self, metadata: Optional[Any], importance: Optional[float], timestamp: float,
+                  starts_section: bool = False, section_seq_id: Optional[int] = None) -> Chunk:
         chunk_id = self.current_chunk_id
         last_chunk = self.chunks[-1] if len(self.chunks) >= 1 else None
         if last_chunk is None:
             from_token_seq_id = self.first_token_seq_id
+        elif starts_section:
+            assert section_seq_id is not None
+            from_token_seq_id = section_seq_id
         else:
-            offset = self.chunk_capacity if starts_section else self.chunk_index_at_overlap
-            from_token_seq_id = last_chunk.from_token_seq_id + offset
+            from_token_seq_id = last_chunk.from_token_seq_id + self.chunk_index_at_overlap
         chunk = Chunk(chunk_id, self.chunk_capacity, from_token_seq_id, metadata, importance, timestamp)
         self.current_chunk_id = chunk_id + 1
         self.chunks.append(chunk)
         self.chunk_map[chunk.chunk_id] = chunk
         return chunk
-
-    def add_separator(self, pad_token_id: int, timestamp: Optional[float] = None):
-        last_chunk = self.chunks[-1] if len(self.chunks) >= 1 else None
-        if last_chunk is not None:
-            room = last_chunk.get_room()
-            pad_seq = [pad_token_id] * room
-            self.add_sequence(pad_seq, metadata=None, importance=None, _no_new_chunks=True)
-        # separator_seq_ids always assumed to be ordered
-        self.separator_seq_ids.append(self.first_token_seq_id + len(self.token_ids))
-        if timestamp is None:
-            timestamp = time.time()
-        self.add_chunk(metadata=None, importance=None, starts_section=True, timestamp=timestamp)
 
     def get_chunk(self, chunk_id: int) -> Chunk:
         return self.chunk_map.get(chunk_id)
@@ -130,9 +133,71 @@ class ChunkQueue:
     def get_next_token_sequence_id(self) -> int:
         return self.first_token_seq_id + len(self.token_ids)
 
+    def _new_text_key(self) -> TextKeyType:
+        self.current_text_key += 1
+        return self.current_text_key
+
+    def _pad_last_chunk(self, pad_token_id: int):
+        last_chunk = self.chunks[-1] if len(self.chunks) >= 1 else None
+        if last_chunk is not None:
+            room = last_chunk.get_room()
+            pad_seq = [pad_token_id] * room
+            self.add_sequence(pad_seq, metadata=None, importance=None, _no_new_chunks=True)
+            return room
+        else:
+            return 0
+
+    def _update_sequence_map(self, text_key: TextKeyType, new_to_seq_id: int, shift_offset: int):
+        # TODO not super efficient
+        old_bounds = self.sequence_map.get(text_key)
+        if old_bounds is None:
+            return
+        from_seq_id, old_to_seq_id = old_bounds
+
+        def _shift(b_from_id: int, b_to_id: int):
+            if b_from_id >= old_to_seq_id:
+                return b_from_id + shift_offset, b_to_id + shift_offset,
+            else:
+                return b_from_id, b_to_id,
+
+        self.sequence_map = {k: _shift(*b) for k, b in self.sequence_map.items()}
+        self.sequence_map[text_key] = (from_seq_id, new_to_seq_id,)
+
+    def _update_separator_ids(self, remove_from_id: int, remove_to_id: int, shift_offset: int):
+        old_ids = self.separator_seq_ids
+        if len(old_ids) > 0:
+            idx1 = bisect.bisect_right(old_ids, remove_from_id)
+            idx2 = bisect.bisect_left(old_ids, remove_to_id)
+            self.separator_seq_ids = old_ids[:idx1] + \
+                (np.array(old_ids[idx2:], dtype=int) + shift_offset).tolist()
+
+    def _split_separators(self, seq_from_id: int, seq_to_id: int) -> Tuple[List[int], List[int]]:
+        old_ids = self.separator_seq_ids
+        if len(old_ids) > 0:
+            idx1 = bisect.bisect_right(old_ids, seq_from_id)
+            idx2 = bisect.bisect_left(old_ids, seq_to_id)
+            return old_ids[:idx1], old_ids[idx2:],
+        else:
+            return [], [],
+
+    def _is_start_section(self):
+        sep_ids = self.separator_seq_ids
+        if len(sep_ids) > 0:
+            last_sep_id = sep_ids[-1]
+            if len(self.token_ids) + self.first_token_seq_id == last_sep_id:
+                return True
+        return False
+
+    def add_separator(self, pad_token_id: int, timestamp: Optional[float] = None):
+        # self._pad_last_chunk(pad_token_id)
+        # separator_seq_ids always assumed to be ordered
+        self.separator_seq_ids.append(self.first_token_seq_id + len(self.token_ids))
+
     def add_sequence(self, new_token_ids: List[int], metadata: Optional[Any],
                      importance: Optional[float] = None, timestamp: Optional[float] = None,
-                     _no_new_chunks: bool = False) -> List[Chunk]:
+                     _no_new_chunks: bool = False,
+                     _no_text_key: bool = False,
+                     _text_key: TextKeyType = None) -> Tuple[List[Chunk], TextKeyType]:
         """
         Adds tokens to the chunk queue.
         :param new_token_ids: The sequence of token IDs to add
@@ -140,25 +205,40 @@ class ChunkQueue:
         :param importance: An optional importance value for the tokens
         :param timestamp: The timestamp of the stored tokens
         :param _no_new_chunks: If true, attempt should be made to add all tokens without adding new chunks
+        :param _no_text_key: Whether associating text with a key should be prevented.
+        :param _text_key: A text key to be used instead of a generated one.
         :return: Any chunks removed due to overflow.
         """
+        if len(new_token_ids) == 0:
+            return [], _text_key,
         if timestamp is None:
             timestamp = time.time()
+        text_key = None if _no_text_key else (_text_key if _text_key is not None else self._new_text_key())
+        first_id = self.first_token_seq_id
+        prev_token_seq_id = len(self.token_ids) + first_id
+        starts_section = self._is_start_section()
         self.token_ids.extend(new_token_ids)
-        next_token_seq_id = len(self.token_ids) + self.first_token_seq_id
+        next_token_seq_id = len(self.token_ids) + first_id
         start_num_chunks = len(self.chunks)
-        first_c_idx = max(0, start_num_chunks - 2)
+        first_c_idx = max(0, start_num_chunks if starts_section else start_num_chunks - 2)
+        key_registered = False
+        new_chunk_starts_section = starts_section
         for c_idx in range(first_c_idx, start_num_chunks + len(new_token_ids) + 1):
             if _no_new_chunks:
                 if c_idx >= len(self.chunks):
                     raise RuntimeError('No new chunks allowed, but at least one more is needed to complete operation')
             else:
                 while c_idx >= len(self.chunks):
-                    self.add_chunk(metadata, importance, timestamp=timestamp)
+                    self.add_chunk(metadata, importance, timestamp=timestamp, starts_section=new_chunk_starts_section,
+                                   section_seq_id=prev_token_seq_id)
+                    new_chunk_starts_section = False
             chunk = self.chunks[c_idx]
             if chunk.to_token_seq_id < next_token_seq_id:
                 room = chunk.get_room()
                 if room > 0:
+                    if not _no_text_key:
+                        chunk.add_key(text_key)
+                        key_registered = True
                     chunk.extend_by(min(next_token_seq_id - chunk.to_token_seq_id, room))
                     much_room = room > self.chunk_capacity // 2
                     if metadata and (chunk.metadata is None or much_room):
@@ -170,9 +250,116 @@ class ChunkQueue:
             if (_no_new_chunks or len(chunk) <= self.chunk_index_at_overlap) and \
                     chunk.to_token_seq_id >= next_token_seq_id:
                 break
-        return self.check_overflow()
+        if key_registered:
+            self.sequence_map[text_key] = (prev_token_seq_id, next_token_seq_id,)
+        return self.check_overflow(), text_key,
+
+    def _split_left(self, head_chunks: List[Chunk], tail_id_from: int):
+        first_id = self.first_token_seq_id
+        if len(head_chunks) > 0:
+            last_head_chunk = head_chunks[-1]
+            last_head_chunk_to = last_head_chunk.to_token_seq_id
+            left_extras_from = last_head_chunk_to - first_id
+            left_extras_to = tail_id_from - first_id
+            left_extras_token_ids = self.token_ids[left_extras_from:left_extras_to]
+            head_token_ids = self.token_ids[:left_extras_from]
+            chunk_params = dict(
+                timestamp=last_head_chunk.timestamp,
+                importance=last_head_chunk.importance,
+                metadata=last_head_chunk.metadata,
+            )
+        else:
+            left_extras_token_ids = []
+            head_token_ids = self.token_ids[:tail_id_from - first_id]
+            chunk_params = dict(metadata=None)
+        return head_token_ids, left_extras_token_ids, chunk_params,
+
+    def _split_right(self, shifted_chunks: List[Chunk], head_id_to: int):
+        first_id = self.first_token_seq_id
+        if len(shifted_chunks) > 0:
+            first_shifted_chunk = shifted_chunks[0]
+            first_shifted_chunk_from = first_shifted_chunk.from_token_seq_id
+            right_extras_from = head_id_to - first_id
+            right_extras_to = first_shifted_chunk_from - first_id
+            right_extras_token_ids = self.token_ids[right_extras_from:right_extras_to]
+            shifted_token_ids = self.token_ids[right_extras_to:]
+            chunk_params = dict(
+                timestamp=first_shifted_chunk.timestamp,
+                importance=first_shifted_chunk.importance,
+                metadata=first_shifted_chunk.metadata,
+            )
+        else:
+            right_extras_token_ids = []
+            shifted_token_ids = self.token_ids[head_id_to:]
+            chunk_params = dict(metadata=None)
+        return shifted_token_ids, right_extras_token_ids, chunk_params,
+
+    def _resolve_discarded_chunks(self, discarded_chunks: List[Chunk], text_key: TextKeyType,
+                                  seq_id_from: int, old_seq_id_to: int, new_seq_id_to: int,
+                                  shift_offset: int):
+        # Remove chunks from map, etc.
+        for chunk in discarded_chunks:
+            self._removed_chunk_cleanup(chunk)
+        # Update the bounds of the current sequence, and shift the ones to the right
+        self._update_sequence_map(text_key, new_seq_id_to, shift_offset)
+        # Remove and shift separator seq IDs
+        self._update_separator_ids(seq_id_from, old_seq_id_to, shift_offset)
+        return discarded_chunks
+
+    def replace_sequence(self, text_key: TextKeyType, new_token_ids: List[int],
+                         metadata: Optional[dict] = None, importance: Optional[float] = None,
+                         timestamp: Optional[float] = None) -> Tuple[List[Chunk], TextKeyType]:
+        old_bounds = self.sequence_map.get(text_key)
+        if old_bounds is None:
+            logging.warning(f'Subsequence with key {text_key} not found.')
+            return [], text_key,
+        seq_id_from, old_seq_id_to = old_bounds
+        new_seq_id_to = seq_id_from + len(new_token_ids)
+        discarded_chunks = []
+        shifted_chunks = []
+        head_chunks = []
+        for chunk in self.chunks:
+            if chunk.to_token_seq_id > seq_id_from:
+                if chunk.from_token_seq_id >= old_seq_id_to:
+                    shifted_chunks.append(chunk)
+                else:
+                    discarded_chunks.append(chunk)
+            else:
+                head_chunks.append(chunk)
+        # Find out which tokens will be left out prior to first shifted chunk, plus overlap
+        shifted_token_ids, right_extras_token_ids, right_params = self._split_right(shifted_chunks, old_seq_id_to)
+        # Find out which tokens will be left out after the last head chunk, before the new sequence
+        head_token_ids, left_extras_token_ids, left_params = self._split_left(head_chunks, seq_id_from)
+        # Split separator IDs
+        head_sep_ids, shifted_sep_ids = self._split_separators(seq_id_from, old_seq_id_to)
+        # Truncate chunks, token IDs and separators
+        self.token_ids = head_token_ids
+        self.chunks = head_chunks
+        self.separator_seq_ids = head_sep_ids
+        # Add new token sequence to truncated queues
+        self.add_sequence(left_extras_token_ids, _no_text_key=True, **left_params)
+        self.add_sequence(new_token_ids, metadata=metadata, importance=importance,
+                          timestamp=timestamp)
+        self.add_sequence(right_extras_token_ids, _no_text_key=True, **right_params)
+        # Calculate the shift offset
+        shift_offset = new_seq_id_to - old_seq_id_to
+        # Shift the sequence IDs of the chunks that need to be shifted
+        # No padding is added, so shifted chunks should contain the same tokens as before
+        for chunk in shifted_chunks:
+            chunk.shift(shift_offset)
+        # Extend the token IDs queue and the chunk queue
+        self.token_ids.extend(shifted_token_ids)
+        self.chunks.extend(shifted_chunks)
+        self.separator_seq_ids.extend(shifted_sep_ids)
+        # This call updates separator seq IDs according to the shift offset
+        dc1 = self._resolve_discarded_chunks(discarded_chunks, text_key,
+                                             seq_id_from, old_seq_id_to, new_seq_id_to,
+                                             shift_offset)
+        dc2 = self.check_overflow()
+        return dc1 + dc2, text_key,
 
     def get_chunks_for_indexing(self) -> Tuple[List[Chunk], List[List[int]]]:
+        # TODO not super efficient
         token_id_matrix = []
         picked_buckets = []
         for i, chunk in enumerate(self.chunks):
@@ -326,3 +513,4 @@ class ChunkQueue:
         self.first_token_seq_id = 0
         self.current_chunk_id = 0
         self.chunk_map.clear()
+        self.sequence_map.clear()

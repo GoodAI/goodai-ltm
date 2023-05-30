@@ -135,7 +135,7 @@ class TestMem(unittest.TestCase):
         assert 'UV-light' in r_memories[0].passage
         assert 'greenhouse' in r_memories[1].passage
 
-    def test_separators(self):
+    def test_separators_and_replacement(self):
         facts = [
             'Cane toads have a life expectancy of 10 to 15 years in the wild.',
             'Kayaks are used to transport people in water.',
@@ -145,14 +145,44 @@ class TestMem(unittest.TestCase):
         config = TextMemoryConfig()
         config.chunk_capacity = 128
         mem = AutoTextMemory.create(emb_model=self._lr_emb_model, config=config)
+        text_keys = []
         for i, fact in enumerate(facts):
-            mem.add_text(fact, metadata={'index': i}, timestamp=i + 5)
+            text_key = mem.add_text(fact, metadata={'index': i}, timestamp=i + 5)
+            text_keys.append(text_key)
             mem.add_separator()
+        facts[1] = "Higher education, also called post-secondary education, third-level or " \
+                   "tertiary education, is an optional final stage of formal learning that " \
+                   "occurs after completion of secondary education."
+        mem.replace_text(text_keys[1], facts[1], metadata={'replacement': True}, timestamp=1 + 5)
+        is_replacement = [False] * len(facts)
+        is_replacement[1] = True
         for i, query in enumerate(facts):
             r_memories = mem.retrieve(query, k=1)
             self.assertEqual(query.strip(), r_memories[0].passage.strip())
-            self.assertEqual(i, r_memories[0].metadata['index'])
             self.assertAlmostEqual(i + 5, r_memories[0].timestamp)
+            if is_replacement[i]:
+                self.assertTrue(r_memories[0].metadata['replacement'])
+            else:
+                self.assertEqual(i, r_memories[0].metadata['index'])
+
+    def test_delete_all(self):
+        facts = [
+            'Cane toads have a life expectancy of 10 to 15 years in the wild.',
+            'Kayaks are used to transport people in water.',
+            'Darth Vader is portrayed as a man who always appears in black full-body armor and a mask.',
+            'Tony Bennett had four children.'
+        ]
+        config = TextMemoryConfig()
+        config.chunk_capacity = 128
+        mem = AutoTextMemory.create(emb_model=self._lr_emb_model, config=config)
+        text_keys = []
+        for i, fact in enumerate(facts):
+            text_key = mem.add_text(fact, metadata={'index': i}, timestamp=i + 5)
+            text_keys.append(text_key)
+            mem.add_separator()
+        for tk in text_keys:
+            mem.delete_text(tk)
+        assert mem.is_empty()
 
     def test_expansion_to_paragraph(self):
         _text = "Earth has a dynamic atmosphere, which sustains Earth's surface conditions and protects " \
