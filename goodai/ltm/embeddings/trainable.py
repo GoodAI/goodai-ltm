@@ -91,7 +91,8 @@ class TrainableEmbeddingModel(BaseTextEmbeddingModel, nn.Module):
                           device: Union[str, torch.device] = None):
         device = device if device else self.get_device()
         t = self.tokenizer
-        rng = range(0, len(sentences), batch_size)
+        s_count = len(sentences)
+        rng = range(0, s_count, batch_size)
         if show_progress_bar:
             rng = tqdm(rng, desc='Embeddings', unit='batch')
         keys_list = []

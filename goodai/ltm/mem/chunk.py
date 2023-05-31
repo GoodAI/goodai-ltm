@@ -1,14 +1,21 @@
+import time
 from typing import Any, Optional
+
+TextKeyType = int
 
 
 class Chunk:
-    def __init__(self, index: int, capacity: int, from_token_seq_id: int, metadata: Optional[dict]):
+    def __init__(self, chunk_id: int, capacity: int, from_token_seq_id: int, metadata: Optional[dict],
+                 importance: Optional[float], timestamp: float):
+        self.importance = importance
         self.metadata = metadata
-        self.index = index
+        self.chunk_id = chunk_id
         self.capacity = capacity
         self.from_token_seq_id = from_token_seq_id
         self.to_token_seq_id = from_token_seq_id
         self.indexed: bool = False
+        self.timestamp: float = timestamp
+        self.associated_keys = []
 
     def __len__(self):
         return self.to_token_seq_id - self.from_token_seq_id
@@ -29,8 +36,15 @@ class Chunk:
             raise ValueError(f'capacity={self.capacity} would be exceeded')
         self.to_token_seq_id += num_tokens
 
+    def shift(self, offset: int):
+        self.from_token_seq_id += offset
+        self.to_token_seq_id += offset
+
     def is_indexed(self) -> bool:
         return self.indexed
 
     def set_indexed(self, mode: bool):
         self.indexed = mode
+
+    def add_key(self, text_key: TextKeyType):
+        self.associated_keys.append(text_key)
