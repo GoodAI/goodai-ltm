@@ -5,6 +5,22 @@ from goodai.ltm.mem.chunk_queue import ChunkQueue, ChunkExpansionOptions
 
 
 class TestChunkQueue(unittest.TestCase):
+    def test_simple_insertion(self):
+        seq_len = 8
+        queue_capacity = 10
+        num_seqs_in_chunk = 3
+        chunk_capacity = seq_len * num_seqs_in_chunk
+        chunk_index_at_overlap = chunk_capacity // 2
+        self.assertEqual(12, chunk_index_at_overlap)
+        sq = ChunkQueue(queue_capacity, chunk_capacity, chunk_index_at_overlap)
+        start = 0
+        token_ids = list(range(start, start + seq_len))
+        sq.add_sequence(token_ids, None)
+        token_ids = list(range(start + seq_len, start + seq_len + seq_len))
+        sq.add_sequence(token_ids, None)
+        self.assertEqual(2, len(sq.chunks))
+        self.assertEqual(16, len(sq.token_ids))
+
     def test_insertion(self):
         seq_len = 8
         queue_capacity = 10
