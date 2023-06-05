@@ -135,7 +135,7 @@ class TestMem(unittest.TestCase):
         assert 'UV-light' in r_memories[0].passage
         assert 'greenhouse' in r_memories[1].passage
 
-    def test_reranking_count(self):
+    def test_reranking_count_1(self):
         s_counts = []
 
         class _LocalReranker(BaseReranker):
@@ -149,7 +149,7 @@ class TestMem(unittest.TestCase):
         config = TextMemoryConfig()
         config.reranking_k_factor = 7
         config.chunk_capacity = 8
-        config.redundancy_overlap_threshold = 0.99
+        config.redundancy_overlap_threshold = 0.5
         config.chunk_expansion_config = ChunkExpansionConfig.for_chunk()
         mem = AutoTextMemory.create(emb_model=self._lr_emb_model, reranker=_LocalReranker(),
                                     config=config)
