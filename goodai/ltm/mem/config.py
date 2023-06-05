@@ -67,6 +67,10 @@ class ChunkExpansionConfig:
     def for_section(cls, max_extra_side_tokens: int = 1024):
         return cls(max_extra_side_tokens=max_extra_side_tokens, limit_type=ChunkExpansionLimitType.SECTION)
 
+    @classmethod
+    def for_chunk(cls):
+        return cls(max_extra_side_tokens=0, limit_type=ChunkExpansionLimitType.SECTION)
+
 
 class TextMemoryConfig:
     chunk_capacity: int
