@@ -143,7 +143,7 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
         return self.replace_text(text_key, "", show_progress_bar=show_progress_bar)
 
     def add_separator(self):
-        self.chunk_queue.add_separator(self.pad_token_id)
+        self.chunk_queue.add_separator()
 
     def is_empty(self) -> bool:
         return len(self.chunk_queue.token_ids) == 0

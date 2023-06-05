@@ -135,6 +135,28 @@ class TestMem(unittest.TestCase):
         assert 'UV-light' in r_memories[0].passage
         assert 'greenhouse' in r_memories[1].passage
 
+    def test_reranking_count_1(self):
+        s_counts = []
+
+        class _LocalReranker(BaseReranker):
+            def rerank(self, _r_memories: List[RetrievedMemory], _mem: BaseTextMemory) -> List[RetrievedMemory]:
+                nonlocal s_counts
+                s_counts.append(len(_r_memories))
+                result = list(_r_memories)
+                result.sort(key=lambda _m: _m.relevance)
+                return result
+
+        config = TextMemoryConfig()
+        config.reranking_k_factor = 7
+        config.chunk_capacity = 8
+        config.redundancy_overlap_threshold = 0.5
+        config.chunk_expansion_config = ChunkExpansionConfig.for_chunk()
+        mem = AutoTextMemory.create(emb_model=self._lr_emb_model, reranker=_LocalReranker(),
+                                    config=config)
+        mem.add_text(self._text)
+        mem.retrieve('Is water vapor widely present in the atmosphere?', k=3)
+        self.assertEqual([21], s_counts)
+
     def test_separators_and_replacement(self):
         facts = [
             'Cane toads have a life expectancy of 10 to 15 years in the wild.',
