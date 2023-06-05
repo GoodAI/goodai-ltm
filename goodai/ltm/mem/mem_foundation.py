@@ -309,6 +309,7 @@ class BaseTextMemoryFoundation(BaseTextMemory):
                 distinct_d_i.append((distance, chunk_id,))
             # Without duplicates, we only need at most expansion_top_k chunks at this point
             distinct_d_i = distinct_d_i[:expansion_top_k]
+
             # Retrieve chunk objects from queue
             row_chunks = [self.get_chunk(chunk_id) for _, chunk_id in distinct_d_i]
             row_passages = [self.get_complete_passage(chunk) for chunk in row_chunks]
