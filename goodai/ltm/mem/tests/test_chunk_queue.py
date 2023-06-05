@@ -1,6 +1,4 @@
-import math
 import unittest
-
 from goodai.ltm.mem.chunk_queue import ChunkQueue, ChunkExpansionOptions
 
 
@@ -159,16 +157,16 @@ class TestChunkQueue(unittest.TestCase):
         _chunk_queue = ChunkQueue(25, chunk_capacity, chunk_index_at_overlap, first_token_seq_id=75)
         _chunk_queue.add_sequence([1, 2, 3], None)
         _chunk_queue.add_sequence([4, 5, 6], None)
-        _chunk_queue.add_separator(0)
+        _chunk_queue.add_separator()
         _chunk_queue.add_sequence([7, 8, 9], None)
         _chunk_queue.add_sequence([10, 11, 12], None)
-        _chunk_queue.add_separator(0)
+        _chunk_queue.add_separator()
         _chunk_queue.add_sequence([10, 8, 12], None)
         _chunk_queue.add_sequence([14, 11, 12], None)
-        _chunk_queue.add_separator(0)
+        _chunk_queue.add_separator()
         _chunk_queue.add_sequence([3, 8, 21], None)
         _chunk_queue.add_sequence([13, 12, 9], None)
-        _chunk_queue.add_separator(0)
+        _chunk_queue.add_separator()
         _chunk_queue.add_sequence([3, 4, 28], None)
         _chunk_queue.add_sequence([12, 8, 25], None)
 
@@ -190,7 +188,7 @@ class TestChunkQueue(unittest.TestCase):
         _chunk_queue = ChunkQueue(queue_capacity, chunk_capacity, chunk_index_at_overlap, first_token_seq_id=75)
         for i in range(200):
             _chunk_queue.add_sequence([1, 2, 3], None)
-            _chunk_queue.add_separator(0)
+            _chunk_queue.add_separator()
         self.assertEqual(6, len(_chunk_queue.separator_seq_ids))
         self.assertTrue(_chunk_queue.separator_seq_ids[0] >= _chunk_queue.first_token_seq_id)
         self.assertTrue(_chunk_queue.separator_seq_ids[-1] <= _chunk_queue.first_token_seq_id +
@@ -203,7 +201,7 @@ class TestChunkQueue(unittest.TestCase):
         _chunk_queue = ChunkQueue(queue_capacity, chunk_capacity, chunk_index_at_overlap, first_token_seq_id=220)
         for i in range(100):
             _chunk_queue.add_sequence([1, 2, 3], None)
-            _chunk_queue.add_separator(0)
+            _chunk_queue.add_separator()
         _chunk_queue.flush()
         self.assertTrue(len(_chunk_queue.separator_seq_ids) == 0)
         self.assertTrue(len(_chunk_queue.chunks) == 0)
@@ -232,7 +230,7 @@ class TestChunkQueue(unittest.TestCase):
         chunk_capacity = 5
         chunk_index_at_overlap = chunk_capacity // 2
         _chunk_queue = ChunkQueue(25, chunk_capacity, chunk_index_at_overlap, first_token_seq_id=73)
-        _chunk_queue.add_separator(pad_token_id=0)
+        _chunk_queue.add_separator()
         _, k1 = _chunk_queue.add_sequence([1, 2, 3], None)
         _, k2 = _chunk_queue.add_sequence([4, 5, 6], None)
         _, k3 = _chunk_queue.add_sequence([7, 8, 9], None)
@@ -252,7 +250,7 @@ class TestChunkQueue(unittest.TestCase):
         _chunk_queue = ChunkQueue(25, chunk_capacity, chunk_index_at_overlap, first_token_seq_id=43)
         _, k1 = _chunk_queue.add_sequence([1, 2, 3], None)
         _, k2 = _chunk_queue.add_sequence([4, 5, 6], None)
-        _chunk_queue.add_separator(pad_token_id=0)
+        _chunk_queue.add_separator()
         _, k3 = _chunk_queue.add_sequence([7, 8, 9], None)
 
         chunk_sequences = _chunk_queue.get_chunk_sequences()
@@ -283,7 +281,7 @@ class TestChunkQueue(unittest.TestCase):
         _chunk_queue = ChunkQueue(25, chunk_capacity, chunk_index_at_overlap, first_token_seq_id=43)
         _, k1 = _chunk_queue.add_sequence([1, 2, 3], None)
         _, k2 = _chunk_queue.add_sequence([4, 5, 6], None)
-        _chunk_queue.add_separator(pad_token_id=0)
+        _chunk_queue.add_separator()
         _, k3 = _chunk_queue.add_sequence([7, 8, 9], None)
 
         chunk_sequences = _chunk_queue.get_chunk_sequences()

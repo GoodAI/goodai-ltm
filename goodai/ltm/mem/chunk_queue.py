@@ -188,7 +188,7 @@ class ChunkQueue:
                 return True
         return False
 
-    def add_separator(self, pad_token_id: int, timestamp: Optional[float] = None):
+    def add_separator(self):
         # self._pad_last_chunk(pad_token_id)
         # separator_seq_ids always assumed to be ordered
         self.separator_seq_ids.append(self.first_token_seq_id + len(self.token_ids))
