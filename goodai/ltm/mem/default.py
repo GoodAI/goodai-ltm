@@ -184,8 +184,7 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
             sk_all_np = sk_all.cpu().numpy().astype(np.float32)
             b_indexes = []
             for chunk in picked_chunks:
-                if chunk.is_at_capacity():
-                    chunk.set_indexed(True)
+                chunk.update_indexed_state()
                 b_indexes.extend([chunk.chunk_id] * num_sk)
             b_indexes_np = np.array(b_indexes).astype(np.int64)
             self.vector_db.add_with_ids(sk_all_np, b_indexes_np)
