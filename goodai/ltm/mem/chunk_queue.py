@@ -358,6 +358,16 @@ class ChunkQueue:
         dc2 = self.check_overflow()
         return dc1 + dc2, text_key,
 
+    def get_sequence_token_ids(self, text_key: TextKeyType) -> Optional[List[int]]:
+        seq_bounds = self.sequence_map.get(text_key)
+        if seq_bounds is None:
+            logging.warning(f'Subsequence with key {text_key} not found.')
+            return None
+        seq_id_from, seq_id_to = seq_bounds
+        first_id = self.first_token_seq_id
+        index_from, index_to = seq_id_from - first_id, seq_id_to - first_id,
+        return self.token_ids[index_from:index_to]
+
     def get_chunks_for_indexing(self) -> Tuple[List[Chunk], List[List[int]]]:
         # TODO not super efficient
         token_id_matrix = []

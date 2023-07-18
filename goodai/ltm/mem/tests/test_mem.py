@@ -353,3 +353,26 @@ class TestMem(unittest.TestCase):
                 self.assertAlmostEqual(m.importance, 0.50)
             else:
                 self.assertAlmostEqual(m.importance, 0)
+
+    def test_get_text(self):
+        facts = [
+            'Cane toads have a life expectancy of 10 to 15 years in the wild.',
+            'Kayaks are used to transport people in water.',
+            'Darth Vader is portrayed as a man who always appears in black full-body armor and a mask.',
+            'Tony Bennett had four children.'
+        ]
+        config = TextMemoryConfig()
+        mem = AutoTextMemory.create(emb_model=self._lr_emb_model,
+                                    config=config)
+        text_keys = []
+        for i, fact in enumerate(facts):
+            tk = mem.add_text(fact, metadata={'index': i})
+            text_keys.append(tk)
+
+        for tk, fact in zip(text_keys, facts):
+            text = mem.get_text(tk)
+            self.assertEqual(fact, text)
+
+        text = mem.get_text(99999)
+        self.assertIsNone(text)
+
