@@ -89,6 +89,12 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
     def retrieve_chunk_sequences(self, chunks: List[Chunk]):
         return self.chunk_queue.retrieve_chunk_sequences_given_chunks(chunks)
 
+    def get_text(self, text_key: TextKeyType) -> Optional[str]:
+        token_ids = self.chunk_queue.get_sequence_token_ids(text_key)
+        if token_ids is None:
+            return None
+        return self.chunk_tokenizer.decode(token_ids, skip_special_tokens=True)
+
     def get_retrieval_key_for_text(self, queries: List[str], show_progress_bar: bool = False) -> torch.Tensor:
         return self.emb_model.encode_queries(queries, convert_to_tensor=True, show_progress_bar=show_progress_bar)
 

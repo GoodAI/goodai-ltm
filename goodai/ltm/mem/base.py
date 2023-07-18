@@ -124,6 +124,14 @@ class BaseTextMemory(ABC):
         pass
 
     @abstractmethod
+    def get_text(self, text_key: TextKeyType) -> Optional[str]:
+        """
+        :param text_key: A key previously returned by the add_text() method.
+        :return: The text associated with the provided key. If the key does not exist, the returned value is None.
+        """
+        pass
+
+    @abstractmethod
     def add_separator(self):
         """
         Adds a section separator. The last chunk in the memory queue will be filled with padding.
