@@ -13,7 +13,7 @@ class Chunk:
         self.capacity = capacity
         self.from_token_seq_id = from_token_seq_id
         self.to_token_seq_id = from_token_seq_id
-        self.indexed: bool = False
+        self.indexed_length: int = -1
         self.timestamp: float = timestamp
         self.associated_keys = []
 
@@ -41,10 +41,10 @@ class Chunk:
         self.to_token_seq_id += offset
 
     def is_indexed(self) -> bool:
-        return self.indexed
+        return self.indexed_length == len(self)
 
-    def set_indexed(self, mode: bool):
-        self.indexed = mode
+    def update_indexed_state(self):
+        self.indexed_length = len(self)
 
     def add_key(self, text_key: TextKeyType):
         self.associated_keys.append(text_key)

@@ -1,6 +1,6 @@
 import gc
 import unittest
-from typing import List, Tuple
+from typing import List, Tuple, cast
 
 from transformers import AutoTokenizer
 
@@ -9,6 +9,7 @@ from goodai.ltm.eval.metrics import get_correctness_score
 from goodai.ltm.mem.auto import AutoTextMemory
 from goodai.ltm.mem.base import BaseReranker, RetrievedMemory, BaseTextMemory, BaseImportanceModel
 from goodai.ltm.mem.config import TextMemoryConfig, ChunkExpansionConfig, ChunkExpansionLimitType
+from goodai.ltm.mem.default import DefaultTextMemory
 from goodai.ltm.reranking.base import BaseTextMatchingModel
 
 
@@ -187,6 +188,26 @@ class TestMem(unittest.TestCase):
             else:
                 self.assertEqual(i, r_memories[0].metadata['index'])
 
+    def test_chunk_indexing_with_separators(self):
+        facts = [
+            "Higher education, also called post-secondary education, third-level or "
+            "tertiary education, is an optional final stage of formal learning that "
+            "occurs after completion of secondary education.",
+            'Cane toads have a life expectancy of 10 to 15 years in the wild.',
+            'Kayaks are used to transport people in water.',
+            'Darth Vader is portrayed as a man who always appears in black full-body armor and a mask.',
+            'Tony Bennett had four children.'
+        ]
+        config = TextMemoryConfig()
+        config.chunk_capacity = 8
+        mem = AutoTextMemory.create(emb_model=self._lr_emb_model, config=config)
+        for i, fact in enumerate(facts):
+            mem.add_text(fact)
+            mem.add_separator()
+        mem_default: DefaultTextMemory = cast(DefaultTextMemory, mem)
+        chunks, _ = mem_default.chunk_queue.get_chunks_for_indexing()
+        assert len(chunks) <= 3
+
     def test_delete_all(self):
         facts = [
             'Cane toads have a life expectancy of 10 to 15 years in the wild.',
@@ -332,3 +353,26 @@ class TestMem(unittest.TestCase):
                 self.assertAlmostEqual(m.importance, 0.50)
             else:
                 self.assertAlmostEqual(m.importance, 0)
+
+    def test_get_text(self):
+        facts = [
+            'Cane toads have a life expectancy of 10 to 15 years in the wild.',
+            'Kayaks are used to transport people in water.',
+            'Darth Vader is portrayed as a man who always appears in black full-body armor and a mask.',
+            'Tony Bennett had four children.'
+        ]
+        config = TextMemoryConfig()
+        mem = AutoTextMemory.create(emb_model=self._lr_emb_model,
+                                    config=config)
+        text_keys = []
+        for i, fact in enumerate(facts):
+            tk = mem.add_text(fact, metadata={'index': i})
+            text_keys.append(tk)
+
+        for tk, fact in zip(text_keys, facts):
+            text = mem.get_text(tk)
+            self.assertEqual(fact, text)
+
+        text = mem.get_text(99999)
+        self.assertIsNone(text)
+
