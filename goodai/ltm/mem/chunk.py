@@ -1,21 +1,24 @@
-import time
-from typing import Any, Optional
+from dataclasses import dataclass, field
+from typing import Optional, List, Dict, Any
 
 TextKeyType = int
 
 
+@dataclass
 class Chunk:
-    def __init__(self, chunk_id: int, capacity: int, from_token_seq_id: int, metadata: Optional[dict],
-                 importance: Optional[float], timestamp: float):
-        self.importance = importance
-        self.metadata = metadata
-        self.chunk_id = chunk_id
-        self.capacity = capacity
-        self.from_token_seq_id = from_token_seq_id
-        self.to_token_seq_id = from_token_seq_id
-        self.indexed_length: int = -1
-        self.timestamp: float = timestamp
-        self.associated_keys = []
+    chunk_id: int
+    capacity: int
+    from_token_seq_id: int
+    metadata: Optional[Dict[Any, Any]]
+    importance: Optional[float]
+    timestamp: float
+    to_token_seq_id: int = None
+    indexed_length: int = field(default=-1)
+    associated_keys: List[TextKeyType] = field(default_factory=list)
+
+    def __post_init__(self):
+        if not self.to_token_seq_id:
+            self.to_token_seq_id = self.from_token_seq_id
 
     def __len__(self):
         return self.to_token_seq_id - self.from_token_seq_id
