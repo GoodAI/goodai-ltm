@@ -1,4 +1,4 @@
-from abc import ABC
+from abc import ABC, abstractmethod
 from pathlib import Path
 
 from goodai.ltm.mem.default import DefaultTextMemory
@@ -11,6 +11,7 @@ class MemoryPersistence(ABC):
     save and load methods for memory persistence.
     """
 
+    @abstractmethod
     def save(self, memory: DefaultTextMemory, directory: Path) -> None:
         """
         Save the provided memory to the specified directory.
@@ -22,6 +23,7 @@ class MemoryPersistence(ABC):
         """
         pass
 
+    @abstractmethod
     def load(self, directory: Path, **kwargs) -> DefaultTextMemory:
         """
         Load the memory from the specified directory.
@@ -31,5 +33,17 @@ class MemoryPersistence(ABC):
         :param kwargs: Additional keyword arguments passed to AutoTextMemory.create.
         :return: The loaded memory instance.
         :rtype: DefaultTextMemory
+        """
+        pass
+
+    @abstractmethod
+    def exists(self, directory: Path) -> bool:
+        """
+        Check whether the memory exists in the specified directory.
+
+        :param directory: The directory to check.
+        :type directory: Path
+        :return: True if the memory exists, False otherwise.
+        :rtype: bool
         """
         pass

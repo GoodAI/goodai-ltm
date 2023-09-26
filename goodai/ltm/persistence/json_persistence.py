@@ -1,7 +1,8 @@
 import json
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Callable
 
 import numpy
 
@@ -13,9 +14,11 @@ from goodai.ltm.mem.simple_vector_db import SimpleVectorDb
 from goodai.ltm.persistence.abstract import MemoryPersistence
 
 
-def obj_to_dict(obj):
+def default_obj_to_dict(obj):
     if isinstance(obj, numpy.ndarray):
         return obj.tolist()
+    if isinstance(obj, datetime):
+        return {"type": "datetime", "value": obj.isoformat()}
     if hasattr(obj, "__dict__"):
         obj_dict = obj.__dict__.copy()
         obj_dict.pop("chunk_map", None)
@@ -23,7 +26,14 @@ def obj_to_dict(obj):
     raise TypeError(f"{type(obj)} is not JSON/Msgpack serializable")
 
 
-def serialize_to_json(obj: Any) -> str:
+def default_dict_to_obj(dct):
+    if "type" in dct:
+        if dct["type"] == "datetime":
+            return datetime.fromisoformat(dct["value"])
+    return dct
+
+
+def serialize_to_json(obj: Any, obj_to_dict: Callable) -> str:
     return json.dumps(obj, default=obj_to_dict)
 
 
@@ -39,9 +49,9 @@ def load_vector_db_from_npz(file: Path) -> SimpleVectorDb:
     return vector_db
 
 
-def save_vector_db_to_json(vector_db: SimpleVectorDb, file: Path):
+def save_vector_db_to_json(vector_db: SimpleVectorDb, file: Path, obj_to_dict: Callable = default_obj_to_dict):
     with open(file, "w", encoding="utf-8") as fd:
-        fd.write(serialize_to_json(vector_db))
+        fd.write(serialize_to_json(vector_db, obj_to_dict))
 
 
 def load_vector_db_from_json(file: Path) -> SimpleVectorDb:
@@ -80,12 +90,14 @@ class JsonMemoryPersistence(MemoryPersistence):
     """
     chunk_queue_filename: str = "chunk_queue.json"
     vector_db_npz_filename = "vector_db.json"
+    obj_to_dict: Callable = default_obj_to_dict
+    dict_to_obj: Callable = default_dict_to_obj
 
     def save(self, memory: DefaultTextMemory, directory: Path):
         chunk_queue = memory.chunk_queue
         file = directory / self.chunk_queue_filename
         with open(file, "w", encoding="utf-8") as fd:
-            fd.write(serialize_to_json(chunk_queue))
+            fd.write(serialize_to_json(chunk_queue, self.obj_to_dict))
 
         vector_db = memory.vector_db
         file = directory / self.vector_db_npz_filename
@@ -93,11 +105,20 @@ class JsonMemoryPersistence(MemoryPersistence):
 
     def load(self, directory: Path, **kwargs) -> DefaultTextMemory:
         file = directory / self.chunk_queue_filename
-        chunk_queue = load_chunk_queue_from_dict(json.load(open(file, "r", encoding="utf-8")))
+        chunk_queue = load_chunk_queue_from_dict(
+            json.load(open(file, "r", encoding="utf-8"), object_hook=self.dict_to_obj)
+        )
 
         file = directory / self.vector_db_npz_filename
         vector_db = load_vector_db_from_json(file)
         return AutoTextMemory.create(chunk_queue=chunk_queue, vector_db=vector_db, **kwargs)
+
+    def exists(self, directory: Path) -> bool:
+        files = [
+            directory / self.chunk_queue_filename,
+            directory / self.vector_db_npz_filename,
+        ]
+        return all([file.exists() for file in files])
 
 
 @dataclass
@@ -107,12 +128,14 @@ class JsonNpzMemoryPersistence(MemoryPersistence):
     """
     chunk_queue_filename: str = "chunk_queue.json"
     vector_db_npz_filename = "vector_db.npz"
+    obj_to_dict: Callable = default_obj_to_dict
+    dict_to_obj: Callable = default_dict_to_obj
 
     def save(self, memory: DefaultTextMemory, directory: Path):
         chunk_queue = memory.chunk_queue
         file = directory / self.chunk_queue_filename
         with open(file, "w", encoding="utf-8") as fd:
-            fd.write(serialize_to_json(chunk_queue))
+            fd.write(serialize_to_json(chunk_queue, self.obj_to_dict))
 
         vector_db = memory.vector_db
         file = directory / self.vector_db_npz_filename
@@ -120,7 +143,8 @@ class JsonNpzMemoryPersistence(MemoryPersistence):
 
     def load(self, directory: Path, **kwargs) -> DefaultTextMemory:
         file = directory / self.chunk_queue_filename
-        chunk_queue = load_chunk_queue_from_dict(json.load(open(file, "r", encoding="utf-8")))
+        chunk_queue = load_chunk_queue_from_dict(
+            json.load(open(file, "r", encoding="utf-8"), object_hook=self.dict_to_obj))
 
         file = directory / self.vector_db_npz_filename
         vector_db = load_vector_db_from_npz(file)
@@ -129,3 +153,10 @@ class JsonNpzMemoryPersistence(MemoryPersistence):
             chunk_queue=chunk_queue, vector_db=vector_db,
             **kwargs
         )
+
+    def exists(self, directory: Path) -> bool:
+        files = [
+            directory / self.chunk_queue_filename,
+            directory / self.vector_db_npz_filename,
+        ]
+        return all([file.exists() for file in files])

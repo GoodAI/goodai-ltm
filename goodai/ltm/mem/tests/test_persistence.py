@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+from datetime import datetime
 from pathlib import Path
 
 from goodai.ltm.embeddings.auto import AutoTextEmbeddingModel
@@ -54,7 +55,7 @@ class TestPersistence(unittest.TestCase):
 
     def do_saving(self, memory_persistence: MemoryPersistence, **kwargs):
         mem: DefaultTextMemory = AutoTextMemory.create(**kwargs)
-        mem.add_text(self._text, metadata={'foo': 'bar'})
+        mem.add_text(self._text, metadata={'foo': 'bar', "timestamp": datetime.now()})
         directory = tempfile.TemporaryDirectory().name
         path = Path(directory)
         path.mkdir(parents=True, exist_ok=True)

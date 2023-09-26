@@ -28,6 +28,12 @@ class WholeMemoryPicklePersistence(MemoryPersistence):
                 raise ValueError(f"Expected BaseTextMemory, got {type(result)}")
             return result
 
+    def exists(self, directory: Path) -> bool:
+        files = [
+            directory / self.pickle_memory_filename,
+        ]
+        return all([file.exists() for file in files])
+
 
 @dataclass
 class TargetedMemoryPicklePersistence(MemoryPersistence):
@@ -35,24 +41,31 @@ class TargetedMemoryPicklePersistence(MemoryPersistence):
     Saves and loads the memory in a targeted way as a pickle file. Platform dependent and heavily version dependent,
     but only takes as much space as necessary.
     """
-    CHUNK_QUEUE_PICKLE_FILENAME = "chunk_queue.pickle"
-    VECTOR_DB_PICKLE_FILENAME = "vector_db.pickle"
+    chunk_queue_pickle_filename = "chunk_queue.pickle"
+    vector_db_pickle_filename = "vector_db.pickle"
 
     def save(self, memory: DefaultTextMemory, directory: Path):
         chunk_queue = memory.chunk_queue
-        file = directory / self.CHUNK_QUEUE_PICKLE_FILENAME
+        file = directory / self.chunk_queue_pickle_filename
         with open(file, "bw") as fd:
             pickle.dump(chunk_queue, fd, protocol=pickle.DEFAULT_PROTOCOL)
         vector_db = memory.vector_db
-        file = directory / self.VECTOR_DB_PICKLE_FILENAME
+        file = directory / self.vector_db_pickle_filename
         with open(file, "bw") as fd:
             pickle.dump(vector_db, fd, protocol=pickle.DEFAULT_PROTOCOL)
 
     def load(self, directory: Path, **kwargs) -> DefaultTextMemory:
-        file = directory / self.CHUNK_QUEUE_PICKLE_FILENAME
+        file = directory / self.chunk_queue_pickle_filename
         with open(file, "br") as fd:
             chunk_queue = pickle.load(fd)
-        file = directory / self.VECTOR_DB_PICKLE_FILENAME
+        file = directory / self.vector_db_pickle_filename
         with open(file, "br") as fd:
             vector_db = pickle.load(fd)
         return AutoTextMemory.create(chunk_queue=chunk_queue, vector_db=vector_db, **kwargs)
+
+    def exists(self, directory: Path) -> bool:
+        files = [
+            directory / self.chunk_queue_pickle_filename,
+            directory / self.vector_db_pickle_filename,
+        ]
+        return all([file.exists() for file in files])
