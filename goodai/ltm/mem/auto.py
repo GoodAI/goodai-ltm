@@ -8,10 +8,12 @@ from transformers import AutoTokenizer, PreTrainedTokenizer
 from goodai.ltm.embeddings.auto import AutoTextEmbeddingModel
 from goodai.ltm.embeddings.base import BaseTextEmbeddingModel
 from goodai.ltm.mem.base import BaseTextMemory, BaseReranker, BaseImportanceModel
+from goodai.ltm.mem.chunk_queue import ChunkQueue
 from goodai.ltm.mem.config import TextMemoryConfig
 from goodai.ltm.mem.default import DefaultTextMemory
 from goodai.ltm.mem.mem_foundation import VectorDbType
 from goodai.ltm.mem.rewrite_model import BaseRewriteModel
+from goodai.ltm.mem.simple_vector_db import SimpleVectorDb
 from goodai.ltm.reranking.auto import AutoTextMatchingModel
 from goodai.ltm.reranking.base import BaseTextMatchingModel
 
@@ -38,7 +40,9 @@ class AutoTextMemory:
                reranker: BaseReranker = None,
                importance_model: BaseImportanceModel = None,
                device: Union[torch.device, str] = None,
-               config: TextMemoryConfig = None
+               config: TextMemoryConfig = None,
+               chunk_queue: Optional[ChunkQueue] = None,
+               vector_db: Optional[SimpleVectorDb] = None,
                ) -> BaseTextMemory:
         """
         Creates a memory instance.
@@ -54,6 +58,8 @@ class AutoTextMemory:
         It may be required by some rerankers.
         :param device: The Pytorch device.
         :param config: The memory configuration.
+        :param chunk_queue: The chunk queue, only when loading the memory.
+        :param vector_db: The vector db, only when loading the memory.
         :return: An instance of BaseTextMemory.
         """
         if tokenizer is None:
@@ -81,4 +87,7 @@ class AutoTextMemory:
                                  query_rewrite_model=query_rewrite_model,
                                  memory_rewrite_model=memory_rewrite_model,
                                  reranker=reranker,
-                                 importance_model=importance_model)
+                                 importance_model=importance_model,
+                                 chunk_queue=chunk_queue,
+                                 vector_db=vector_db,
+                                 )

@@ -112,14 +112,18 @@ class RetrievedChunk:
 
 
 class BaseTextMemoryFoundation(BaseTextMemory):
-    def __init__(self, vector_db_type: VectorDbType, tokenizer: PreTrainedTokenizer, has_match_prob_model: bool,
+    def __init__(self,
+                 vector_db_type: VectorDbType, tokenizer: PreTrainedTokenizer, has_match_prob_model: bool,
                  num_storage_embeddings: int, emb_dim: int,
                  chunk_capacity: int, reranking_k_factor: float,
                  max_query_length: Optional[int],
                  query_rewrite_model: BaseRewriteModel, reranker: BaseReranker,
                  overlap_fraction: float,
                  overlap_threshold: float, chunk_expansion_options: ChunkExpansionOptions,
-                 device: torch.device, max_expansion_top_k_factor: int = 200):
+                 device: torch.device,
+                 max_expansion_top_k_factor: int = 200,
+                 vector_db: Optional[_vector_db_type] = None
+                 ):
         super().__init__()
         if overlap_fraction < 0 or overlap_fraction > 0.5:
             raise ValueError(f'Invalid chunk overlap fraction: {overlap_fraction}')
@@ -147,7 +151,7 @@ class BaseTextMemoryFoundation(BaseTextMemory):
         self.num_storage_embeddings = num_storage_embeddings
         self.has_match_prob_model = has_match_prob_model
         self.emb_dim = emb_dim
-        self.vector_db = self.create_vector_db(vector_db_type, emb_dim)
+        self.vector_db = vector_db or self.create_vector_db(vector_db_type, emb_dim)
         self.device = device
         self.chunk_tokenizer = tokenizer
         self.query_rewrite_model = query_rewrite_model
@@ -373,4 +377,3 @@ class BaseTextMemoryFoundation(BaseTextMemory):
             else:
                 result.append(query)
         return result
-

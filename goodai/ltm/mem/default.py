@@ -28,13 +28,15 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
                  memory_rewrite_model: Optional[BaseRewriteModel] = None,
                  reranker: Optional[BaseReranker] = None,
                  importance_model: Optional[BaseImportanceModel] = None,
+                 chunk_queue: Optional[ChunkQueue] = None,
+                 vector_db: Optional[_vector_db_type] = None,
                  ):
         cc = config.chunk_capacity
         cof = config.chunk_overlap_fraction
         if cof < 0 or cof > 0.5:
             raise ValueError(f'Invalid chunk overlap fraction: {cof}')
         ciao = cc - math.ceil(cc * cof)
-        self.chunk_queue = ChunkQueue(config.queue_capacity, cc, ciao)
+        self.chunk_queue = chunk_queue or ChunkQueue(config.queue_capacity, cc, ciao)
         self.config = config
         self.device = device
         self.emb_model = emb_model
@@ -56,7 +58,7 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
                          config.reranking_k_factor, config.max_query_length,
                          query_rewrite_model, reranker,
                          config.chunk_overlap_fraction, config.redundancy_overlap_threshold,
-                         self.ce_options, device)
+                         self.ce_options, device, vector_db=vector_db)
 
     def has_importance_model(self) -> bool:
         return self.importance_model is not None
