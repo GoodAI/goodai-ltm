@@ -1,5 +1,4 @@
 import abc
-import copy
 import enum
 import io
 import json
@@ -227,10 +226,11 @@ class BaseTextMemoryFoundation(BaseTextMemory):
         if not self.reranker:
             processed_r_chunks = processed_r_chunks[:k]
         has_pm = self.has_match_prob_model
+        passage_info_list = [r_chunk.passage for r_chunk in processed_r_chunks]
         sequences = [r_chunk.passage.tokenIds for r_chunk in processed_r_chunks]
         retrieved_texts = self.chunk_tokenizer.batch_decode(sequences, skip_special_tokens=True)
         result = []
-        for r_chunk, r_text in zip(processed_r_chunks, retrieved_texts):
+        for p_info, r_chunk, r_text in zip(passage_info_list, processed_r_chunks, retrieved_texts):
             confidence = r_chunk.confidence
             chunk = r_chunk.chunk
             metadata = chunk.metadata
@@ -239,7 +239,8 @@ class BaseTextMemoryFoundation(BaseTextMemory):
             relevance = self._distance_to_relevance(distance, confidence)
             if not has_pm:
                 confidence = None
-            result.append(RetrievedMemory(passage=r_text.strip(), timestamp=chunk.timestamp,
+            result.append(RetrievedMemory(passage=r_text.strip(), passage_info=p_info,
+                                          timestamp=chunk.timestamp,
                                           distance=distance, relevance=relevance,
                                           textKeys=list(chunk.associated_keys),
                                           confidence=confidence,
