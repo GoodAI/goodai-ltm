@@ -24,5 +24,5 @@ setup(name='goodai-ltm',
       package_data={'goodai.ltm.data': ['**/*.json']},
       install_requires=['torch>=1.8.0', 'pytest>=7.0.0', 'numpy>=1.19.0', 'transformers>=4.0.0',
                         'openai>=0.27.0', 'faiss-cpu', 'datasets', 'boto3', 'python-dotenv',
-                        'sentence-transformers>=2.2.2']
+                        'sentence-transformers>=2.2.2', 'FlagEmbedding>=1.1']
 )
