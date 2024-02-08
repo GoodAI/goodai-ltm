@@ -1,3 +1,4 @@
+import json
 import math
 from typing import List, Union, Any, Optional, Tuple, Callable
 import numpy as np
@@ -6,6 +7,7 @@ from faiss import Index
 from tqdm import tqdm
 from transformers import PreTrainedTokenizer
 
+from goodai.helpers.json_helper import SimpleJSONEncoder, SimpleJSONDecoder
 from goodai.helpers.tokenizer_helper import get_pad_token_id, get_sentence_punctuation_ids
 from goodai.ltm.embeddings.base import BaseTextEmbeddingModel
 from goodai.ltm.mem.base import BaseReranker, BaseImportanceModel
@@ -13,11 +15,17 @@ from goodai.ltm.mem.chunk import Chunk, TextKeyType
 from goodai.ltm.mem.rewrite_model import BaseRewriteModel
 from goodai.ltm.reranking.base import BaseTextMatchingModel
 from goodai.ltm.mem.chunk_queue import ChunkQueue, PassageInfo, ChunkExpansionOptions
-from goodai.ltm.mem.config import TextMemoryConfig
+from goodai.ltm.mem.config import TextMemoryConfig, ChunkExpansionLimitType
 from goodai.ltm.mem.mem_foundation import BaseTextMemoryFoundation, VectorDbType
 from goodai.ltm.mem.simple_vector_db import SimpleVectorDb
 
 _vector_db_type = Union[Index, SimpleVectorDb]
+_serializable_enums = [ChunkExpansionLimitType]
+
+
+class IncompatibleTextMemoryConfig(BaseException):
+    def __init__(self, message: str):
+        super().__init__(message)
 
 
 class DefaultTextMemory(BaseTextMemoryFoundation):
@@ -200,3 +208,29 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
     def clear(self):
         self.chunk_queue.flush()
         self.vector_db.reset()
+
+    def state_as_text(self, indent=None) -> str:
+        state = dict(config=self.config,
+                     vector_db=self.vector_db,
+                     chunk_queue=self.chunk_queue,
+                     tokenizer_name=self.chunk_tokenizer.name_or_path,
+                     emb_model_info=self.emb_model.get_info())
+        return json.dumps(state, cls=SimpleJSONEncoder, indent=indent)
+
+    def set_state(self, state_text: str):
+        state = json.loads(state_text, cls=SimpleJSONDecoder)
+        saved_config: TextMemoryConfig = state["config"]
+        saved_vector_db: _vector_db_type = state["vector_db"]
+        saved_chunk_queue: ChunkQueue = state["chunk_queue"]
+        saved_tokenizer_name = state["tokenizer_name"]
+        saved_emb_model_info = state["emb_model_info"]
+        if saved_config.chunk_capacity != self.config.chunk_capacity:
+            raise IncompatibleTextMemoryConfig("chunk_capacity")
+        if saved_config.chunk_overlap_fraction != self.config.chunk_overlap_fraction:
+            raise IncompatibleTextMemoryConfig("chunk_overlap_fraction")
+        if saved_tokenizer_name != self.chunk_tokenizer.name_or_path:
+            raise IncompatibleTextMemoryConfig("tokenizer")
+        if saved_emb_model_info != self.emb_model.get_info():
+            raise IncompatibleTextMemoryConfig("emb_model")
+        self.vector_db = saved_vector_db
+        self.chunk_queue = saved_chunk_queue

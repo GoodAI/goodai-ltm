@@ -1,8 +1,13 @@
+import builtins
 import codecs
+import dataclasses
+import enum
+import importlib
 import json
 import re
-from json import JSONDecodeError
-from typing import Any
+from json import JSONDecodeError, JSONEncoder, JSONDecoder
+from typing import Any, Type, Optional
+import numpy as np
 
 _javascript_re = re.compile(r"^.*```javascript(.*)```.*$", re.MULTILINE | re.DOTALL)
 _json_re = re.compile(r"^.*```(?:json)?(.*)```.*$", re.MULTILINE | re.DOTALL)
@@ -153,3 +158,64 @@ def _handle_extra_beginning_text(content: str, countdown: int) -> Any:
 def load_json(file_path: str, charset='utf-8'):
     with codecs.open(file_path, 'r', charset) as fd:
         return json.load(fd)
+
+
+class SimpleJSONEncoder(JSONEncoder):
+    @staticmethod
+    def _full_name(a_type: Type):
+        return a_type.__module__ + "." + a_type.__name__
+
+    @staticmethod
+    def asdict_filtered(obj):
+        return {field.name: getattr(obj, field.name) for field in dataclasses.fields(obj)
+                if field.init}
+
+    def default(self, o):
+        if dataclasses.is_dataclass(o):
+            result = self.asdict_filtered(o)
+            result["__class__"] = self._full_name(type(o))
+            return result
+        elif isinstance(o, enum.Enum):
+            return dict(__class__=self._full_name(type(o)), value=o.name)
+        elif isinstance(o, np.ndarray):
+            return dict(__class__=self._full_name(np.ndarray), value=o.tolist())
+        else:
+            return super().default(o)
+
+
+class SimpleJSONDecoder(JSONDecoder):
+    def __init__(self):
+        super().__init__(object_hook=self._from_dict)
+
+    @staticmethod
+    def _load_type(full_name: str) -> Optional[Type]:
+        dot_idx = full_name.rfind('.')
+        module_name = None if dot_idx == -1 else full_name[:dot_idx]
+        class_name = full_name if dot_idx == -1 else full_name[dot_idx + 1:]
+        try:
+            if module_name is None:
+                return getattr(builtins, class_name, None)
+            else:
+                module = importlib.import_module(module_name) if module_name else None
+                return getattr(module, class_name, None)
+        except (ModuleNotFoundError, AttributeError):
+            return None
+
+    @classmethod
+    def _from_dict(cls, d: dict) -> Any:
+        _class = d.get("__class__", "")
+        _type = cls._load_type(_class) if _class else None
+        if _type is None:
+            return d
+        elif dataclasses.is_dataclass(_type):
+            d_copy = dict(d)
+            del d_copy["__class__"]
+            return _type(**d_copy)
+        elif issubclass(_type, enum.Enum):
+            value = d.get("value")
+            return _type[value]
+        elif _type == np.ndarray:
+            value = d.get("value")
+            return np.array(value)
+        else:
+            return d

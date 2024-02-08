@@ -1,14 +1,12 @@
 ## GoodAI-LTM
 
-GoodAI-LTM brings together all the components necessary for equipping agents with text-based long term memory. 
-This includes text embedding models, reranking, vector databases, chunking, metadata such as time stamps and 
-document information, memory and query rewriting (expansion and disambiguation), storage and retrieval. 
+GoodAI-LTM equips agents with text-based long-term memory by combining essential components such as 
+text embedding models, reranking, vector databases, memory and query rewriting, automatic chunking, 
+chunk metadata, and chunk expansion. This package is specifically designed to offer a dialog-centric 
+memory stream for social agents.
 
-The package is especially adapted to provide a dialog-centric memory stream for social agents.
-
-GoodAI-LTM also provides a conversational agent component (`LTMAgent`) that can be easily integrated into
-Python-based apps.
-
+Additionally, GoodAI-LTM includes a conversational agent component (LTMAgent) for seamless 
+integration into Python-based apps.
 
 ## Installation
 
@@ -17,9 +15,10 @@ Python-based apps.
 ## Usage of LTMAgent
 
 
-## Text memory: basic usage
+## Usage of text memory
 
-The following code snippet creates an instance of LTM, loads in some text and then retrieves the most relevant text chunks given a query:
+The following code snippet creates an instance of the LTM, loads in some text and then retrieves 
+the most relevant text passages (expanded chunks) given a query:
 
     from goodai.ltm.mem.auto import AutoTextMemory
     mem = AutoTextMemory.create()
@@ -28,7 +27,7 @@ The following code snippet creates an instance of LTM, loads in some text and th
                  metadata={'title': 'My document', 'tags': ['latin']})
     r_memories = mem.retrieve(query='dolorem eum fugiat quo voluptas nulla pariatur?', k=3)
 
-### Loading a text memory instance
+### Creating a text memory instance
 
 A default memory instance can be created as follows:
 
@@ -76,19 +75,21 @@ Text can be associated with an arbitrary metadata dictionary, such as:
     mem.add_text("Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore\n",
                  metadata={'title': 'My document', 'tags': ['latin']})
 
-Internally, the memory concatenates text stored using add_text with any text previously sent to the memory.
+The memory concatenates text stored using `add_text` with any text previously sent to the memory,
+but you can call `add_separator` to ensure that new text is not added to previously created chunks.
 
 To retrieve a list of passages associated with a query,
 call the `retrieve` method:
 
     r_memories = mem.retrieve(query='dolorem eum fugiat quo voluptas nulla pariatur?', k=3)
 
-The `retrieve` method returns a list of objects of type `RetrievedMemory`, containing
-the following properties:
+The `retrieve` method returns a list of objects of type `RetrievedMemory`, in descending order of
+relevance. Each retrieved memory has the following properties:
 
 * `passage`: The text of the memory. This corresponds to text found in a matching chunk, but it may be expanded using text from adjacent chunks.
 * `timestamp`: The time (seconds since Epoch by default) when the retrieved chunk was created. 
 * `distance`: Calculated distance between the query and the chunk passage.
+* `relevance`: A number between 0 and 1 representing the relevance of the retrieved memory.
 * `confidence`: If a query-passage matching model is available, this is the probability assigned by the model.
 * `metadata`: Metadata associated with the retrieved text, if any.
 
@@ -103,11 +104,6 @@ will return the two passages most relevant to the query.
 The embedding model converts the query into an embedding. Then the stored embeddings closest to the query embedding 
 are found and the corresponding texts decoded.
 
-Optionally, a query-passage matching model can be used to compute pairwise query-passage matching probabilities 
-and rerank the passages.
-
-![Storage](diagram-simple.png)
-
 ## Embedding models
 
 ### Loading
@@ -121,6 +117,7 @@ An embedding model is loaded as follows:
 The `model_name` can be one of the following:
 
 * A SentenceTransformer (Huggingface), starting with `"st:"`, for example, `"st:sentence-transformers/multi-qa-mpnet-base-cos-v1"`.
+* A flag embedding model, starting with `"flag:"`, for example, `"flag:BAAI/bge-base-en-v1.5"`.
 * An OpenAI embedding model name, starting with `"openai:"`, for example, `"openai:text-embedding-ada-002"`.
 * One of our fine-tuned models:
 
@@ -149,12 +146,10 @@ the `encode_corpus` method, as follows:
 
     s_emb = em.encode_corpus(['it was...', 'the best of...'])
 
-A peculiarity of our embedding model is that queries
-and passages can have more than one embedding.
+Queries and passages can have more than one embedding.
 Embedding tensors have 3 axes: The batch size, the number of
 embeddings, and the number of embedding dimensions. Typically,
-the number of embeddings per query/passage will be 1, except for the 
-passage embeddings in some of our fine-tuned models.
+the number of embeddings per query/passage will be 1, with some exceptions.
 
 ## Query-passage matching models
 
@@ -210,34 +205,10 @@ representing estimated match probabilities. Example:
 
 See the [evaluations README](./evaluations).
 
+## Agent benchmarks
+
+Refer to the [goodai-ltm-benchmark project page](https://github.com/GoodAI/goodai-ltm-benchmark).
+
 ## More examples
 
 Additional example code can be found in the `examples` folder. 
-
-`examples/dump_mem.py` adds text to memory and shows how it is stored.
-
-`examples/wiki_retrieval.py` stores and queries articles from Wikipedia.
-
-`examples/rewriting.py` demonstrates query and memory rewriting.
-
-## Use in GoodAI's AI game
-
-An early application of GoodAI-LTM is in GoodAI's forthcoming [AI Game](https://www.goodai.com/ai-in-games/). 
-LLMs are used to shape NPC behavior and to generate dialog. Long-term memory is used to provide characters 
-with backstories and allows them to accumulate  experience during game play. 
-
-[![AI-game](game-screenshot-25.png)](https://www.youtube.com/watch?v=xkn0H_iWDEQ)
-
-Internally, we integrate the library with its C# port which allows us to split the library functionality between
-server and client more easily. The C# part of the library has not been made public yet.
-
-## Future plans
-
-We will continue to improve GoodAI-LTM. Possible next steps include
-* Retrieval weighted by recency and importance
-* Flag for preventing internal text concatenation in mem.add_text()
-* Embeddings for source code retrieval
-* Storage and retrieval methods without embeddings
-* Improvements to the currently experimental query and memory rewriting feature and its default prompts
-* Configurable chunk overlapping and expansion
-* Iterating on improvements to our datasets and models

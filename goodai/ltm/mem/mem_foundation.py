@@ -200,6 +200,14 @@ class BaseTextMemoryFoundation(BaseTextMemory):
     def get_complete_passage(self, chunk: Chunk) -> PassageInfo:
         pass
 
+    @abc.abstractmethod
+    def state_as_text(self) -> str:
+        pass
+
+    @abc.abstractmethod
+    def set_state(self, state: str):
+        pass
+
     def dump(self, stream: io.TextIOBase = sys.stdout):
         chunks = self.get_all_chunks()
         stream.write('| Id | Metadata | Importance | Content |\n')
@@ -378,3 +386,4 @@ class BaseTextMemoryFoundation(BaseTextMemory):
             else:
                 result.append(query)
         return result
+
