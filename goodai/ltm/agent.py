@@ -8,7 +8,7 @@ import time
 import uuid
 from dataclasses import dataclass
 from json import JSONDecodeError
-from typing import List, Callable, Optional, Any
+from typing import List, Callable, Optional, Any, Union
 
 from litellm import completion, completion_cost
 
@@ -20,13 +20,19 @@ from goodai.ltm.mem.config import ChunkExpansionConfig, TextMemoryConfig
 import tiktoken
 
 from goodai.ltm.prompts.chronological_ltm import cltm_template_queries_info
+from goodai.ltm.prompts.scratchpad_ltm import s_ltm_template_queries_info
 
 _logger = logging.getLogger("exp_agent")
+_txt_re = re.compile(r"^.*```(?:txt)?(.*)```.*$", re.MULTILINE | re.DOTALL)
 _log_prompts = os.environ.get("LTM_BENCH_PROMPT_LOGGING", "False").lower() in ["true", "yes", "1"]
 _default_system_message = """
 You are a helpful AI assistant with a long-term memory. Prior interactions with the user are tagged with a timestamp. Current time: {datetime}.
 """
 _user_info_system_message = """
+You are an expert in helping AI assistants manage their knowledge about a user and their 
+operating environment.
+"""
+_scratchpad_system_message = """
 You are an expert in helping AI assistants manage their knowledge about a user and their 
 operating environment.
 """
@@ -85,8 +91,6 @@ class LTMAgent:
         prompt_callback: Callable[[str, list[dict], str], Any] = None
     ):
         # TODO:
-        # - persist user_info and wm_scratchpad
-        # - query strategy for different variants
         # - knowledge base support
 
         super().__init__()
@@ -103,14 +107,11 @@ class LTMAgent:
         self.ctx_fraction_for_mem = config.ctx_fraction_for_mem
         self.max_prompt_size = max_prompt_size
         self.time_fn = time_fn
-        self.session_index = 0
-        self.session: Optional['LTMAgentSession'] = None
+        self._session: Optional['LTMAgentSession'] = None
         self.system_message_template = config.system_message or _default_system_message
         self.user_info: dict = {}
         self.wm_scratchpad: str = ""
         self.model = model
-        self.log_lock = threading.RLock()
-        self.log_count = 0
         mem_config = TextMemoryConfig()
         mem_config.queue_capacity = config.chunk_queue_capacity
         mem_config.chunk_capacity = config.chunk_size
@@ -127,7 +128,7 @@ class LTMAgent:
                                             config=mem_config)
 
     @staticmethod
-    def num_tokens_from_string(string: str, model="gpt-4"):
+    def _num_tokens_from_string(string: str, model="gpt-4"):
         """Returns the number of tokens in a text string."""
         try:
             encoding = tiktoken.encoding_for_model(model)
@@ -136,20 +137,34 @@ class LTMAgent:
         return len(encoding.encode(string))
 
     @classmethod
-    def context_token_counts(cls, messages: List[dict]):
+    def _context_token_counts(cls, messages: List[dict]):
         """Calculates the total number of tokens in a list of messages."""
         total_tokens = 0
         for message in messages:
-            total_tokens += cls.num_tokens_from_string(message["content"])
+            total_tokens += cls._num_tokens_from_string(message["content"])
         return total_tokens
+
+    @property
+    def session(self) -> 'LTMAgentSession':
+        if self._session is None:
+            self.new_session()
+        return self._session
 
     def new_session(self) -> 'LTMAgentSession':
         session_id = str(uuid.uuid4())
-        self.session = LTMAgentSession(session_id=session_id, m_history=[])
-        return self.session
+        self._session = LTMAgentSession(session_id=session_id, m_history=[])
+        if not self.convo_mem.is_empty():
+            self.convo_mem.add_separator()
+        return self._session
 
     def use_session(self, session: 'LTMAgentSession'):
-        self.session = session
+        self._session = session
+
+    def add_knowledge(self, text: str, with_separator: bool = True,
+                      show_progress_bar: bool = False):
+        self.kb_mem.add_text(text, show_progress_bar=show_progress_bar)
+        if with_separator:
+            self.kb_mem.add_separator()
 
     def state_as_text(self) -> str:
         convo_mem_state = self.convo_mem.state_as_text()
@@ -159,11 +174,13 @@ class LTMAgent:
                      config=self.config,
                      convo_mem=convo_mem_state,
                      kb_mem=kb_mem_state,
+                     user_info=self.user_info,
+                     wm_scratchpad=self.wm_scratchpad,
                      )
         return json.dumps(state, cls=SimpleJSONEncoder)
 
     @classmethod
-    def load_from_state(cls, state_text: str,
+    def from_state_text(cls, state_text: str,
                         time_fn: Callable[[str, int], float] = _default_time,
                         prompt_callback: Callable[[str, list[dict], str], Any] = None) -> 'LTMAgent':
         state = json.loads(state_text, cls=SimpleJSONDecoder)
@@ -172,13 +189,17 @@ class LTMAgent:
         config = state["config"]
         convo_mem_state = state["convo_mem"]
         kb_mem_state = state["kb_mem"]
+        user_info = state["user_info"]
+        wm_scratchpad = state["wm_scratchpad"]
         agent = cls(max_prompt_size, model=model_name, config=config,
                     time_fn=time_fn, prompt_callback=prompt_callback)
         agent.convo_mem.set_state(convo_mem_state)
         agent.kb_mem.set_state(kb_mem_state)
+        agent.user_info = user_info
+        agent.wm_scratchpad = wm_scratchpad
         return agent
 
-    def prepare_system_content(self) -> str:
+    def _prepare_system_content(self) -> str:
         new_system_content = ""
         if self.system_message_template:
             new_system_content = self.system_message_template.format(
@@ -201,34 +222,45 @@ class LTMAgent:
                     new_system_content = user_info_content
         return new_system_content
 
-    def build_llm_context(self, m_history: list[Message], user_content: str,
-                          cost_callback: Callable[[float], Any]) -> list[dict]:
+    def _update_info_object(self, info_object: Union[dict, str]):
+        if self.variant == LTMAgentVariant.QG_JSON_USER_INFO:
+            assert isinstance(info_object, dict)
+            self.user_info = info_object
+        elif self.variant == LTMAgentVariant.TEXT_SCRATCHPAD:
+            assert isinstance(info_object, str)
+            self.wm_scratchpad = str
+        else:
+            # nop
+            pass
+
+    def _build_llm_context(self, m_history: list[Message], user_content: str,
+                           cost_callback: Callable[[float], Any]) -> list[dict]:
         target_history_tokens = self.max_prompt_size * (1.0 - self.ctx_fraction_for_mem)
-        new_system_content = self.prepare_system_content()
+        new_system_content = self._prepare_system_content()
         context = []
         if new_system_content:
             context.append({"role": "system", "content": new_system_content})
         context.append({"role": "user", "content": user_content})
-        token_count = self.context_token_counts(context)
+        token_count = self._context_token_counts(context)
         to_timestamp = self.current_time
         for message in reversed(m_history):
             if message.is_user:
-                et_descriptor = self.get_elapsed_time_descriptor(message.timestamp,
-                                                                 self.current_time)
+                et_descriptor = self._get_elapsed_time_descriptor(message.timestamp,
+                                                                  self.current_time)
                 new_content = f"[{et_descriptor}]\n{message.content}"
                 message = Message(message.role, new_content, message.timestamp)
             message_dict = message.as_llm_dict()
-            new_token_count = self.context_token_counts([message_dict]) + token_count
+            new_token_count = self._context_token_counts([message_dict]) + token_count
             if new_token_count > target_history_tokens:
                 break
             to_timestamp = message.timestamp
             context.insert(1, message_dict)
             token_count = new_token_count
         remain_tokens = self.max_prompt_size - token_count
-        user_info, mem_message = self.get_mem_message(m_history, user_content, remain_tokens,
-                                                      to_timestamp=to_timestamp,
-                                                      cost_callback=cost_callback)
-        self.user_info = user_info
+        info_object, mem_message = self._get_mem_message(m_history, user_content, remain_tokens,
+                                                         to_timestamp=to_timestamp,
+                                                         cost_callback=cost_callback)
+        self._update_info_object(info_object)
         if mem_message:
             context.insert(1, mem_message)
         return context
@@ -247,16 +279,16 @@ class LTMAgent:
                                                      overlap_threshold=self.overlap_threshold)
         return r_memories
 
-    def get_mem_message(
+    def _get_mem_message(
         self, m_history: list[Message], user_content: str, remain_tokens: int,
             to_timestamp: float, cost_callback: Callable[[float], Any], k_per_query=250
-    ) -> tuple[dict, Optional[dict[str, str]]]:
+    ) -> tuple[Union[dict, str], Optional[dict[str, str]]]:
         """
         Gets (1) a new user object, and (2) a context message with
         information from memory if available.
         """
-        queries, user_info = self.prepare_mem_info(m_history, user_content,
-                                                   cost_callback=cost_callback)
+        queries, user_info = self._prepare_mem_info(m_history, user_content,
+                                                    cost_callback=cost_callback)
         queries = queries or []
         queries = [f"user: {user_content}"] + queries
         r_memories = self.retrieve_from_queries(queries, k_per_query=k_per_query,
@@ -276,20 +308,30 @@ class LTMAgent:
             dict(role="system", content=excerpts_content),
         )
 
-    def prepare_mem_info(self, message_history: list[Message], user_content: str,
-                         cost_callback: Callable[[float], Any]) -> tuple[list[str], dict]:
-        prompt_messages = [{"role": "system", "content": _user_info_system_message}]
-        last_assistant_message = None
-        for i in range(len(message_history) - 1, -1, -1):
-            m = message_history[i]
-            if m.role == "assistant":
-                last_assistant_message = m
-                break
-        if last_assistant_message:
-            if len(message_history) > 2:
-                prompt_messages.append({"role": "system",
-                                        "content": "Prior conversation context omitted."})
-            prompt_messages.append(last_assistant_message.as_llm_dict())
+    def _get_internal_prompt_system_message(self):
+        if self.variant == LTMAgentVariant.QG_JSON_USER_INFO:
+            return _user_info_system_message
+        elif self.variant == LTMAgentVariant.TEXT_SCRATCHPAD:
+            return _scratchpad_system_message
+        else:
+            raise ValueError(f"Unexpected: {self.variant}")
+
+    @staticmethod
+    def _sanitize_and_parse_scratchpad(s_completion: str) -> Optional[str]:
+        match_txt = _txt_re.search(s_completion)
+        if match_txt:
+            return match_txt.group(1)
+        else:
+            _logger.warning(f"Scratchpad content not found in completion: {s_completion}")
+            return None
+
+    @staticmethod
+    def _formatted_scratchpad(raw_scratchpad):
+        return f"```txt\n{raw_scratchpad}\n```"
+
+    def _complete_prepare_user_info(self, prompt_messages: list[dict],
+                                    user_content: str,
+                                    cost_callback: Callable[[float], Any]) -> tuple[list[str], dict]:
         if self.user_info:
             user_info_text = json.dumps(self.user_info, indent=3)
             user_info_description = f"Prior information about the user:\n{user_info_text}"
@@ -300,8 +342,8 @@ class LTMAgent:
             user_content=user_content,
         ).strip()
         prompt_messages.append({"role": "user", "content": sp_content})
-        query_json = self.completion(prompt_messages, temperature=self.mem_temperature,
-                                     label="query-generation", cost_callback=cost_callback)
+        query_json = self._completion(prompt_messages, temperature=self.mem_temperature,
+                                      label="query-generation", cost_callback=cost_callback)
         try:
             queries_and_info = sanitize_and_parse_json(query_json)
         except (JSONDecodeError, ValueError):
@@ -318,8 +360,57 @@ class LTMAgent:
             user_info,
         )
 
+    def _complete_prepare_wm_scratchpad(self, prompt_messages: list[dict],
+                                        user_content: str,
+                                        cost_callback: Callable[[float], Any]) -> str:
+        if self.wm_scratchpad:
+            user_info_description = (f"Prior scratchpad content (world model, user info):\n" +
+                                     self._formatted_scratchpad(
+                                         self.wm_scratchpad
+                                     ))
+        else:
+            user_info_description = f"Prior scratchpad content is empty."
+        sp_content = s_ltm_template_queries_info.format(
+            user_info_description=user_info_description,
+            user_content=user_content,
+        ).strip()
+        prompt_messages.append({"role": "user", "content": sp_content})
+        s_completion = self._completion(prompt_messages, temperature=self.mem_temperature,
+                                        label="scratchpad-generation",
+                                        cost_callback=cost_callback)
+        new_scratchpad = self._sanitize_and_parse_scratchpad(s_completion)
+        return new_scratchpad
+
+    def _prepare_mem_info(self, message_history: list[Message], user_content: str,
+                          cost_callback: Callable[[float], Any]) -> tuple[list[str], Union[dict, str, None]]:
+        if self.variant == LTMAgentVariant.SEMANTIC_ONLY:
+            queries = [f"user: {user_content}"]
+            return queries, None,
+        system_message = self._get_internal_prompt_system_message()
+        prompt_messages = [{"role": "system", "content": system_message}]
+        last_assistant_message = None
+        for i in range(len(message_history) - 1, -1, -1):
+            m = message_history[i]
+            if m.role == "assistant":
+                last_assistant_message = m
+                break
+        if last_assistant_message:
+            if len(message_history) > 2:
+                prompt_messages.append({"role": "system",
+                                        "content": "Prior conversation context omitted."})
+            prompt_messages.append(last_assistant_message.as_llm_dict())
+        if self.variant == LTMAgentVariant.QG_JSON_USER_INFO:
+            return self._complete_prepare_user_info(prompt_messages, user_content, cost_callback)
+        elif self.variant == LTMAgentVariant.TEXT_SCRATCHPAD:
+            new_scratchpad = self._complete_prepare_wm_scratchpad(prompt_messages, user_content,
+                                                                  cost_callback)
+            queries = [f"user: {user_content}"]
+            return queries, new_scratchpad,
+        else:
+            raise ValueError(f"Unexpected: {self.variant}")
+
     @staticmethod
-    def get_elapsed_time_descriptor(event_timestamp: float, current_timestamp: float):
+    def _get_elapsed_time_descriptor(event_timestamp: float, current_timestamp: float):
         elapsed = current_timestamp - event_timestamp
         if elapsed < 1:
             return "just now"
@@ -337,9 +428,9 @@ class LTMAgent:
         excerpts: list[tuple[float, str]] = []
         ts = self.current_time
         for m in memories:
-            ts_descriptor = self.get_elapsed_time_descriptor(m.timestamp, current_timestamp=ts)
+            ts_descriptor = self._get_elapsed_time_descriptor(m.timestamp, current_timestamp=ts)
             excerpt = f"## Excerpt from {ts_descriptor}\n{m.passage.strip()}\n\n"
-            new_token_count = self.num_tokens_from_string(excerpt) + token_count
+            new_token_count = self._num_tokens_from_string(excerpt) + token_count
             if new_token_count > token_limit:
                 break
             token_count = new_token_count
@@ -355,32 +446,30 @@ class LTMAgent:
     @property
     def current_time(self) -> float:
         session = self.session
-        session_id = "" if session is None else session.session_id
-        session_len = 0 if session is None else session.message_count
+        session_id = session.session_id
+        session_len = session.message_count
         return self.time_fn(session_id, session_len)
 
-    def add_to_memory(self, message: "Message"):
+    def _add_to_convo_memory(self, message: "Message"):
         text = f"{message.role}: {message.content}\n"
         self.convo_mem.add_text(text, timestamp=message.timestamp)
 
     def reply(self, user_content: str, cost_callback: Callable[[float], Any] = None) -> str:
-        if self.session is None:
-            self.new_session()
         session = self.session
-        context = self.build_llm_context(session.message_history, user_content,
-                                         cost_callback)
-        response = self.completion(context, temperature=self.llm_temperature, label="reply",
-                                   cost_callback=cost_callback)
+        context = self._build_llm_context(session.message_history, user_content,
+                                          cost_callback)
+        response = self._completion(context, temperature=self.llm_temperature, label="reply",
+                                    cost_callback=cost_callback)
         user_message = Message(role="user", content=user_content, timestamp=self.current_time)
         session.add(user_message)
-        self.add_to_memory(user_message)
+        self._add_to_convo_memory(user_message)
         assistant_message = Message(role="assistant", content=response, timestamp=self.current_time)
         session.add(assistant_message)
-        self.add_to_memory(assistant_message)
+        self._add_to_convo_memory(assistant_message)
         return response
 
-    def completion(self, context: List[dict[str, str]], temperature: float, label: str,
-                   cost_callback: Callable[[float], Any]) -> str:
+    def _completion(self, context: List[dict[str, str]], temperature: float, label: str,
+                    cost_callback: Callable[[float], Any]) -> str:
         response = completion(model=self.model, messages=context, timeout=self.config.timeout,
                               temperature=temperature, max_tokens=self.config.max_completion_tokens)
         response_text = response['choices'][0]['message']['content']
@@ -391,11 +480,18 @@ class LTMAgent:
             cost_callback(cost)
         return response_text
 
-    def reset(self):
-        self.convo_mem.clear()
+    def clear_knowledge(self):
         self.kb_mem.clear()
+
+    def clear_conversation_memory(self):
+        self.convo_mem.clear()
         self.user_info = {}
         self.wm_scratchpad = ""
+
+    def reset(self):
+        self.clear_knowledge()
+        self.clear_conversation_memory()
+        self.new_session()
 
 
 class LTMAgentSession:
