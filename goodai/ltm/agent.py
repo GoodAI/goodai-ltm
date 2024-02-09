@@ -63,7 +63,6 @@ class LTMAgentConfig:
     llm_temperature: float = 0.01
     mem_temperature: float = 0.01
     timeout: Optional[int] = 300.0
-    max_completion_tokens: Optional[float] = None
 
 
 @dataclass
@@ -89,21 +88,23 @@ class LTMAgent:
         variant: LTMAgentVariant = LTMAgentVariant.SEMANTIC_ONLY,
         model: str = None,
         max_prompt_size: int = 4000,
+        max_completion_tokens: Optional[float] = None,
         config: LTMAgentConfig = None,
         time_fn: Callable[[str, int], float] = _default_time,
-        prompt_callback: Callable[[str, list[dict], str], Any] = None
+        prompt_callback: Callable[[str, str, list[dict], str], Any] = None
     ):
         super().__init__()
         if config is None:
             config = LTMAgentConfig()
         self.variant = variant
         self.prompt_callback = prompt_callback
+        self.max_prompt_size = max_prompt_size
+        self.max_completion_tokens = max_completion_tokens
         self.config = config
         self.mem_temperature = config.mem_temperature
         self.llm_temperature = config.llm_temperature
         self.overlap_threshold = config.redundancy_overlap_threshold
         self.ctx_fraction_for_mem = config.ctx_fraction_for_mem
-        self.max_prompt_size = max_prompt_size
         self.time_fn = time_fn
         self._session: Optional['LTMAgentSession'] = None
         self.system_message_template = config.system_message or _default_system_message
@@ -169,6 +170,7 @@ class LTMAgent:
         kb_mem_state = self.kb_mem.state_as_text()
         state = dict(model=self.model,
                      max_prompt_size=self.max_prompt_size,
+                     max_completion_tokens=self.max_completion_tokens,
                      config=self.config,
                      convo_mem=convo_mem_state,
                      kb_mem=kb_mem_state,
@@ -180,16 +182,20 @@ class LTMAgent:
     @classmethod
     def from_state_text(cls, state_text: str,
                         time_fn: Callable[[str, int], float] = _default_time,
-                        prompt_callback: Callable[[str, list[dict], str], Any] = None) -> 'LTMAgent':
+                        prompt_callback: Callable[
+                            [str, str, list[dict], str], Any] = None) -> 'LTMAgent':
         state = json.loads(state_text, cls=SimpleJSONDecoder)
         model_name = state["model"]
         max_prompt_size = state["max_prompt_size"]
+        max_completion_tokens = state["max_completion_tokens"]
         config = state["config"]
         convo_mem_state = state["convo_mem"]
         kb_mem_state = state["kb_mem"]
         user_info = state["user_info"]
         wm_scratchpad = state["wm_scratchpad"]
-        agent = cls(max_prompt_size, model=model_name, config=config,
+        agent = cls(max_prompt_size=max_prompt_size,
+                    max_completion_tokens=max_completion_tokens,
+                    model=model_name, config=config,
                     time_fn=time_fn, prompt_callback=prompt_callback)
         agent.convo_mem.set_state(convo_mem_state)
         agent.kb_mem.set_state(kb_mem_state)
@@ -226,7 +232,7 @@ class LTMAgent:
             self.user_info = info_object
         elif self.variant == LTMAgentVariant.TEXT_SCRATCHPAD:
             assert isinstance(info_object, str)
-            self.wm_scratchpad = str
+            self.wm_scratchpad = info_object
         else:
             # nop
             pass
@@ -503,10 +509,10 @@ class LTMAgent:
     def _completion(self, context: List[dict[str, str]], temperature: float, label: str,
                     cost_callback: Callable[[float], Any]) -> str:
         response = completion(model=self.model, messages=context, timeout=self.config.timeout,
-                              temperature=temperature, max_tokens=self.config.max_completion_tokens)
+                              temperature=temperature, max_tokens=self.max_completion_tokens)
         response_text = response['choices'][0]['message']['content']
         if self.prompt_callback:
-            self.prompt_callback(label, context, response_text)
+            self.prompt_callback(self.session.session_id, label, context, response_text)
         if cost_callback:
             cost = completion_cost(model=self.model, completion_response=response, messages=context)
             cost_callback(cost)
