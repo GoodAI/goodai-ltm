@@ -3,7 +3,7 @@ import enum
 import json
 import logging
 import os
-import threading
+import re
 import time
 import uuid
 from dataclasses import dataclass
@@ -36,6 +36,9 @@ _scratchpad_system_message = """
 You are an expert in helping AI assistants manage their knowledge about a user and their 
 operating environment.
 """
+_convo_excerpts_prefix = f"# The following are excerpts from the early part of the conversation "\
+                         f"or prior conversations, in chronological order:\n\n"
+_kb_excerpts_prefix = f"# The following are relevant excerpts from your knowledge base:\n\n"
 
 
 def _default_time(session_id: str, line_index: int) -> float:
@@ -85,19 +88,14 @@ class LTMAgent:
         self,
         variant: LTMAgentVariant = LTMAgentVariant.SEMANTIC_ONLY,
         model: str = None,
-        max_prompt_size: Optional[int] = None,
+        max_prompt_size: int = 4000,
         config: LTMAgentConfig = None,
         time_fn: Callable[[str, int], float] = _default_time,
         prompt_callback: Callable[[str, list[dict], str], Any] = None
     ):
-        # TODO:
-        # - knowledge base support
-
         super().__init__()
         if config is None:
             config = LTMAgentConfig()
-        if max_prompt_size is None:
-            max_prompt_size = todo()
         self.variant = variant
         self.prompt_callback = prompt_callback
         self.config = config
@@ -265,8 +263,8 @@ class LTMAgent:
             context.insert(1, mem_message)
         return context
 
-    def retrieve_from_queries(self, queries: list[str], k_per_query: int,
-                              to_timestamp: float) -> List[RetrievedMemory]:
+    def convo_retrieve(self, queries: list[str], k_per_query: int,
+                       to_timestamp: float) -> List[RetrievedMemory]:
         try:
             multi_list = self.convo_mem.retrieve_multiple(queries, k=k_per_query)
         except IndexError:
@@ -274,6 +272,18 @@ class LTMAgent:
             raise
         r_memories = [rm for entry in multi_list for rm in entry]
         r_memories = [rm for rm in r_memories if rm.timestamp < to_timestamp]
+        r_memories.sort(key=lambda _rm: _rm.relevance, reverse=True)
+        r_memories = RetrievedMemory.remove_overlaps(r_memories,
+                                                     overlap_threshold=self.overlap_threshold)
+        return r_memories
+
+    def kb_retrieve(self, queries: list[str], k_per_query: int) -> List[RetrievedMemory]:
+        try:
+            multi_list = self.kb_mem.retrieve_multiple(queries, k=k_per_query)
+        except IndexError:
+            _logger.error(f"Unable to retrieve memories using these queries: {queries}")
+            raise
+        r_memories = [rm for entry in multi_list for rm in entry]
         r_memories.sort(key=lambda _rm: _rm.relevance, reverse=True)
         r_memories = RetrievedMemory.remove_overlaps(r_memories,
                                                      overlap_threshold=self.overlap_threshold)
@@ -291,21 +301,16 @@ class LTMAgent:
                                                     cost_callback=cost_callback)
         queries = queries or []
         queries = [f"user: {user_content}"] + queries
-        r_memories = self.retrieve_from_queries(queries, k_per_query=k_per_query,
-                                                to_timestamp=to_timestamp)
-        if not r_memories:
-            return (
-                user_info,
-                None,
-            )
-        excerpts_text = self.get_mem_excerpts(r_memories, remain_tokens)
-        excerpts_content = (
-            f"The following are excerpts from the early part of the conversation "
-            f"or prior conversations, in chronological order:\n\n{excerpts_text}"
-        )
+        convo_memories = self.convo_retrieve(queries, k_per_query=k_per_query,
+                                             to_timestamp=to_timestamp)
+        kb_memories = self.kb_retrieve(queries, k_per_query=k_per_query)
+        excerpts_text = self.get_mem_excerpts(convo_memories, kb_memories,
+                                              remain_tokens)
+        if not excerpts_text:
+            return user_info, None,
         return (
             user_info,
-            dict(role="system", content=excerpts_content),
+            dict(role="system", content=excerpts_text),
         )
 
     def _get_internal_prompt_system_message(self):
@@ -423,25 +428,52 @@ class LTMAgent:
         else:
             return f"{elapsed / (60 * 60 * 24):.1f} day(s) ago"
 
-    def get_mem_excerpts(self, memories: List[RetrievedMemory], token_limit: int) -> str:
+    def get_mem_excerpts(self, convo_memories: list[RetrievedMemory],
+                         kb_memories: list[RetrievedMemory],
+                         token_limit: int) -> str:
+        all_memory_tuples: list[tuple[bool, RetrievedMemory]] = []
+        all_memory_tuples.extend([(True, m,) for m in convo_memories])
+        all_memory_tuples.extend([(False, m,) for m in kb_memories])
+        all_memory_tuples.sort(key=lambda _t: _t[1].relevance, reverse=True)
         token_count = 0
-        excerpts: list[tuple[float, str]] = []
+        convo_excerpts: list[tuple[float, str]] = []
+        kb_excerpts: list[tuple[float, str]] = []
+        first_time = [True] * 2
         ts = self.current_time
-        for m in memories:
+        for is_convo, m in all_memory_tuples:
+            if first_time[int(is_convo)]:
+                first_time[int(is_convo)] = False
+                prefix = _convo_excerpts_prefix if is_convo else _kb_excerpts_prefix
+                new_token_count = self._num_tokens_from_string(prefix) + token_count
+                if new_token_count > token_limit:
+                    break
+                token_count = new_token_count
             ts_descriptor = self._get_elapsed_time_descriptor(m.timestamp, current_timestamp=ts)
-            excerpt = f"## Excerpt from {ts_descriptor}\n{m.passage.strip()}\n\n"
+            if is_convo:
+                excerpt = f"# Excerpt from {ts_descriptor}\n{m.passage.strip()}\n\n"
+            else:
+                excerpt = f"# Excerpt\n{m.passage.strip()}\n\n"
             new_token_count = self._num_tokens_from_string(excerpt) + token_count
             if new_token_count > token_limit:
                 break
             token_count = new_token_count
-            excerpts.append(
-                (
-                    m.timestamp,
-                    excerpt,
+            if is_convo:
+                convo_excerpts.append(
+                    (
+                        m.timestamp,
+                        excerpt,
+                    )
                 )
-            )
-        excerpts.sort(key=lambda _t: _t[0])
-        return "\n".join([e for _, e in excerpts])
+            else:
+                kb_excerpts.append((m.passage_info.fromIndex, excerpt))
+        convo_excerpts.sort(key=lambda _t: _t[0])
+        kb_excerpts.sort(key=lambda _t: _t[0])
+        result = ""
+        if kb_excerpts:
+            result += _kb_excerpts_prefix + "\n".join([e for _, e in kb_excerpts])
+        if convo_excerpts:
+            result += _convo_excerpts_prefix + "\n".join([e for _, e in convo_excerpts])
+        return result
 
     @property
     def current_time(self) -> float:
