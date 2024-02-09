@@ -543,14 +543,14 @@ class LTMAgentSession:
 
     def state_as_text(self) -> str:
         state = dict(session_id=self.session_id, history=self.message_history)
-        return json.dumps(state)
+        return json.dumps(state, cls=SimpleJSONEncoder)
 
     def add(self, message: Message):
         self.message_history.append(message)
 
     @classmethod
     def from_state_text(cls, state_text: str) -> 'LTMAgentSession':
-        state: dict = json.loads(state_text)
+        state: dict = json.loads(state_text, cls=SimpleJSONDecoder)
         session_id = state["session_id"]
         m_history = state["history"]
         return cls(session_id, m_history)

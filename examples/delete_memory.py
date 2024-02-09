@@ -1,8 +1,4 @@
-from goodai.ltm.embeddings.auto import AutoTextEmbeddingModel
 from goodai.ltm.mem.auto import AutoTextMemory
-import wikipediaapi
-
-from goodai.ltm.mem.mem_foundation import VectorDbType
 
 # This example adds some facts to the memory. Then we delete
 # a specific fact. We also query the memory and delete a fact
