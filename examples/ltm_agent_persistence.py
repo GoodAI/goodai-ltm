@@ -1,12 +1,17 @@
-from goodai.ltm.agent import LTMAgent, LTMAgentVariant, LTMAgentSession
+from goodai.ltm.agent import LTMAgent, LTMAgentSession, LTMAgentConfig
+
 
 # In this example we simulate saving agent memory and an agent session
 # and then rebuilding an agent and the session.
 
 
 def get_saved_agent_info() -> tuple[str, str]:
+    # Let's use a lightweight embedding model
+    _config = LTMAgentConfig()
+    _config.emb_model = "em-MiniLM-p1-01"
     _agent = LTMAgent(model="gpt-3.5-turbo",
-                      max_prompt_size=3000)
+                      max_prompt_size=3000,
+                      config=_config)
     # Let's add some knowledge
     _agent.add_knowledge("If the user asks you to perform a mathematical operation "
                          "write Typescript code instead and do not perform the calculation.")
@@ -23,6 +28,8 @@ def get_saved_agent_info() -> tuple[str, str]:
 
 if __name__ == '__main__':
     agent_state, session_state = get_saved_agent_info()
+    print(f"Agent state size: {len(agent_state)/1024:.3g} Kchars")
+    print(f"Session state size: {len(session_state)/1024:.3g} Kchars")
     # Let's first restore the agent
     agent = LTMAgent.from_state_text(agent_state)
     query = "What are your operational instructions regarding mathematical operations?"

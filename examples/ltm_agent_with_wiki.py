@@ -1,9 +1,6 @@
 import codecs
 import json
 import os.path
-
-import litellm
-
 from goodai.ltm.agent import LTMAgent, LTMAgentVariant
 import wikipediaapi
 

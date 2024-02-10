@@ -1,11 +1,7 @@
 import codecs
 import json
 import os.path
-
-import litellm
-
 from goodai.ltm.agent import LTMAgent, LTMAgentVariant
-import wikipediaapi
 
 # In this example we ask the agent to keep track of a shopping list, and then we test it.
 

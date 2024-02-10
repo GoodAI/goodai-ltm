@@ -46,30 +46,104 @@ def _default_time(session_id: str, line_index: int) -> float:
 
 
 class LTMAgentVariant(enum.Enum):
+    """The type of memory used by LTMAgent."""
+
     SEMANTIC_ONLY = 0,
+    """    
+    A fast memory that relies only on semantic retrieval of chunks.
+    """
+
     QG_JSON_USER_INFO = 1,
+    """
+    In addition to semantic retrieval, this memory has query generation and it also
+    maintains a JSON object with information provided by the user.
+    """
+
     TEXT_SCRATCHPAD = 2,
+    """
+    In addition to semantic retrieval, this memory maintains a text scratchpad
+    with information provided by the user.
+    """
 
 
 @dataclass
 class LTMAgentConfig:
+    """
+    Configuration of LTMAgent.
+    """
+
     system_message: str = None
+    """
+    Text of the system prompt.
+    """
+
     ctx_fraction_for_mem: float = 0.5
+    """
+    How much of the prompt should be reserved for memory excerpts.
+    """
+
     emb_model: str = "flag:BAAI/bge-base-en-v1.5"
+    """
+    The name of the embedding model, as supported by goodai-ltm.
+    """
+
     chunk_size: int = 32
+    """
+    The size of a chunk in the text memory.
+    """
+
     chunk_queue_capacity: int = 50000
+    """
+    The capacity of the chunk queue, in number of chunks.
+    """
+
     chunk_overlap_fraction: float = 0.5
+    """
+    How much chunks overlap with one another. This can be a number from 0 to 0.5.
+    """
+
     redundancy_overlap_threshold: float = 0.6
+    """
+    For retrieved passages, or expanded chunks, what's the maximum overlap they can
+    have with an already-retrieved chunk so they aren't removed.
+    """
+
     llm_temperature: float = 0.01
+    """
+    The temperature for chat interaction LLM completions.
+    """
+
     mem_temperature: float = 0.01
+    """
+    The temperature for internal LTM-related LLM completions.
+    """
+
     timeout: Optional[int] = 300.0
+    """
+    The timeout of LLM requests.
+    """
 
 
 @dataclass
 class Message:
+    """
+    A message in a chat session
+    """
+
     role: str
+    """
+    This can be "assistant" or "user".
+    """
+
     content: str
+    """
+    The text of the message.
+    """
+
     timestamp: float
+    """
+    The timestamp of the message. Normally, this is seconds since Epoch.
+    """
 
     def as_llm_dict(self) -> dict[str, str]:
         return {"role": self.role, "content": self.content}
@@ -93,6 +167,16 @@ class LTMAgent:
         time_fn: Callable[[str, int], float] = _default_time,
         prompt_callback: Callable[[str, str, list[dict], str], Any] = None
     ):
+        """
+        LTMAgent initializer.
+        :param variant: The type of LTM implementation.
+        :param model: Any LLM model supported by the litellm library.
+        :param max_prompt_size: The maximum size of the LLM prompt, in tokens.
+        :param max_completion_tokens: The maximum size of the completion.
+        :param config: Additional agent configuration parameters.
+        :param time_fn: Optional function for message timestamps.
+        :param prompt_callback: Optional function used to get information on prompts sent to the LLM.
+        """
         super().__init__()
         if config is None:
             config = LTMAgentConfig()
@@ -145,11 +229,18 @@ class LTMAgent:
 
     @property
     def session(self) -> 'LTMAgentSession':
+        """
+        :return: The current agent session.
+        """
         if self._session is None:
             self.new_session()
         return self._session
 
     def new_session(self) -> 'LTMAgentSession':
+        """
+        Creates a new LTMAgentSession object and sets it as the current session.
+        :return: The new session object.
+        """
         session_id = str(uuid.uuid4())
         self._session = LTMAgentSession(session_id=session_id, m_history=[])
         if not self.convo_mem.is_empty():
@@ -157,15 +248,30 @@ class LTMAgent:
         return self._session
 
     def use_session(self, session: 'LTMAgentSession'):
+        """
+        Replaces the current session with the one provided.
+        :param session: An instance of LTMAgentSession.
+        """
         self._session = session
 
     def add_knowledge(self, text: str, with_separator: bool = True,
                       show_progress_bar: bool = False):
+        """
+        Adds text to the agent's knowledge base.
+        :param text: A document or statement.
+        :param with_separator: Whether to add a separator to the memory so chunks of the next document are separate.
+        :param show_progress_bar: Whether to show a progress bar while indexing chunks.
+        """
         self.kb_mem.add_text(text, show_progress_bar=show_progress_bar)
         if with_separator:
             self.kb_mem.add_separator()
 
     def state_as_text(self) -> str:
+        """
+        :return: A string representation of the content of the agent's memories (including
+        embeddings and chunks) in addition to agent configuration information.
+        Note that callback functions are not part of the provided state string.
+        """
         convo_mem_state = self.convo_mem.state_as_text()
         kb_mem_state = self.kb_mem.state_as_text()
         state = dict(model=self.model,
@@ -184,6 +290,14 @@ class LTMAgent:
                         time_fn: Callable[[str, int], float] = _default_time,
                         prompt_callback: Callable[
                             [str, str, list[dict], str], Any] = None) -> 'LTMAgent':
+        """
+        Builds an LTMAgent given a state string previously obtained by
+        calling the state_as_text() method.
+        :param state_text: A string previously obtained by calling the state_as_text() method.
+        :param time_fn: Optional function for message timestamps.
+        :param prompt_callback: Optional function used to get information on prompts sent to the LLM.
+        :return:
+        """
         state = json.loads(state_text, cls=SimpleJSONDecoder)
         model_name = state["model"]
         max_prompt_size = state["max_prompt_size"]
@@ -493,6 +607,13 @@ class LTMAgent:
         self.convo_mem.add_text(text, timestamp=message.timestamp)
 
     def reply(self, user_content: str, cost_callback: Callable[[float], Any] = None) -> str:
+        """
+        Asks the LLM to generate a completion from a user question/statement.
+        This method first constructs a prompt from session history and memory excerpts.
+        :param user_content: The user's question or statement.
+        :param cost_callback: An optional function used to track LLM costs.
+        :return: The agent's completion or reply.
+        """
         session = self.session
         context = self._build_llm_context(session.message_history, user_content,
                                           cost_callback)
@@ -519,20 +640,32 @@ class LTMAgent:
         return response_text
 
     def clear_knowledge(self):
+        """
+        Empties the agent's knowledge base.
+        """
         self.kb_mem.clear()
 
     def clear_conversation_memory(self):
+        """
+        Empties the agent's conversation memory.
+        """
         self.convo_mem.clear()
         self.user_info = {}
         self.wm_scratchpad = ""
 
     def reset(self):
+        """
+        Empties all agent memories and starts a new chat session.
+        """
         self.clear_knowledge()
         self.clear_conversation_memory()
         self.new_session()
 
 
 class LTMAgentSession:
+    """
+    An agent session, or a collection of messages.
+    """
     def __init__(self, session_id: str, m_history: list[Message]):
         self.session_id = session_id
         self.message_history: list[Message] = m_history or []
@@ -542,6 +675,9 @@ class LTMAgentSession:
         return len(self.message_history)
 
     def state_as_text(self) -> str:
+        """
+        :return: A string that represents the contents of the session.
+        """
         state = dict(session_id=self.session_id, history=self.message_history)
         return json.dumps(state, cls=SimpleJSONEncoder)
 
@@ -550,6 +686,11 @@ class LTMAgentSession:
 
     @classmethod
     def from_state_text(cls, state_text: str) -> 'LTMAgentSession':
+        """
+        Builds a session object given state text.
+        :param state_text: Text previously obtained using the state_as_text() method.
+        :return: A session instance.
+        """
         state: dict = json.loads(state_text, cls=SimpleJSONDecoder)
         session_id = state["session_id"]
         m_history = state["history"]
