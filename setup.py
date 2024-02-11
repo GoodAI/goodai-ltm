@@ -25,5 +25,5 @@ setup(name='goodai-ltm',
       install_requires=['torch>=1.8.0', 'pytest>=7.0.0', 'numpy>=1.19.0', 'transformers>=4.34.0',
                         'openai>=1.0.0', 'faiss-cpu', 'datasets', 'boto3', 'python-dotenv',
                         'sentence-transformers>=2.2.2', 'FlagEmbedding>=1.1', 'tiktoken>=0.5.0',
-                        'litellm>=1.15.0']
+                        'litellm', 'cohere']
 )
