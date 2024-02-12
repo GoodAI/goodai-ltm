@@ -52,7 +52,7 @@ To build an agent from state text, call the `from_state_text` method.
 
     agent2 = LTMAgent.from_state_text(state_text)
 
-Note that this does not restore the conversation session. The persist the conversation session
+Note that this does not restore the conversation session. To persist the conversation session
 call the `state_as_text` method of the session.
 
     from goodai.ltm.agent import LTMAgentSession
