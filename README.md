@@ -22,7 +22,7 @@ Call the `reply` method of an `LTMAgent` instance to get a response from the age
     response = agent.reply("What can you tell me about yourself?")
     print(response)
 
-The `model` parameter can be tha name of any model supported by the [litellm library](https://github.com/BerriAI/litellm).
+The `model` parameter can be the name of any model supported by the [litellm library](https://github.com/BerriAI/litellm).
 
 A session history is maintained automatically by the agent. If you want to start a 
 new session, call the `new_session` method.
