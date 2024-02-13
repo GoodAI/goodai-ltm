@@ -19,11 +19,15 @@ st:sentence-transformers/all-distilroberta-v1 | 65.01 | 76.15 | 66.35     | 82.5
 st:sentence-transformers/sentence-t5-large | 68.40 | 78.28 | 72.55     | 86.60      | 71.30 | 80.51 |
 st:sentence-transformers/all-mpnet-base-v2 | 70.69 | 80.19 | 74.50     | 87.65      | 75.00 | 81.77 |
 st:sentence-transformers/multi-qa-mpnet-base-cos-v1 | 74.95 | 82.42 | 79.75     | 91.25      | 75.00 | 82.85 |
+flag:BAAI/bge-base-en-v1.5 | 74.18 | 82.70 | 78.55 | 89.40 |  |  | 
+flag:BAAI/bge-large-en-v1.5 | 77.51 | 84.33 | 78.15 | 90.00 |  |  | 
 **em-MiniLM-p1-01** (ours) | 72.43 | 79.26 | 75.50 | 89.00 | 71.75 | 79.60 |
 **em-MiniLM-p3-01** (ours) | 72.87 | 80.02 | 78.00     | 89.75      | 73.38 | 79.96 |
 **em-distilroberta-p1-01** (ours) | 77.67 | 83.84 | 83.25     | 94.15      | **79.78** | 84.39 |
 **em-distilroberta-p3-01** (ours) | 78.33 | **84.66** | 86.55     | 95.40      | 79.51 | **85.29** |
 **em-distilroberta-p5-01** (ours) | **78.88** | 84.44 | **87.40** | **95.70**  | 79.24 | 84.84 |
+
+*Note: The msmarco dataset has apparently changed since these tests (except for FlagEmbedding tests) were conducted.*
 
 Model `em-distilroberta-p1-01` is the default embedding model used
 by this library. While `em-distilroberta-p3-01` and `em-distilroberta-p5-01` have better
