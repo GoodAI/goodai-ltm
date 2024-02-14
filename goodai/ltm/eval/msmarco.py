@@ -17,7 +17,7 @@ class MsMarcoMemEvaluator(BaseMemEvaluator):
                  max_scenarios: int = 2000):
         super().__init__(tokenizer, top_ks, max_query_tokens, has_query_noise)
         self.use_rewrite = use_rewrite
-        ds = datasets.load_dataset('ms_marco', 'v2.1')
+        ds = datasets.load_dataset('ms_marco', 'v2.1', ignore_verifications=True)
         valid_data = ds['validation']
         self.data = valid_data[:max_scenarios]
 

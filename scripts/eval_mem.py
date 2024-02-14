@@ -63,6 +63,11 @@ _openai_eval_specs = [EvalSpec(mid, mid) for mid in [
     'openai:text-embedding-ada-002',
 ]]
 
+_flag_eval_specs = [EvalSpec(mid, mid) for mid in [
+    'flag:BAAI/bge-base-en-v1.5',
+    'flag:BAAI/bge-large-en-v1.5',
+]]
+
 _qpm_eval_specs_1 = [EvalSpec.for_qpm('qpm-distilroberta-01', mid, rkf) for mid, rkf in [
     ('em-distilroberta-p3-01', 10),
     ('em-distilroberta-p3-01', 5),
@@ -147,7 +152,7 @@ _qpm_eval_specs_18 = [EvalSpec.for_qpm('em:em-distilroberta-p5-01', mid, rkf) fo
 ]]
 
 if __name__ == '__main__':
-    eval_specs: List[EvalSpec] = _hf_eval_specs_0
+    eval_specs: List[EvalSpec] = _flag_eval_specs
 
     device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
     torch.manual_seed(1001)

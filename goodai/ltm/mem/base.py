@@ -219,3 +219,19 @@ class BaseTextMemory(ABC):
     @abstractmethod
     def has_importance_model(self) -> bool:
         pass
+
+    @abstractmethod
+    def state_as_text(self) -> str:
+        """
+        Returns the contents of the memory as text.
+        Use set_state() to replace contents.
+        """
+        pass
+
+    @abstractmethod
+    def set_state(self, state: str):
+        """
+        Replaces the contents of the memory with state previously
+        obtained using state_as_text().
+        """
+        pass
