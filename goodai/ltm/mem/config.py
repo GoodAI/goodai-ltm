@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional, List, Any
 
@@ -111,7 +111,8 @@ class TextMemoryConfig:
     redundant if it overlaps with other passages that are a better match to a query.
     """
 
-    chunk_expansion_config: ChunkExpansionConfig = ChunkExpansionConfig(24)
+    chunk_expansion_config: ChunkExpansionConfig = field(
+        default_factory=ChunkExpansionConfig)
     """
     The chunk expansion configuration.
     """
