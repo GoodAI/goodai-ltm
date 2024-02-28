@@ -127,10 +127,12 @@ Text can be associated with an arbitrary metadata dictionary, such as:
 The memory concatenates text stored using `add_text` with any text previously sent to the memory,
 but you can call `add_separator` to ensure that new text is not added to previously created chunks.
 
+### Retrieval 
+
 To retrieve a list of passages associated with a query,
 call the `retrieve` method:
 
-    r_memories = mem.retrieve(query='dolorem eum fugiat quo voluptas nulla pariatur?', k=3)
+    r_memories = mem.retrieve("What does Jake propose?", k=2)
 
 The `retrieve` method returns a list of objects of type `RetrievedMemory`, in descending order of
 relevance. Each retrieved memory has the following properties:
@@ -141,17 +143,6 @@ relevance. Each retrieved memory has the following properties:
 * `relevance`: A number between 0 and 1 representing the relevance of the retrieved memory.
 * `confidence`: If a query-passage matching model is available, this is the probability assigned by the model.
 * `metadata`: Metadata associated with the retrieved text, if any.
-
-### Retrieval 
-
-To retrieve memories, we pass a query and the desired number of memories to the method `retrieve`. For example,
-
-    mem.retrieve("What does Jake propose?", k=2)
-
-will return the two passages most relevant to the query.
-
-The embedding model converts the query into an embedding. Then the stored embeddings closest to the query embedding 
-are found and the corresponding texts decoded.
 
 ## Embedding models
 
