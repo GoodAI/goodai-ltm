@@ -47,8 +47,13 @@ class LTMSystem:
         self.keyword_index = defaultdict(list, state["keyword_index"])
         self.semantic_memory.set_state(state["semantic_memory"])
 
-    def retrieve(self, query: str, k: int) -> list[RetrievedMemory]:
-        return self.semantic_memory.retrieve(query, k)
+    def retrieve(
+        self, query: str, k: int, max_distance: float = None,
+    ) -> list[RetrievedMemory]:
+        memories = self.semantic_memory.retrieve(query, k)
+        if max_distance is not None:
+            memories = [m for m in memories if m.distance <= max_distance]
+        return memories
 
     def retrieve_from_keywords(self, keywords: list[str]) -> list[RetrievedMemory]:
         assert len(keywords) > 0
