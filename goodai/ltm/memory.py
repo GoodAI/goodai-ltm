@@ -1,4 +1,6 @@
 import json
+from typing import Any
+from copy import deepcopy
 from collections import defaultdict
 from goodai.ltm.mem.auto import AutoTextMemory, DefaultTextMemory
 from goodai.ltm.mem.config import TextMemoryConfig
@@ -8,25 +10,14 @@ from goodai.ltm.mem.base import RetrievedMemory, PassageInfo
 class LTMSystem:
 
     def __init__(
-        self, max_retrieve_capacity: int = 2000, chunk_capacity: int = 50,
-        chunk_overlap_fraction=0, **other_params,
+        self, chunk_capacity: int = 50, chunk_overlap_fraction=0, **other_params,
     ):
-        self.max_retrieve_capacity = max_retrieve_capacity
         self.semantic_memory = AutoTextMemory.create(config=TextMemoryConfig(
             chunk_capacity=chunk_capacity,
             chunk_overlap_fraction=chunk_overlap_fraction,
             **other_params,
         ))
         self.keyword_index = defaultdict(list)
-
-    def add_content(self, content: str, timestamp: float = None, keywords: list[str] = None):
-        keywords = keywords or []
-        text_key = self.semantic_memory.add_text(
-            content, timestamp=timestamp, metadata={"keywords": keywords}
-        )
-        self.semantic_memory.add_separator()
-        for kw in keywords:
-            self.keyword_index[kw].append(text_key)
 
     def is_empty(self) -> bool:
         return self.semantic_memory.is_empty()
@@ -36,16 +27,21 @@ class LTMSystem:
 
     def state_as_text(self) -> str:
         return json.dumps(dict(
-            max_retrieve_capacity=self.max_retrieve_capacity,
             semantic_memory=self.semantic_memory.state_as_text(),
             keyword_index=self.keyword_index,
         ))
 
     def set_state(self, state_text: str):
         state = json.loads(state_text)
-        self.max_retrieve_capacity = state["max_retrieve_capacity"]
         self.keyword_index = defaultdict(list, state["keyword_index"])
         self.semantic_memory.set_state(state["semantic_memory"])
+
+    def add_content(self, content: str, keywords: list[str] = None):
+        content, metadata = self.content_addition_preprocessing(content, keywords)
+        text_key = self.semantic_memory.add_text(content, metadata=metadata)
+        self.semantic_memory.add_separator()
+        for kw in keywords:
+            self.keyword_index[kw].append(text_key)
 
     def retrieve(
         self, query: str, k: int, max_distance: float = None,
@@ -84,3 +80,10 @@ class LTMSystem:
                 metadata=chunk.metadata,
             ))
         return memories
+
+    def content_addition_preprocessing(
+        self, content: str, keywords: list[str] = None, **other_metadata: Any,
+    ) -> tuple[str, dict[str, Any]]:
+        metadata = deepcopy(other_metadata)
+        metadata["keywords"] = keywords or []
+        return content, metadata
