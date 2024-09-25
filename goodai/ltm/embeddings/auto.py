@@ -5,6 +5,7 @@ from weakref import WeakValueDictionary
 import torch
 
 from goodai.helpers.file_helper import open_url_as_file, unpickle_downloaded_url
+from goodai.ltm.embeddings.flag_emb import FlagEmbeddingModel
 from goodai.ltm.embeddings.openai_emb import OpenAIEmbeddingModel
 from goodai.ltm.embeddings.st_emb import SentenceTransformerEmbeddingModel
 from goodai.ltm.embeddings.trainable import TrainableEmbeddingModel
@@ -68,6 +69,8 @@ class AutoTextEmbeddingModel:
         model_name = name[colon_idx + 1:]
         if model_type == 'st':
             return SentenceTransformerEmbeddingModel(model_name, device=device, **kwargs)
+        elif model_type == 'flag':
+            return FlagEmbeddingModel(model_name, **kwargs)
         elif model_type == 'openai':
             return OpenAIEmbeddingModel(model_name, device=device, **kwargs)
         else:

@@ -5,10 +5,10 @@ import wikipediaapi
 from goodai.ltm.mem.mem_foundation import VectorDbType
 
 # This example retrieves articles from wikipedia and stores them
-# in the LTM, tagged with the article title
+# in an LTM instance, tagged with the article title
 
 if __name__ == '__main__':
-    mem = AutoTextMemory.create(emb_model='em-distilroberta-p5-01')
+    mem = AutoTextMemory.create(emb_model='flag:BAAI/bge-base-en-v1.5')
     wiki_wiki = wikipediaapi.Wikipedia('en')
     titles = [
         'Earth',

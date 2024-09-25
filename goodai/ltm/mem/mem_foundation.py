@@ -1,5 +1,4 @@
 import abc
-import copy
 import enum
 import io
 import json
@@ -112,14 +111,18 @@ class RetrievedChunk:
 
 
 class BaseTextMemoryFoundation(BaseTextMemory):
-    def __init__(self, vector_db_type: VectorDbType, tokenizer: PreTrainedTokenizer, has_match_prob_model: bool,
+    def __init__(self,
+                 vector_db_type: VectorDbType, tokenizer: PreTrainedTokenizer, has_match_prob_model: bool,
                  num_storage_embeddings: int, emb_dim: int,
                  chunk_capacity: int, reranking_k_factor: float,
                  max_query_length: Optional[int],
                  query_rewrite_model: BaseRewriteModel, reranker: BaseReranker,
                  overlap_fraction: float,
                  overlap_threshold: float, chunk_expansion_options: ChunkExpansionOptions,
-                 device: torch.device, max_expansion_top_k_factor: int = 200):
+                 device: torch.device,
+                 max_expansion_top_k_factor: int = 200,
+                 vector_db: Optional[_vector_db_type] = None
+                 ):
         super().__init__()
         if overlap_fraction < 0 or overlap_fraction > 0.5:
             raise ValueError(f'Invalid chunk overlap fraction: {overlap_fraction}')
@@ -147,7 +150,7 @@ class BaseTextMemoryFoundation(BaseTextMemory):
         self.num_storage_embeddings = num_storage_embeddings
         self.has_match_prob_model = has_match_prob_model
         self.emb_dim = emb_dim
-        self.vector_db = self.create_vector_db(vector_db_type, emb_dim)
+        self.vector_db = vector_db or self.create_vector_db(vector_db_type, emb_dim)
         self.device = device
         self.chunk_tokenizer = tokenizer
         self.query_rewrite_model = query_rewrite_model
@@ -197,6 +200,14 @@ class BaseTextMemoryFoundation(BaseTextMemory):
     def get_complete_passage(self, chunk: Chunk) -> PassageInfo:
         pass
 
+    @abc.abstractmethod
+    def state_as_text(self) -> str:
+        pass
+
+    @abc.abstractmethod
+    def set_state(self, state: str):
+        pass
+
     def dump(self, stream: io.TextIOBase = sys.stdout):
         chunks = self.get_all_chunks()
         stream.write('| Id | Metadata | Importance | Content |\n')
@@ -223,10 +234,11 @@ class BaseTextMemoryFoundation(BaseTextMemory):
         if not self.reranker:
             processed_r_chunks = processed_r_chunks[:k]
         has_pm = self.has_match_prob_model
+        passage_info_list = [r_chunk.passage for r_chunk in processed_r_chunks]
         sequences = [r_chunk.passage.tokenIds for r_chunk in processed_r_chunks]
         retrieved_texts = self.chunk_tokenizer.batch_decode(sequences, skip_special_tokens=True)
         result = []
-        for r_chunk, r_text in zip(processed_r_chunks, retrieved_texts):
+        for p_info, r_chunk, r_text in zip(passage_info_list, processed_r_chunks, retrieved_texts):
             confidence = r_chunk.confidence
             chunk = r_chunk.chunk
             metadata = chunk.metadata
@@ -235,7 +247,8 @@ class BaseTextMemoryFoundation(BaseTextMemory):
             relevance = self._distance_to_relevance(distance, confidence)
             if not has_pm:
                 confidence = None
-            result.append(RetrievedMemory(passage=r_text.strip(), timestamp=chunk.timestamp,
+            result.append(RetrievedMemory(passage=r_text.strip(), passage_info=p_info,
+                                          timestamp=chunk.timestamp,
                                           distance=distance, relevance=relevance,
                                           textKeys=list(chunk.associated_keys),
                                           confidence=confidence,

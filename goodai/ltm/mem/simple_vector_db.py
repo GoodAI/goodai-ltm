@@ -1,17 +1,16 @@
+from dataclasses import dataclass
 from typing import Optional, Tuple
 
 import numpy as np
 
 
+@dataclass
 class SimpleVectorDb:
     """
     Simple vector database implementation.
     """
-
-    def __init__(self):
-        super().__init__()
-        self.all_vectors: Optional[np.ndarray] = None
-        self.all_ids: Optional[np.ndarray] = None
+    all_vectors: Optional[np.ndarray] = None
+    all_ids: Optional[np.ndarray] = None
 
     def search(self, vectors: np.ndarray, k: int = 1, max_batch_size=256) -> Tuple[np.ndarray, np.ndarray]:
         dist_list = []
@@ -80,3 +79,8 @@ class SimpleVectorDb:
                 keep = ~to_remove
                 self.all_ids = self.all_ids[keep]
                 self.all_vectors = self.all_vectors[keep, :]
+
+    def __eq__(self, other):
+        if not isinstance(other, SimpleVectorDb):
+            return False
+        return np.array_equal(self.all_vectors, other.all_vectors) and np.array_equal(self.all_ids, other.all_ids)

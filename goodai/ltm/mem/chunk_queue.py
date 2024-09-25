@@ -1,8 +1,9 @@
 import bisect
 import logging
 import time
-from dataclasses import dataclass
-from typing import List, Tuple, Dict, Optional, Any, Set
+from dataclasses import dataclass, field
+from typing import List, Dict, Optional
+from typing import Tuple, Any, Set
 
 import numpy as np
 from transformers import PreTrainedTokenizer
@@ -42,27 +43,28 @@ class ChunkExpansionOptions:
                    rightStopAtTokenIds=limit_token_ids)
 
 
+@dataclass
 class ChunkQueue:
-    def __init__(self, queue_capacity: int, chunk_capacity: int, chunk_index_at_overlap: int,
-                 first_token_seq_id: int = 0):
-        super().__init__()
-        if queue_capacity <= 2:
+    capacity: int
+    chunk_capacity: int
+    chunk_index_at_overlap: int
+    first_token_seq_id: int = 0
+    chunks: List[Chunk] = field(default_factory=list)
+    current_chunk_id: int = 0
+    current_text_key: int = 0
+    token_ids: List[int] = field(default_factory=list)
+    separator_seq_ids: List[int] = field(default_factory=list)
+    sequence_map: Dict[TextKeyType, Tuple[int, int]] = field(default_factory=dict)
+    chunk_map: Dict[int, Chunk] = field(default_factory=dict, init=False)
+
+    def __post_init__(self):
+        if self.capacity <= 2:
             raise ValueError('Queue capacity cannot be 2 or less')
-        if chunk_capacity < 1:
+        if self.chunk_capacity < 1:
             raise ValueError('Chunk capacity cannot be zero or less')
-        if chunk_index_at_overlap < chunk_capacity // 2:
+        if self.chunk_index_at_overlap < self.chunk_capacity // 2:
             raise ValueError('Chunk overlap cannot be more than 50%')
-        self.capacity = queue_capacity
-        self.chunk_capacity = chunk_capacity
-        self.chunks: List[Chunk] = []
-        self.chunk_index_at_overlap = chunk_index_at_overlap
-        self.current_chunk_id = 0
-        self.current_text_key = 0
-        self.first_token_seq_id = first_token_seq_id
-        self.token_ids: List[int] = []
-        self.separator_seq_ids: List[int] = []
-        self.chunk_map: Dict[int, Chunk] = dict()
-        self.sequence_map: Dict[TextKeyType, Tuple[int, int]] = dict()
+        self.chunk_map = {c.chunk_id: c for c in self.chunks}
 
     def _removed_chunk_cleanup(self, chunk: Chunk):
         self.chunk_map.pop(chunk.chunk_id)
@@ -169,7 +171,7 @@ class ChunkQueue:
             idx1 = bisect.bisect_right(old_ids, remove_from_id)
             idx2 = bisect.bisect_left(old_ids, remove_to_id)
             self.separator_seq_ids = old_ids[:idx1] + \
-                (np.array(old_ids[idx2:], dtype=int) + shift_offset).tolist()
+                                     (np.array(old_ids[idx2:], dtype=int) + shift_offset).tolist()
 
     def _split_separators(self, seq_from_id: int, seq_to_id: int) -> Tuple[List[int], List[int]]:
         old_ids = self.separator_seq_ids

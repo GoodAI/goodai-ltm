@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 from goodai.ltm.mem.chunk import TextKeyType
+from goodai.ltm.mem.chunk_queue import PassageInfo
 
 
 @dataclass
@@ -12,6 +13,11 @@ class RetrievedMemory:
     passage: str
     """
     The text of the retrieved passage, or expanded chunk.
+    """
+
+    passage_info: PassageInfo
+    """
+    Additional information about the passage location and tokens.
     """
 
     timestamp: float
@@ -54,6 +60,37 @@ class RetrievedMemory:
     """
     Metadata associated with the retrieved text.
     """
+
+    @staticmethod
+    def has_overlap(included_indexes: set[int], p_from: int, p_to: int,
+                    overlap_threshold: float):
+        if p_from not in included_indexes and (p_to - 1) not in included_indexes:
+            return False
+        if p_to <= p_from:
+            return False
+        intersection = included_indexes.intersection(range(p_from, p_to))
+        len_inter = len(intersection)
+        if len_inter <= 0:
+            return False
+        overlap_fraction = len_inter / (p_to - p_from)
+        return overlap_fraction >= overlap_threshold
+
+    @classmethod
+    def remove_overlaps(cls, r_memories: list['RetrievedMemory'],
+                        overlap_threshold: float) -> list['RetrievedMemory']:
+        result = []
+        included_indexes: set[int] = set()
+        for item in r_memories:
+            p_info = item.passage_info
+            if p_info is None:
+                continue
+            p_from = p_info.fromIndex
+            p_to = p_info.toIndex
+            if cls.has_overlap(included_indexes, p_from, p_to, overlap_threshold):
+                continue
+            result.append(item)
+            included_indexes.update(range(p_from, p_to))
+        return result
 
 
 class BaseReranker(ABC):
@@ -181,4 +218,20 @@ class BaseTextMemory(ABC):
 
     @abstractmethod
     def has_importance_model(self) -> bool:
+        pass
+
+    @abstractmethod
+    def state_as_text(self) -> str:
+        """
+        Returns the contents of the memory as text.
+        Use set_state() to replace contents.
+        """
+        pass
+
+    @abstractmethod
+    def set_state(self, state: str):
+        """
+        Replaces the contents of the memory with state previously
+        obtained using state_as_text().
+        """
         pass
