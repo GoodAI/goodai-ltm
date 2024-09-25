@@ -1,50 +1,56 @@
 import json
 import time
+import queue
 from typing import Any
 from copy import deepcopy
 from collections import defaultdict
 from goodai.ltm.mem.auto import AutoTextMemory, DefaultTextMemory
 from goodai.ltm.mem.config import TextMemoryConfig
 from goodai.ltm.mem.base import RetrievedMemory, PassageInfo
-from multiprocessing import SimpleQueue, Process
+from multiprocessing import Queue, Process
 
 
 def memory_server(
-    mem_kwargs: dict, time_budget: float, query_queue: SimpleQueue, add_queue: SimpleQueue,
-    bkg_queue: SimpleQueue, processed_queue: SimpleQueue, out_queue: SimpleQueue,
+    mem_kwargs: dict, time_budget: float, query_queue: Queue, add_queue: Queue,
+    bkg_queue: Queue, processed_queue: Queue, out_queue: Queue,
 ):
     ltm = LTMSystem(**mem_kwargs)
     while True:
         t0_loop = time.time()
         # Attend queries
-        mems = None
-        if not query_queue.empty():
-            d = query_queue.get()
-            assert d["method"] in {"retrieve", "retrieve_from_keywords"}
-            mems = getattr(ltm, d["method"])(**d["kwargs"])
+        try:
+            query_dict = query_queue.get(block=False)
+            assert query_dict["method"] in {"retrieve", "retrieve_from_keywords"}
+            mems = getattr(ltm, query_dict["method"])(**query_dict["kwargs"])
             out_queue.put(mems)
+        except queue.Empty:
+            pass
         # Give additions and changes some slack. Otherwise, queries might hoard time.
         while True:
             t0_changes = time.time()
             # Add memories and send it to background processing
             # TODO: process these in random order or randomly drop some, to avoid bottlenecks
-            if not add_queue.empty():
-                kwargs = add_queue.get()
+            try:
+                kwargs = add_queue.get(block=False)
                 content, metadata = ltm.content_addition_preprocessing(**kwargs)
                 text_key = ltm.add_content(**kwargs)
                 bkg_kwargs = dict(text=content, metadata=metadata, text_key=text_key)
                 bkg_queue.put(bkg_kwargs)
+            except queue.Empty:
+                pass
             # Take processed memories and update memory database
-            if not processed_queue.empty():
-                kwargs = processed_queue.get()
+            try:
+                kwargs = processed_queue.get(block=False)
                 ltm.semantic_memory.replace_text(**kwargs)
+            except queue.Empty:
+                pass
             t_changes = time.time() - t0_changes
             # See if there's time for another round
             if time.time() - t0_loop + t_changes >= time_budget:
                 break
 
 
-def background_process(bkg_queue: SimpleQueue, processed_queue: SimpleQueue):
+def background_process(bkg_queue: Queue, processed_queue: Queue):
     # TODO: implement limits & include configuration
     while True:
         kwargs = bkg_queue.get()
@@ -54,11 +60,11 @@ def background_process(bkg_queue: SimpleQueue, processed_queue: SimpleQueue):
 
 class RealTimeLTMSystem:
     def __init__(self, time_budget: float = 1):
-        self.query_queue = SimpleQueue()
-        self.out_queue = SimpleQueue()
-        self.add_queue = SimpleQueue()
-        self.bkg_queue = SimpleQueue()
-        self.processed_queue = SimpleQueue()
+        self.query_queue = Queue()
+        self.out_queue = Queue()
+        self.add_queue = Queue()
+        self.bkg_queue = Queue()
+        self.processed_queue = Queue()
         self.mem_server = Process(daemon=True, target=memory_server, kwargs=dict(
             mem_kwargs=dict(), time_budget=time_budget, query_queue=self.query_queue,
             out_queue=self.out_queue, add_queue=self.add_queue,
