@@ -59,13 +59,14 @@ class RealTimeLTMSystem:
         self.add_queue = SimpleQueue()
         self.bkg_queue = SimpleQueue()
         self.processed_queue = SimpleQueue()
-        self.mem_server = Process(target=memory_server, kwargs=dict(
+        self.mem_server = Process(daemon=True, target=memory_server, kwargs=dict(
             mem_kwargs=dict(), time_budget=time_budget, query_queue=self.query_queue,
             out_queue=self.out_queue, add_queue=self.add_queue,
             bkg_queue=self.bkg_queue, processed_queue=self.processed_queue,
         ))
         self.mem_server.start()
-        self.bkg_proc = Process(target=background_process, args=(self.bkg_queue, self.processed_queue))
+        self.bkg_proc = Process(daemon=True, target=background_process,
+                                args=(self.bkg_queue, self.processed_queue))
         self.bkg_proc.start()
 
     def add_content(self, content: str, keywords: list[str] = None):
@@ -79,6 +80,9 @@ class RealTimeLTMSystem:
         ))
         mems = self.out_queue.get()
         return mems
+
+    def __end__(self):
+        self.mem_server.terminate()
 
 
 class LTMSystem:
