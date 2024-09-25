@@ -27,6 +27,7 @@ def memory_server(
             pass
         # Give additions and changes some slack. Otherwise, queries might hoard time.
         while True:
+            queues_empty = True
             t0_changes = time.time()
             # Add memories and send it to background processing
             # TODO: process these in random order or randomly drop some, to avoid bottlenecks
@@ -36,17 +37,19 @@ def memory_server(
                 text_key = ltm.add_content(**kwargs)
                 bkg_kwargs = dict(text=content, metadata=metadata, text_key=text_key)
                 bkg_queue.put(bkg_kwargs)
+                queues_empty = False
             except queue.Empty:
                 pass
             # Take processed memories and update memory database
             try:
                 kwargs = processed_queue.get(block=False)
                 ltm.semantic_memory.replace_text(**kwargs)
+                queues_empty = False
             except queue.Empty:
                 pass
             t_changes = time.time() - t0_changes
             # See if there's time for another round
-            if time.time() - t0_loop + t_changes >= time_budget:
+            if queues_empty or time.time() - t0_loop + t_changes >= time_budget:
                 break
 
 
