@@ -176,6 +176,8 @@ class LTMSystem:
         mem: DefaultTextMemory = self.semantic_memory
         memories = list()
         for chunk in mem.get_all_chunks():
+            if len(text_keys) == 0:
+                break
             assert len(chunk.associated_keys) == 1
             text_key = chunk.associated_keys[0]
             if text_key not in text_keys:
