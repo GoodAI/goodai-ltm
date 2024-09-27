@@ -15,14 +15,16 @@ def memory_server(
     bkg_queue: Queue, processed_queue: Queue, out_queue: Queue,
 ):
     ltm = LTMSystem(**mem_kwargs)
+    allowed_methods = {"is_empty", "clear", "state_as_text", "set_state", "retrieve",
+                       "retrieve_from_keywords"}
     while True:
         t0_loop = time.time()
-        # Attend queries
+        # Attend queries and other priority actions
         try:
             query_dict = query_queue.get(block=False)
-            assert query_dict["method"] in {"retrieve", "retrieve_from_keywords"}
-            mems = getattr(ltm, query_dict["method"])(**query_dict["kwargs"])
-            out_queue.put(mems)
+            assert query_dict["method"] in allowed_methods
+            return_value = getattr(ltm, query_dict["method"])(**query_dict["kwargs"])
+            out_queue.put(return_value)
         except queue.Empty:
             pass
         # Give additions and changes some slack. Otherwise, queries might hoard time.
@@ -78,17 +80,38 @@ class RealTimeLTMSystem:
                                 args=(self.bkg_queue, self.processed_queue))
         self.bkg_proc.start()
 
-    def add_content(self, content: str, keywords: list[str] = None):
-        self.add_queue.put(dict(content=content, keywords=keywords))
+    def _sync_call(self, method: str, **kwargs):
+        self.query_queue.put(dict(method=method, kwargs=kwargs))
+        return self.out_queue.get()
+
+    def is_empty(self) -> bool:
+        return self._sync_call("is_empty")
+
+    def clear(self):
+        return self._sync_call("clear")
+
+    def state_as_text(self) -> str:
+        return self._sync_call("state_as_text")
+
+    def set_state(self, state_text: str):
+        return self._sync_call("set_state", state_text=state_text)
+
+    def add_content(
+        self, content: str, timestamp: float = None, keywords: list[str] = None,
+        **metadata: Any,
+    ):
+        self.add_queue.put(
+            dict(content=content, timestamp=timestamp, keywords=keywords) | metadata
+        )
 
     def retrieve(
         self, query: str, k: int, max_distance: float = None,
     ) -> list[RetrievedMemory]:
-        self.query_queue.put(dict(
-            method="retrieve", kwargs=dict(query=query, k=k, max_distance=max_distance),
-        ))
-        mems = self.out_queue.get()
-        return mems
+        return self._sync_call("retrieve", query=query, k=k, max_distance=max_distance)
+
+    def retrieve_from_keywords(self, keywords: list[str]) -> list[RetrievedMemory]:
+        assert len(keywords) > 0
+        return self._sync_call("retrieve_from_keywords", keywords=keywords)
 
     def __end__(self):
         self.mem_server.terminate()
@@ -123,10 +146,15 @@ class LTMSystem:
         self.keyword_index = defaultdict(list, state["keyword_index"])
         self.semantic_memory.set_state(state["semantic_memory"])
 
-    def add_content(self, content: str, keywords: list[str] = None) -> int:
+    def add_content(
+        self, content: str, timestamp: float = None, keywords: list[str] = None,
+        **metadata: Any,
+    ) -> int:
         keywords = keywords or []
-        content, metadata = self.content_addition_preprocessing(content, keywords)
-        text_key = self.semantic_memory.add_text(content, metadata=metadata)
+        content, metadata = self.content_addition_preprocessing(content, keywords, **metadata)
+        text_key = self.semantic_memory.add_text(
+            content, timestamp=timestamp, metadata=metadata,
+        )
         self.semantic_memory.add_separator()
         for kw in keywords:
             self.keyword_index[kw].append(text_key)
@@ -173,6 +201,7 @@ class LTMSystem:
     def content_addition_preprocessing(
         self, content: str, keywords: list[str] = None, **other_metadata: Any,
     ) -> tuple[str, dict[str, Any]]:
+        assert "keywords" not in other_metadata
         metadata = deepcopy(other_metadata)
         metadata["keywords"] = keywords or []
         return content, metadata
