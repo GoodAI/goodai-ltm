@@ -222,6 +222,9 @@ class DefaultTextMemory(BaseTextMemoryFoundation):
         saved_config: TextMemoryConfig = state["config"]
         saved_vector_db: _vector_db_type = state["vector_db"]
         saved_chunk_queue: ChunkQueue = state["chunk_queue"]
+        saved_chunk_queue.sequence_map = {
+            int(k): tuple(bs) for k, bs in saved_chunk_queue.sequence_map.items()
+        }
         saved_tokenizer_name = state["tokenizer_name"]
         saved_emb_model_info = state["emb_model_info"]
         if saved_config.chunk_capacity != self.config.chunk_capacity:
