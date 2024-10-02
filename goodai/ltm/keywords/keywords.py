@@ -1,8 +1,5 @@
 import spacy
 from sklearn.feature_extraction.text import TfidfVectorizer
-from torch import candidate
-
-from goodai.ltm.keywords.classifier import classify_sentence
 
 # Load the English model
 nlp = spacy.load("en_core_web_sm")
@@ -76,44 +73,3 @@ def extract_keywords(text:str, num_keywords:int=5, predefined_keywords:list[str]
             final_keywords.append(keyword)
     
     return final_keywords
-
-# Get keywords using the classifier to enhance which keywords are most important and classify the sentence type
-def keywords_with_classification(text:str, meta_classes:list[str], predefined_keywords:list[str]) -> tuple[list[str], str]:
-    # Get keywords that are applicable to the text
-    applicable_keywords = []
-    if len(predefined_keywords) > 0:
-        # Use the classifier to get the keywords that are most relevant to the text
-        bart_keywords, confidence = classify_sentence(text, predefined_keywords, multi_label=True)
-        for keyword, score in zip(bart_keywords, confidence):
-            if score > 0.5:
-                applicable_keywords.append(keyword)
-
-    # Get the keywords that are most important to the text
-    keywords = extract_keywords(text, predefined_keywords=applicable_keywords)
-    
-    # Get the sentence type of the text
-    meta_types, confidences = classify_sentence(text, meta_classes)
-    sentence_type = meta_types[0]
-    confidence = confidences[0]
-
-    return keywords, sentence_type
-
-# Get keywords only without using the classifier
-def keywords_only(text:str, predefined_keywords:list[str]) -> list[str]:
-
-    return extract_keywords(text, predefined_keywords=predefined_keywords)
-
-
-def keywords_with_filtering(text:str, predefined_keywords:list[str]) -> list[str]:
-    applicable_keywords = []
-    if len(predefined_keywords) > 0:
-        # Use the classifier to get the keywords that are most relevant to the text
-        bart_keywords, confidence = classify_sentence(text, predefined_keywords, multi_label=True)
-        for keyword, score in zip(bart_keywords, confidence):
-            if score > 0.5:
-                applicable_keywords.append(keyword)
-
-    # Get the keywords that are most important to the text
-    keywords = extract_keywords(text, predefined_keywords=applicable_keywords)
-
-    return keywords
