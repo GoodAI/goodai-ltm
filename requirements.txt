@@ -17,3 +17,4 @@ wikipedia-api==0.5.8
 FlagEmbedding==1.1.8
 tiktoken==0.5.2
 litellm==1.15.6
+spacy 

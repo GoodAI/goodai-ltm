@@ -5,7 +5,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 nlp = spacy.load("en_core_web_sm")
 
 # Check if a keyword is valid
-def is_valid_keyword(keyword:str) -> bool:
+def is_valid_keyword(keyword: str) -> bool:
     keyword_doc = nlp(keyword)
     if len(keyword_doc) == 1:
         return keyword_doc[0].pos_ in ['NOUN', 'PROPN', 'ADJ']
@@ -14,12 +14,12 @@ def is_valid_keyword(keyword:str) -> bool:
                 not any(token.dep_ == 'det' for token in keyword_doc))
 
 # Remove stop words, punctuation, and determiners from a keyword
-def sanitize_keyword(keyword:str) -> str:
+def sanitize_keyword(keyword: str) -> str:
     doc = nlp(keyword)
     return ' '.join([token.lemma_ for token in doc if not token.is_stop and not token.is_punct and not token.dep_ == 'det'])
 
 # Extract keywords from a text
-def extract_keywords(text:str, num_keywords:int=5, predefined_keywords:list[str]=None) -> list[str]:
+def extract_keywords(text: str, num_keywords: int = 5, predefined_keywords: list[str] = None) -> list[str]:
     doc = nlp(text.lower())
     predefined_keywords = predefined_keywords or []
 
