@@ -17,4 +17,5 @@ wikipedia-api==0.5.8
 FlagEmbedding==1.1.8
 tiktoken==0.5.2
 litellm==1.15.6
-spacy 
+spacy
+en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl
