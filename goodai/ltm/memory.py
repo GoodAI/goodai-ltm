@@ -4,6 +4,9 @@ import queue
 from typing import Any
 from copy import deepcopy
 from collections import defaultdict
+
+from transformers import AutoTokenizer
+
 from goodai.ltm.mem.auto import AutoTextMemory, DefaultTextMemory
 from goodai.ltm.mem.config import TextMemoryConfig
 from goodai.ltm.mem.base import RetrievedMemory, PassageInfo
@@ -122,7 +125,9 @@ class LTMSystem:
     def __init__(
         self, chunk_capacity: int = 50, chunk_overlap_fraction=0, **other_params,
     ):
-        self.semantic_memory = AutoTextMemory.create(config=TextMemoryConfig(
+        self.semantic_memory = AutoTextMemory.create(
+            tokenizer=AutoTokenizer.from_pretrained("bert-base-uncased"),
+            config=TextMemoryConfig(
             chunk_capacity=chunk_capacity,
             chunk_overlap_fraction=chunk_overlap_fraction,
             **other_params,
@@ -207,3 +212,8 @@ class LTMSystem:
         metadata = deepcopy(other_metadata)
         metadata["keywords"] = keywords or []
         return content, metadata
+
+
+if __name__ == '__main__':
+    ltm = RealTimeLTMSystem()
+    ltm.add_content("Hello!")
