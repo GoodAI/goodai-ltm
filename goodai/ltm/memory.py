@@ -216,7 +216,3 @@ class LTMSystem:
         metadata["keywords"] = keywords or []
         return content, metadata
 
-
-if __name__ == '__main__':
-    ltm = LTMSystem()
-    ltm.add_content("Hello!")
