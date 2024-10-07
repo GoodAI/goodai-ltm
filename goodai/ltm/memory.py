@@ -5,9 +5,6 @@ from typing import Any
 from copy import deepcopy
 from collections import defaultdict
 
-from sentence_transformers import SentenceTransformer
-from transformers import AutoTokenizer
-
 from goodai.ltm.embeddings.st_emb import SentenceTransformerEmbeddingModel
 from goodai.ltm.mem.auto import AutoTextMemory, DefaultTextMemory
 from goodai.ltm.mem.config import TextMemoryConfig
@@ -128,7 +125,6 @@ class LTMSystem:
         self, chunk_capacity: int = 50, chunk_overlap_fraction=0, **other_params,
     ):
         self.semantic_memory = AutoTextMemory.create(
-            # tokenizer=AutoTokenizer.from_pretrained("google-bert/bert-base-uncased"),
             emb_model= SentenceTransformerEmbeddingModel("avsolatorio/GIST-Embedding-v0"),
             config=TextMemoryConfig(
             chunk_capacity=chunk_capacity,
@@ -215,4 +211,3 @@ class LTMSystem:
         metadata = deepcopy(other_metadata)
         metadata["keywords"] = keywords or []
         return content, metadata
-
