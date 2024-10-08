@@ -12,8 +12,8 @@ scikit-learn==1.2.2
 sentence-transformers==2.2.2
 torch==2.0.0
 tqdm==4.65.0
-transformers==4.34.0
+transformers==4.45.1
 wikipedia-api==0.5.8
-FlagEmbedding==1.1.8
+FlagEmbedding==1.2.11
 tiktoken==0.5.2
 litellm==1.15.6

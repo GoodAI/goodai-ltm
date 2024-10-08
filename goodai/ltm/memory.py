@@ -4,6 +4,8 @@ import queue
 from typing import Any
 from copy import deepcopy
 from collections import defaultdict
+
+from goodai.ltm.embeddings.st_emb import SentenceTransformerEmbeddingModel
 from goodai.ltm.mem.auto import AutoTextMemory, DefaultTextMemory
 from goodai.ltm.mem.config import TextMemoryConfig
 from goodai.ltm.mem.base import RetrievedMemory, PassageInfo
@@ -122,7 +124,9 @@ class LTMSystem:
     def __init__(
         self, chunk_capacity: int = 50, chunk_overlap_fraction=0, **other_params,
     ):
-        self.semantic_memory = AutoTextMemory.create(config=TextMemoryConfig(
+        self.semantic_memory = AutoTextMemory.create(
+            emb_model= SentenceTransformerEmbeddingModel("avsolatorio/GIST-Embedding-v0"),
+            config=TextMemoryConfig(
             chunk_capacity=chunk_capacity,
             chunk_overlap_fraction=chunk_overlap_fraction,
             **other_params,
