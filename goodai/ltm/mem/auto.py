@@ -5,8 +5,9 @@ import weakref
 import torch
 from typing import Union, Optional
 from transformers import AutoTokenizer, PreTrainedTokenizer
-from goodai.ltm.embeddings.auto import AutoTextEmbeddingModel
+# from goodai.ltm.embeddings.auto import AutoTextEmbeddingModel
 from goodai.ltm.embeddings.base import BaseTextEmbeddingModel
+from goodai.ltm.embeddings.st_emb import SentenceTransformerEmbeddingModel
 from goodai.ltm.mem.base import BaseTextMemory, BaseReranker, BaseImportanceModel
 from goodai.ltm.mem.chunk_queue import ChunkQueue
 from goodai.ltm.mem.config import TextMemoryConfig
@@ -75,9 +76,12 @@ class AutoTextMemory:
         if device is None:
             device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
         if emb_model is None:
-            emb_model = 'em-distilroberta-p1-01'
-        if isinstance(emb_model, str):
-            emb_model = AutoTextEmbeddingModel.shared_pretrained(emb_model)
+            emb_model = SentenceTransformerEmbeddingModel("avsolatorio/GIST-Embedding-v0"),
+            # TODO: AutoTextEmbeddingModel is for downloading our own pretrained embedders.
+            #  Revise if we want to upload new embedders or remove all this entirely.
+            # emb_model = 'em-distilroberta-p1-01'
+        # if isinstance(emb_model, str):
+        #     emb_model = AutoTextEmbeddingModel.shared_pretrained(emb_model)
         if isinstance(matching_model, str):
             matching_model = AutoTextMatchingModel.shared_pretrained(matching_model)
         if config is None:
