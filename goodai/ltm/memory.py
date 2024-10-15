@@ -5,6 +5,8 @@ from typing import Any, Callable, Optional
 from copy import deepcopy
 from collections import defaultdict
 
+from goodai.ltm.embeddings.base import BaseTextEmbeddingModel
+from goodai.ltm.embeddings.remote import RemoteEmbeddingModel
 from goodai.ltm.embeddings.st_emb import SentenceTransformerEmbeddingModel
 from goodai.ltm.mem.auto import AutoTextMemory, DefaultTextMemory
 from goodai.ltm.mem.config import TextMemoryConfig
@@ -77,6 +79,8 @@ class RealTimeLTMSystem:
 
     Attributes:
     ----------
+    embedding_model: RemoteEmbeddingModel
+        An embedding model that supports remote calls.
     time_budget : float
         The time (in seconds) allocated for operations in real-time.
     background_process_fn : Callable[[dict], dict]
@@ -90,8 +94,8 @@ class RealTimeLTMSystem:
     """
 
     def __init__(
-        self, time_budget: float = 1,
-        background_process_fn: Callable[[dict], dict] = None,
+        self, embedding_model: RemoteEmbeddingModel,
+        background_process_fn: Callable[[dict], dict] = None, time_budget: float = 1,
     ):
         self.query_queue = Queue()
         self.out_queue = Queue()
@@ -102,9 +106,10 @@ class RealTimeLTMSystem:
             self.processed_queue = Queue()
 
         self.mem_server = Process(daemon=True, target=memory_server, kwargs=dict(
-            mem_kwargs=dict(), time_budget=time_budget, query_queue=self.query_queue,
+            time_budget=time_budget, query_queue=self.query_queue,
             out_queue=self.out_queue, add_queue=self.add_queue,
             bkg_queue=self.bkg_queue, processed_queue=self.processed_queue,
+            mem_kwargs=dict(embedding_model=embedding_model),
         ))
         self.mem_server.start()
 
@@ -152,10 +157,15 @@ class RealTimeLTMSystem:
 class LTMSystem:
 
     def __init__(
-        self, chunk_capacity: int = 50, chunk_overlap_fraction=0, **other_params,
+        self, chunk_capacity: int = 50, chunk_overlap_fraction=0,
+        embedding_model: BaseTextEmbeddingModel = None, **other_params,
     ):
+        if embedding_model is None:
+            emb_model_name = "avsolatorio/GIST-Embedding-v0"
+            embedding_model = SentenceTransformerEmbeddingModel(emb_model_name)
+
         self.semantic_memory = AutoTextMemory.create(
-            emb_model= SentenceTransformerEmbeddingModel("avsolatorio/GIST-Embedding-v0"),
+            emb_model=embedding_model,
             config=TextMemoryConfig(
             chunk_capacity=chunk_capacity,
             chunk_overlap_fraction=chunk_overlap_fraction,
