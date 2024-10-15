@@ -138,10 +138,10 @@ class RealTimeLTMSystem:
 
     def add_content(
         self, content: str, timestamp: float = None, keywords: list[str] = None,
-        **metadata: Any,
+        metadata: dict[str, Any] = None,
     ):
         self.add_queue.put(
-            dict(content=content, timestamp=timestamp, keywords=keywords) | metadata
+            dict(content=content, timestamp=timestamp, keywords=keywords, metadata=metadata)
         )
 
     def retrieve(
@@ -192,10 +192,14 @@ class LTMSystem:
 
     def add_content(
         self, content: str, timestamp: float = None, keywords: list[str] = None,
-        **metadata: Any,
+        metadata: dict[str, Any] = None,
     ) -> int:
         keywords = keywords or []
-        content, metadata = self.content_addition_preprocessing(content, keywords, **metadata)
+        metadata = metadata or {}
+        if "keywords" in metadata:
+            raise AttributeError('"keywords" is a reserved metadata key')
+        metadata = deepcopy(metadata)
+        metadata["keywords"] = keywords
         text_key = self.semantic_memory.add_text(
             content, timestamp=timestamp, metadata=metadata,
         )
@@ -243,11 +247,3 @@ class LTMSystem:
                 metadata=chunk.metadata,
             ))
         return memories
-
-    def content_addition_preprocessing(
-        self, content: str, keywords: list[str] = None, **other_metadata: Any,
-    ) -> tuple[str, dict[str, Any]]:
-        assert "keywords" not in other_metadata
-        metadata = deepcopy(other_metadata)
-        metadata["keywords"] = keywords or []
-        return content, metadata
