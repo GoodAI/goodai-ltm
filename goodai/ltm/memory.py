@@ -1,10 +1,13 @@
 import json
 import time
 import queue
-from typing import Any
+import logging
+from typing import Any, Callable, Optional
 from copy import deepcopy
 from collections import defaultdict
 
+from goodai.ltm.embeddings.base import BaseTextEmbeddingModel
+from goodai.ltm.embeddings.remote import RemoteEmbeddingModel
 from goodai.ltm.embeddings.st_emb import SentenceTransformerEmbeddingModel
 from goodai.ltm.mem.auto import AutoTextMemory, DefaultTextMemory
 from goodai.ltm.mem.config import TextMemoryConfig
@@ -12,9 +15,33 @@ from goodai.ltm.mem.base import RetrievedMemory, PassageInfo
 from multiprocessing import Queue, Process
 
 
-def memory_server(
+DEFAULT_EMBEDDING_MODEL = "avsolatorio/GIST-Embedding-v0"
+
+
+def build_metadata(
+    keywords: list[str] = None, metadata: dict[str, Any] = None,
+) -> dict[str, Any]:
+    keywords = keywords or []
+    metadata = metadata or {}
+    if "keywords" in metadata:
+        raise AttributeError('"keywords" is a reserved metadata key')
+    metadata = deepcopy(metadata)
+    metadata["keywords"] = keywords
+    return metadata
+
+
+def embedding_model_process(jobs_queue: Queue, results_queue: Queue):
+    embedding_model = SentenceTransformerEmbeddingModel(DEFAULT_EMBEDDING_MODEL)
+    while True:
+        d = jobs_queue.get()
+        assert d["method"] in ["get_embedding_dim", "get_info", "encode"]
+        result = getattr(embedding_model, d["method"])(*d["args"], **d["kwargs"])
+        results_queue.put(result)
+
+
+def memory_server_process(
     mem_kwargs: dict, time_budget: float, query_queue: Queue, add_queue: Queue,
-    bkg_queue: Queue, processed_queue: Queue, out_queue: Queue,
+    bkg_queue: Optional[Queue], processed_queue: Optional[Queue], out_queue: Queue,
 ):
     ltm = LTMSystem(**mem_kwargs)
     allowed_methods = {"is_empty", "clear", "state_as_text", "set_state", "retrieve",
@@ -34,53 +61,105 @@ def memory_server(
             queues_empty = True
             t0_changes = time.time()
             # Add memories and send it to background processing
-            # TODO: process these in random order or randomly drop some, to avoid bottlenecks
+            # TODO: process them in random order to alleviate bottlenecks?
             try:
                 kwargs = add_queue.get(block=False)
-                content, metadata = ltm.content_addition_preprocessing(**kwargs)
-                text_key = ltm.add_content(**kwargs)
-                bkg_kwargs = dict(text=content, metadata=metadata, text_key=text_key)
-                bkg_queue.put(bkg_kwargs)
                 queues_empty = False
+                text_key = ltm.add_content(**kwargs)
+                if bkg_queue is not None:
+                    keywords = kwargs.get("keywords")
+                    metadata = kwargs.get("metadata")
+                    bkg_queue.put(dict(
+                        text_key=text_key, text=kwargs["content"],
+                        metadata=build_metadata(keywords, metadata),
+                    ))
             except queue.Empty:
                 pass
             # Take processed memories and update memory database
-            try:
-                kwargs = processed_queue.get(block=False)
-                ltm.semantic_memory.replace_text(**kwargs)
-                queues_empty = False
-            except queue.Empty:
-                pass
+            if processed_queue is not None:
+                try:
+                    kwargs = processed_queue.get(block=False)
+                    queues_empty = False
+                    ltm.semantic_memory.replace_text(**kwargs)
+                except queue.Empty:
+                    pass
             t_changes = time.time() - t0_changes
             # See if there's time for another round
             if queues_empty or time.time() - t0_loop + t_changes >= time_budget:
                 break
 
 
-def background_process(bkg_queue: Queue, processed_queue: Queue):
-    # TODO: implement limits & include configuration
+def background_process(
+    bkg_queue: Queue, processed_queue: Queue,
+    background_process_fn: Callable[[dict], dict] | None
+):
     while True:
-        kwargs = bkg_queue.get()
-        kwargs["metadata"]["processed"] = True
-        processed_queue.put(kwargs)
+        mem_dict = bkg_queue.get()
+        processed_dict = background_process_fn(mem_dict)
+        processed_dict["text_key"] = mem_dict["text_key"]
+        processed_queue.put(processed_dict)
 
 
 class RealTimeLTMSystem:
-    def __init__(self, time_budget: float = 1):
+    """
+    Version of the LTM system that allows to process memories in the background, in
+    order to ensure a fast response time.
+
+    Attributes:
+    ----------
+    embedding_model: RemoteEmbeddingModel
+        An embedding model that supports remote calls.
+    time_budget : float
+        The time (in seconds) allocated for operations in real-time.
+    background_process_fn : Callable[[dict], dict]
+        A function that processes a memory in the background, which returns a
+        processed copy of the input dictionary.
+        Relevant keys:
+          - "text": memory content
+          - "metadata": metadata dictionary
+        WARNING. This function will run in a subprocess, so any side effect won't be
+        effective outside that subprocess. Consider pipes, queues or sockets for that
+        matter.
+    """
+
+    def __init__(
+        self, embedding_model: RemoteEmbeddingModel = None,
+        background_process_fn: Callable[[dict], dict] = None, time_budget: float = 1,
+    ):
         self.query_queue = Queue()
         self.out_queue = Queue()
         self.add_queue = Queue()
-        self.bkg_queue = Queue()
-        self.processed_queue = Queue()
-        self.mem_server = Process(daemon=True, target=memory_server, kwargs=dict(
-            mem_kwargs=dict(), time_budget=time_budget, query_queue=self.query_queue,
-            out_queue=self.out_queue, add_queue=self.add_queue,
-            bkg_queue=self.bkg_queue, processed_queue=self.processed_queue,
-        ))
+        self.bkg_queue = self.processed_queue = None
+        if background_process_fn is not None:
+            self.bkg_queue = Queue()
+            self.processed_queue = Queue()
+
+        if embedding_model is None:
+            logging.warning("A remote embedding model was not given. Instantiating "
+                            f"one based on {DEFAULT_EMBEDDING_MODEL}.")
+            embedding_model = RemoteEmbeddingModel()
+            self.emb_proc = Process(daemon=True, target=embedding_model_process,
+                                    args=embedding_model.queues)
+            self.emb_proc.start()
+
+        self.mem_server = Process(
+            daemon=True,
+            target=memory_server_process,
+            kwargs=dict(
+                time_budget=time_budget, query_queue=self.query_queue,
+                out_queue=self.out_queue, add_queue=self.add_queue,
+                bkg_queue=self.bkg_queue, processed_queue=self.processed_queue,
+                mem_kwargs=dict(embedding_model=embedding_model),
+            ),
+        )
         self.mem_server.start()
-        self.bkg_proc = Process(daemon=True, target=background_process,
-                                args=(self.bkg_queue, self.processed_queue))
-        self.bkg_proc.start()
+
+        if background_process_fn is not None:
+            self.bkg_proc = Process(
+                daemon=True, target=background_process,
+                args=(self.bkg_queue, self.processed_queue, background_process_fn),
+            )
+            self.bkg_proc.start()
 
     def _sync_call(self, method: str, **kwargs):
         self.query_queue.put(dict(method=method, kwargs=kwargs))
@@ -100,10 +179,10 @@ class RealTimeLTMSystem:
 
     def add_content(
         self, content: str, timestamp: float = None, keywords: list[str] = None,
-        **metadata: Any,
+        metadata: dict[str, Any] = None,
     ):
         self.add_queue.put(
-            dict(content=content, timestamp=timestamp, keywords=keywords) | metadata
+            dict(content=content, timestamp=timestamp, keywords=keywords, metadata=metadata)
         )
 
     def retrieve(
@@ -115,22 +194,24 @@ class RealTimeLTMSystem:
         assert len(keywords) > 0
         return self._sync_call("retrieve_from_keywords", keywords=keywords)
 
-    def __end__(self):
-        self.mem_server.terminate()
-
 
 class LTMSystem:
 
     def __init__(
-        self, chunk_capacity: int = 50, chunk_overlap_fraction=0, **other_params,
+        self, chunk_capacity: int = 50, chunk_overlap_fraction=0,
+        embedding_model: BaseTextEmbeddingModel = None, **other_params,
     ):
+        if embedding_model is None:
+            embedding_model = SentenceTransformerEmbeddingModel(DEFAULT_EMBEDDING_MODEL)
+
         self.semantic_memory = AutoTextMemory.create(
-            emb_model= SentenceTransformerEmbeddingModel("avsolatorio/GIST-Embedding-v0"),
+            emb_model=embedding_model,
             config=TextMemoryConfig(
-            chunk_capacity=chunk_capacity,
-            chunk_overlap_fraction=chunk_overlap_fraction,
-            **other_params,
-        ))
+                chunk_capacity=chunk_capacity,
+                chunk_overlap_fraction=chunk_overlap_fraction,
+                **other_params,
+            ),
+        )
         self.keyword_index = defaultdict(list)
 
     def is_empty(self) -> bool:
@@ -152,15 +233,13 @@ class LTMSystem:
 
     def add_content(
         self, content: str, timestamp: float = None, keywords: list[str] = None,
-        **metadata: Any,
+        metadata: dict[str, Any] = None,
     ) -> int:
-        keywords = keywords or []
-        content, metadata = self.content_addition_preprocessing(content, keywords, **metadata)
         text_key = self.semantic_memory.add_text(
-            content, timestamp=timestamp, metadata=metadata,
+            content, timestamp=timestamp, metadata=build_metadata(keywords, metadata),
         )
         self.semantic_memory.add_separator()
-        for kw in keywords:
+        for kw in keywords or []:
             self.keyword_index[kw].append(text_key)
         return text_key
 
@@ -203,11 +282,3 @@ class LTMSystem:
                 metadata=chunk.metadata,
             ))
         return memories
-
-    def content_addition_preprocessing(
-        self, content: str, keywords: list[str] = None, **other_metadata: Any,
-    ) -> tuple[str, dict[str, Any]]:
-        assert "keywords" not in other_metadata
-        metadata = deepcopy(other_metadata)
-        metadata["keywords"] = keywords or []
-        return content, metadata
