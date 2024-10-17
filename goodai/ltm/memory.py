@@ -1,6 +1,7 @@
 import json
 import time
 import queue
+import logging
 from typing import Any, Callable, Optional
 from copy import deepcopy
 from collections import defaultdict
@@ -14,7 +15,31 @@ from goodai.ltm.mem.base import RetrievedMemory, PassageInfo
 from multiprocessing import Queue, Process
 
 
-def memory_server(
+DEFAULT_EMBEDDING_MODEL = "avsolatorio/GIST-Embedding-v0"
+
+
+def build_metadata(
+    keywords: list[str] = None, metadata: dict[str, Any] = None,
+) -> dict[str, Any]:
+    keywords = keywords or []
+    metadata = metadata or {}
+    if "keywords" in metadata:
+        raise AttributeError('"keywords" is a reserved metadata key')
+    metadata = deepcopy(metadata)
+    metadata["keywords"] = keywords
+    return metadata
+
+
+def embedding_model_process(jobs_queue: Queue, results_queue: Queue):
+    embedding_model = SentenceTransformerEmbeddingModel(DEFAULT_EMBEDDING_MODEL)
+    while True:
+        d = jobs_queue.get()
+        assert d["method"] in ["get_embedding_dim", "get_info", "encode"]
+        result = getattr(embedding_model, d["method"])(*d["args"], **d["kwargs"])
+        results_queue.put(result)
+
+
+def memory_server_process(
     mem_kwargs: dict, time_budget: float, query_queue: Queue, add_queue: Queue,
     bkg_queue: Optional[Queue], processed_queue: Optional[Queue], out_queue: Queue,
 ):
@@ -36,15 +61,18 @@ def memory_server(
             queues_empty = True
             t0_changes = time.time()
             # Add memories and send it to background processing
-            # TODO: process these in random order or randomly drop some, to avoid bottlenecks
+            # TODO: process them in random order to alleviate bottlenecks?
             try:
                 kwargs = add_queue.get(block=False)
                 queues_empty = False
-                content, metadata = ltm.content_addition_preprocessing(**kwargs)
                 text_key = ltm.add_content(**kwargs)
                 if bkg_queue is not None:
-                    bkg_kwargs = dict(text=content, metadata=metadata, text_key=text_key)
-                    bkg_queue.put(bkg_kwargs)
+                    keywords = kwargs.get("keywords")
+                    metadata = kwargs.get("metadata")
+                    bkg_queue.put(dict(
+                        text_key=text_key, text=kwargs["content"],
+                        metadata=build_metadata(keywords, metadata),
+                    ))
             except queue.Empty:
                 pass
             # Take processed memories and update memory database
@@ -90,11 +118,12 @@ class RealTimeLTMSystem:
           - "text": memory content
           - "metadata": metadata dictionary
         WARNING. This function will run in a subprocess, so any side effect won't be
-        effective outside that subprocess.
+        effective outside that subprocess. Consider pipes, queues or sockets for that
+        matter.
     """
 
     def __init__(
-        self, embedding_model: RemoteEmbeddingModel,
+        self, embedding_model: RemoteEmbeddingModel = None,
         background_process_fn: Callable[[dict], dict] = None, time_budget: float = 1,
     ):
         self.query_queue = Queue()
@@ -105,12 +134,24 @@ class RealTimeLTMSystem:
             self.bkg_queue = Queue()
             self.processed_queue = Queue()
 
-        self.mem_server = Process(daemon=True, target=memory_server, kwargs=dict(
-            time_budget=time_budget, query_queue=self.query_queue,
-            out_queue=self.out_queue, add_queue=self.add_queue,
-            bkg_queue=self.bkg_queue, processed_queue=self.processed_queue,
-            mem_kwargs=dict(embedding_model=embedding_model),
-        ))
+        if embedding_model is None:
+            logging.warning("A remote embedding model was not given. Instantiating "
+                            f"one based on {DEFAULT_EMBEDDING_MODEL}.")
+            embedding_model = RemoteEmbeddingModel()
+            self.emb_proc = Process(daemon=True, target=embedding_model_process,
+                                    args=embedding_model.queues)
+            self.emb_proc.start()
+
+        self.mem_server = Process(
+            daemon=True,
+            target=memory_server_process,
+            kwargs=dict(
+                time_budget=time_budget, query_queue=self.query_queue,
+                out_queue=self.out_queue, add_queue=self.add_queue,
+                bkg_queue=self.bkg_queue, processed_queue=self.processed_queue,
+                mem_kwargs=dict(embedding_model=embedding_model),
+            ),
+        )
         self.mem_server.start()
 
         if background_process_fn is not None:
@@ -161,16 +202,16 @@ class LTMSystem:
         embedding_model: BaseTextEmbeddingModel = None, **other_params,
     ):
         if embedding_model is None:
-            emb_model_name = "avsolatorio/GIST-Embedding-v0"
-            embedding_model = SentenceTransformerEmbeddingModel(emb_model_name)
+            embedding_model = SentenceTransformerEmbeddingModel(DEFAULT_EMBEDDING_MODEL)
 
         self.semantic_memory = AutoTextMemory.create(
             emb_model=embedding_model,
             config=TextMemoryConfig(
-            chunk_capacity=chunk_capacity,
-            chunk_overlap_fraction=chunk_overlap_fraction,
-            **other_params,
-        ))
+                chunk_capacity=chunk_capacity,
+                chunk_overlap_fraction=chunk_overlap_fraction,
+                **other_params,
+            ),
+        )
         self.keyword_index = defaultdict(list)
 
     def is_empty(self) -> bool:
@@ -194,17 +235,11 @@ class LTMSystem:
         self, content: str, timestamp: float = None, keywords: list[str] = None,
         metadata: dict[str, Any] = None,
     ) -> int:
-        keywords = keywords or []
-        metadata = metadata or {}
-        if "keywords" in metadata:
-            raise AttributeError('"keywords" is a reserved metadata key')
-        metadata = deepcopy(metadata)
-        metadata["keywords"] = keywords
         text_key = self.semantic_memory.add_text(
-            content, timestamp=timestamp, metadata=metadata,
+            content, timestamp=timestamp, metadata=build_metadata(keywords, metadata),
         )
         self.semantic_memory.add_separator()
-        for kw in keywords:
+        for kw in keywords or []:
             self.keyword_index[kw].append(text_key)
         return text_key
 

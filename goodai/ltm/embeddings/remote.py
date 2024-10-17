@@ -16,6 +16,10 @@ class RemoteEmbeddingModel(BaseTextEmbeddingModel):
         self._jobs_queue = jobs_queue or Queue()
         self._results_queue = results_queue or Queue()
 
+    @property
+    def queues(self) -> tuple[Queue, Queue]:
+        return self._jobs_queue, self._results_queue
+
     def _remote_call(self, method: str, *args, **kwargs):
         self._jobs_queue.put(dict(method=method, args=args, kwargs=kwargs))
         return self._results_queue.get()
@@ -33,20 +37,17 @@ class RemoteEmbeddingModel(BaseTextEmbeddingModel):
         return self._remote_call("get_info")
 
     def encode(self, sentences: list[str], batch_size: int = 64, convert_to_tensor: bool = False,
-               device: str | torch.device = None) -> np.ndarray | torch.Tensor:
-        emb = self._remote_call("encode", sentences, batch_size=batch_size,
-                                convert_to_tensor=convert_to_tensor, convert_to_numpy=not convert_to_tensor,
-                                device=device, normalize_embeddings=True)
-        return emb[:, None, :]
+               device: str | torch.device = None, **kwargs) -> np.ndarray | torch.Tensor:
+        # Expected return dimensions: [batch_size, num_requests, embedding_dim]
+        return self._remote_call("encode", sentences, batch_size=batch_size,
+                                 convert_to_tensor=convert_to_tensor, device=device)
 
-    def encode_queries(self, queries: List[str], batch_size: int = 64, show_progress_bar: bool = False,
-                       convert_to_tensor: bool = False,
-                       device: Union[str, torch.device] = None) -> Union[np.ndarray, torch.Tensor]:
+    def encode_queries(self, queries: list[str], batch_size: int = 64, show_progress_bar: bool = False,
+                       convert_to_tensor: bool = False, device: str | torch.device = None, **kwargs) -> np.ndarray | torch.Tensor:
         return self.encode(queries, batch_size=batch_size, show_progress_bar=show_progress_bar,
                            convert_to_tensor=convert_to_tensor, device=device)
 
-    def encode_corpus(self, passages: List[str], batch_size: int = 64, show_progress_bar: bool = False,
-                      convert_to_tensor: bool = False,
-                      device: Union[str, torch.device] = None) -> Union[np.ndarray, torch.Tensor]:
+    def encode_corpus(self, passages: list[str], batch_size: int = 64, show_progress_bar: bool = False,
+                      convert_to_tensor: bool = False, device: str | torch.device = None, **kwargs) -> np.ndarray | torch.Tensor:
         return self.encode(passages, batch_size=batch_size, show_progress_bar=show_progress_bar,
                            convert_to_tensor=convert_to_tensor, device=device)
