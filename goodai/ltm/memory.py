@@ -296,7 +296,7 @@ class LTMSystem:
                 search_index = idx
                 break
 
-        temporal_chunks = self._timestamp_search_forward(search_index, temporal_hops)
+        temporal_chunks = self._timestamp_search(search_index, temporal_hops)
 
         memories = []
         for chunk in temporal_chunks:
@@ -318,7 +318,7 @@ class LTMSystem:
 
         return memories
 
-    def _timestamp_search_forward(self, index: int, temporal_hops: int):
+    def _timestamp_search(self, index: int, temporal_hops: int):
 
         mem: DefaultTextMemory = self.semantic_memory
         return_chunks = []
