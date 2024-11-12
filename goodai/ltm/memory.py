@@ -6,6 +6,8 @@ from typing import Any, Callable, Optional
 from copy import deepcopy
 from collections import defaultdict
 
+from torch.onnx.symbolic_opset11 import chunk
+
 from goodai.ltm.embeddings.base import BaseTextEmbeddingModel
 from goodai.ltm.embeddings.remote import RemoteEmbeddingModel
 from goodai.ltm.embeddings.st_emb import SentenceTransformerEmbeddingModel
@@ -282,3 +284,70 @@ class LTMSystem:
                 metadata=chunk.metadata,
             ))
         return memories
+
+
+    def temporal_retrieval(self, origin_timestamp: float, temporal_hops: int) -> list[RetrievedMemory]:
+
+        mem: DefaultTextMemory = self.semantic_memory
+        search_index = 0
+        # Get the chunk we are searching from
+        for idx, chunk in enumerate(mem.get_all_chunks()):
+            if chunk.timestamp == origin_timestamp:
+                search_index = idx
+                break
+
+        temporal_chunks = self._timestamp_search_forward(search_index, temporal_hops)
+
+        memories = []
+        for chunk in temporal_chunks:
+            text_key = chunk.associated_keys[0]
+            token_ids = mem.chunk_queue.get_sequence_token_ids(text_key)
+            text = mem.chunk_tokenizer.decode(token_ids, skip_special_tokens=True)
+
+            memories.append(RetrievedMemory(
+                passage=text,
+                passage_info=PassageInfo(
+                    chunk.from_token_seq_id, chunk.to_token_seq_id, token_ids,
+                ),
+                timestamp=chunk.timestamp,
+                distance=0.0,
+                relevance=0.0,
+                textKeys=[text_key],
+                metadata=chunk.metadata,
+            ))
+
+        return memories
+
+    def _timestamp_search_forward(self, index: int, temporal_hops: int):
+
+        mem: DefaultTextMemory = self.semantic_memory
+        return_chunks = []
+        chunks = mem.get_all_chunks()
+
+        current_index = index + 1
+        current_timestamp = chunks[index].timestamp
+        hops_to_complete = temporal_hops
+
+        # Search forward
+        while hops_to_complete > 0 and current_index < len(chunks):
+            if chunks[current_index].timestamp != current_timestamp:
+                return_chunks.append(chunks[current_index])
+                current_timestamp = chunks[current_index].timestamp
+                hops_to_complete -= 1
+
+            current_index += 1
+
+        # Search backward
+        current_timestamp = chunks[index].timestamp
+        hops_to_complete = temporal_hops
+        current_index = index - 1
+        while hops_to_complete > 0 and current_index >= 0:
+            if chunks[current_index].timestamp != current_timestamp:
+                return_chunks.append(chunks[current_index])
+                current_timestamp = chunks[current_index].timestamp
+                hops_to_complete -= 1
+
+            current_index -= 1
+
+        return return_chunks
+
