@@ -6,8 +6,6 @@ from typing import Any, Callable, Optional
 from copy import deepcopy
 from collections import defaultdict
 
-from torch.onnx.symbolic_opset11 import chunk
-
 from goodai.ltm.embeddings.base import BaseTextEmbeddingModel
 from goodai.ltm.embeddings.remote import RemoteEmbeddingModel
 from goodai.ltm.embeddings.st_emb import SentenceTransformerEmbeddingModel
