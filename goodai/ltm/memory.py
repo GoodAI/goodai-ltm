@@ -203,7 +203,7 @@ class LTMSystem:
     def __init__(
         self, chunk_capacity: int = 50, chunk_overlap_fraction=0,
         embedding_model: BaseTextEmbeddingModel = None,
-        embedding_model_name: str = None
+        embedding_model_name: str = None,  **other_params,
     ):
         if embedding_model is None:
             model_name = embedding_model_name or DEFAULT_EMBEDDING_MODEL
@@ -214,6 +214,7 @@ class LTMSystem:
             config=TextMemoryConfig(
                 chunk_capacity=chunk_capacity,
                 chunk_overlap_fraction=chunk_overlap_fraction,
+                **other_params,
             ),
         )
         self.keyword_index = defaultdict(list)
@@ -353,3 +354,6 @@ class LTMSystem:
 
         return return_chunks
 
+
+if __name__ == '__main__':
+    LTMSystem(embedding_model_name="avsolatorio/GIST-Embedding-v0")
