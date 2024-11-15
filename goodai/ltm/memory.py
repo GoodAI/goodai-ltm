@@ -125,6 +125,7 @@ class RealTimeLTMSystem:
     def __init__(
         self, embedding_model: RemoteEmbeddingModel = None,
         background_process_fn: Callable[[dict], dict] = None, time_budget: float = 1,
+        embedding_model_name: str = None
     ):
         self.query_queue = Queue()
         self.out_queue = Queue()
@@ -199,10 +200,12 @@ class LTMSystem:
 
     def __init__(
         self, chunk_capacity: int = 50, chunk_overlap_fraction=0,
-        embedding_model: BaseTextEmbeddingModel = None, **other_params,
+        embedding_model: BaseTextEmbeddingModel = None,
+        embedding_model_name: str = None, **other_params,
     ):
         if embedding_model is None:
-            embedding_model = SentenceTransformerEmbeddingModel(DEFAULT_EMBEDDING_MODEL)
+            model_name = embedding_model_name or DEFAULT_EMBEDDING_MODEL
+            embedding_model = SentenceTransformerEmbeddingModel(model_name)
 
         self.semantic_memory = AutoTextMemory.create(
             emb_model=embedding_model,
