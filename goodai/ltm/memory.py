@@ -30,8 +30,8 @@ def build_metadata(
     return metadata
 
 
-def embedding_model_process(jobs_queue: Queue, results_queue: Queue):
-    embedding_model = SentenceTransformerEmbeddingModel(DEFAULT_EMBEDDING_MODEL)
+def embedding_model_process(jobs_queue: Queue, results_queue: Queue, model_name: str):
+    embedding_model = SentenceTransformerEmbeddingModel(model_name)
     while True:
         d = jobs_queue.get()
         assert d["method"] in ["get_embedding_dim", "get_info", "encode"]
@@ -136,11 +136,13 @@ class RealTimeLTMSystem:
             self.processed_queue = Queue()
 
         if embedding_model is None:
+            model_name = embedding_model_name or DEFAULT_EMBEDDING_MODEL
             logging.warning("A remote embedding model was not given. Instantiating "
-                            f"one based on {DEFAULT_EMBEDDING_MODEL}.")
+                            f"one based on {model_name}.")
             embedding_model = RemoteEmbeddingModel()
+            jobs_queue, results_queue = embedding_model.queues
             self.emb_proc = Process(daemon=True, target=embedding_model_process,
-                                    args=embedding_model.queues)
+                                    args=(jobs_queue, results_queue, model_name))
             self.emb_proc.start()
 
         self.mem_server = Process(
@@ -201,7 +203,7 @@ class LTMSystem:
     def __init__(
         self, chunk_capacity: int = 50, chunk_overlap_fraction=0,
         embedding_model: BaseTextEmbeddingModel = None,
-        embedding_model_name: str = None, **other_params,
+        embedding_model_name: str = None
     ):
         if embedding_model is None:
             model_name = embedding_model_name or DEFAULT_EMBEDDING_MODEL
@@ -212,7 +214,6 @@ class LTMSystem:
             config=TextMemoryConfig(
                 chunk_capacity=chunk_capacity,
                 chunk_overlap_fraction=chunk_overlap_fraction,
-                **other_params,
             ),
         )
         self.keyword_index = defaultdict(list)
