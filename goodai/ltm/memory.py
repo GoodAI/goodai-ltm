@@ -122,6 +122,7 @@ class RealTimeLTMSystem:
         matter.
     """
 
+    # TODO: Simplify configuration to deal with redundant elements
     def __init__(
         self, embedding_model: RemoteEmbeddingModel = None,
         background_process_fn: Callable[[dict], dict] = None, time_budget: float = 1,
@@ -200,6 +201,7 @@ class RealTimeLTMSystem:
 
 class LTMSystem:
 
+    # TODO: Simplify configuration to deal with redundant elements
     def __init__(
         self, chunk_capacity: int = 50, chunk_overlap_fraction=0,
         embedding_model: BaseTextEmbeddingModel = None,
@@ -339,8 +341,8 @@ class LTMSystem:
                 if chunks[current_index].timestamp != current_timestamp:
                     return_chunks.append(chunks[current_index])
                     current_timestamp = chunks[current_index].timestamp
-                    hops_to_complete += direction
+                    hops_to_complete -= 1
 
-                current_index += 1
+                current_index += direction
 
         return return_chunks
