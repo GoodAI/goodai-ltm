@@ -30,8 +30,8 @@ def build_metadata(
     return metadata
 
 
-def embedding_model_process(jobs_queue: Queue, results_queue: Queue):
-    embedding_model = SentenceTransformerEmbeddingModel(DEFAULT_EMBEDDING_MODEL)
+def embedding_model_process(jobs_queue: Queue, results_queue: Queue, model_name: str):
+    embedding_model = SentenceTransformerEmbeddingModel(model_name)
     while True:
         d = jobs_queue.get()
         assert d["method"] in ["get_embedding_dim", "get_info", "encode"]
@@ -122,9 +122,11 @@ class RealTimeLTMSystem:
         matter.
     """
 
+    # TODO: Simplify configuration to deal with redundant elements
     def __init__(
         self, embedding_model: RemoteEmbeddingModel = None,
         background_process_fn: Callable[[dict], dict] = None, time_budget: float = 1,
+        embedding_model_name: str = None
     ):
         self.query_queue = Queue()
         self.out_queue = Queue()
@@ -135,11 +137,13 @@ class RealTimeLTMSystem:
             self.processed_queue = Queue()
 
         if embedding_model is None:
+            model_name = embedding_model_name or DEFAULT_EMBEDDING_MODEL
             logging.warning("A remote embedding model was not given. Instantiating "
-                            f"one based on {DEFAULT_EMBEDDING_MODEL}.")
+                            f"one based on {model_name}.")
             embedding_model = RemoteEmbeddingModel()
+            jobs_queue, results_queue = embedding_model.queues
             self.emb_proc = Process(daemon=True, target=embedding_model_process,
-                                    args=embedding_model.queues)
+                                    args=(jobs_queue, results_queue, model_name))
             self.emb_proc.start()
 
         self.mem_server = Process(
@@ -197,12 +201,15 @@ class RealTimeLTMSystem:
 
 class LTMSystem:
 
+    # TODO: Simplify configuration to deal with redundant elements
     def __init__(
         self, chunk_capacity: int = 50, chunk_overlap_fraction=0,
-        embedding_model: BaseTextEmbeddingModel = None, **other_params,
+        embedding_model: BaseTextEmbeddingModel = None,
+        embedding_model_name: str = None,  **other_params,
     ):
         if embedding_model is None:
-            embedding_model = SentenceTransformerEmbeddingModel(DEFAULT_EMBEDDING_MODEL)
+            model_name = embedding_model_name or DEFAULT_EMBEDDING_MODEL
+            embedding_model = SentenceTransformerEmbeddingModel(model_name)
 
         self.semantic_memory = AutoTextMemory.create(
             emb_model=embedding_model,
@@ -282,3 +289,60 @@ class LTMSystem:
                 metadata=chunk.metadata,
             ))
         return memories
+
+
+    def temporal_retrieval(self, origin_timestamp: float, temporal_hops: int) -> list[RetrievedMemory]:
+
+        mem: DefaultTextMemory = self.semantic_memory
+        temporal_chunks = self._timestamp_search(origin_timestamp, temporal_hops)
+
+        memories = []
+        for chunk in temporal_chunks:
+            text_key = chunk.associated_keys[0]
+            token_ids = mem.chunk_queue.get_sequence_token_ids(text_key)
+            text = mem.chunk_tokenizer.decode(token_ids, skip_special_tokens=True)
+
+            memories.append(RetrievedMemory(
+                passage=text,
+                passage_info=PassageInfo(
+                    chunk.from_token_seq_id, chunk.to_token_seq_id, token_ids,
+                ),
+                timestamp=chunk.timestamp,
+                distance=0.0,
+                relevance=0.0,
+                textKeys=[text_key],
+                metadata=chunk.metadata,
+            ))
+
+        return memories
+
+    def _timestamp_search(self, origin_timestamp: float, temporal_hops: int):
+
+        mem: DefaultTextMemory = self.semantic_memory
+
+        search_index = 0
+
+        # Get the chunk we are searching from
+        for idx, chunk in enumerate(mem.get_all_chunks()):
+            if chunk.timestamp == origin_timestamp:
+                search_index = idx
+                break
+
+        return_chunks = []
+        chunks = mem.get_all_chunks()
+
+        # Search both backward, and forward
+        for direction in [-1, 1]:
+            current_index = search_index + direction
+            current_timestamp = chunks[search_index].timestamp
+            hops_to_complete = temporal_hops
+
+            while hops_to_complete > 0 and 0 <= current_index < len(chunks):
+                if chunks[current_index].timestamp != current_timestamp:
+                    return_chunks.append(chunks[current_index])
+                    current_timestamp = chunks[current_index].timestamp
+                    hops_to_complete -= 1
+
+                current_index += direction
+
+        return return_chunks
