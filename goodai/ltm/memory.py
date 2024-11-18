@@ -292,14 +292,7 @@ class LTMSystem:
     def temporal_retrieval(self, origin_timestamp: float, temporal_hops: int) -> list[RetrievedMemory]:
 
         mem: DefaultTextMemory = self.semantic_memory
-        search_index = 0
-        # Get the chunk we are searching from
-        for idx, chunk in enumerate(mem.get_all_chunks()):
-            if chunk.timestamp == origin_timestamp:
-                search_index = idx
-                break
-
-        temporal_chunks = self._timestamp_search(search_index, temporal_hops)
+        temporal_chunks = self._timestamp_search(origin_timestamp, temporal_hops)
 
         memories = []
         for chunk in temporal_chunks:
@@ -321,39 +314,33 @@ class LTMSystem:
 
         return memories
 
-    def _timestamp_search(self, index: int, temporal_hops: int):
+    def _timestamp_search(self, origin_timestamp: float, temporal_hops: int):
 
         mem: DefaultTextMemory = self.semantic_memory
+
+        search_index = 0
+
+        # Get the chunk we are searching from
+        for idx, chunk in enumerate(mem.get_all_chunks()):
+            if chunk.timestamp == origin_timestamp:
+                search_index = idx
+                break
+
         return_chunks = []
         chunks = mem.get_all_chunks()
 
-        current_index = index + 1
-        current_timestamp = chunks[index].timestamp
-        hops_to_complete = temporal_hops
+        # Search both backward, and forward
+        for direction in [-1, 1]:
+            current_index = search_index + direction
+            current_timestamp = chunks[search_index].timestamp
+            hops_to_complete = temporal_hops
 
-        # Search forward
-        while hops_to_complete > 0 and current_index < len(chunks):
-            if chunks[current_index].timestamp != current_timestamp:
-                return_chunks.append(chunks[current_index])
-                current_timestamp = chunks[current_index].timestamp
-                hops_to_complete -= 1
+            while hops_to_complete > 0 and 0 <= current_index < len(chunks):
+                if chunks[current_index].timestamp != current_timestamp:
+                    return_chunks.append(chunks[current_index])
+                    current_timestamp = chunks[current_index].timestamp
+                    hops_to_complete += direction
 
-            current_index += 1
-
-        # Search backward
-        current_timestamp = chunks[index].timestamp
-        hops_to_complete = temporal_hops
-        current_index = index - 1
-        while hops_to_complete > 0 and current_index >= 0:
-            if chunks[current_index].timestamp != current_timestamp:
-                return_chunks.append(chunks[current_index])
-                current_timestamp = chunks[current_index].timestamp
-                hops_to_complete -= 1
-
-            current_index -= 1
+                current_index += 1
 
         return return_chunks
-
-
-if __name__ == '__main__':
-    LTMSystem(embedding_model_name="avsolatorio/GIST-Embedding-v0")
