@@ -291,10 +291,10 @@ class LTMSystem:
         return memories
 
 
-    def temporal_retrieval(self, origin_timestamp: float, temporal_hops: int) -> list[RetrievedMemory]:
+    def temporal_retrieval(self, origin_timestamp: float, lookahead_hops: int = 0, lookback_hops: int = 0) -> list[RetrievedMemory]:
 
         mem: DefaultTextMemory = self.semantic_memory
-        temporal_chunks = self._timestamp_search(origin_timestamp, temporal_hops)
+        temporal_chunks = self._timestamp_search(origin_timestamp, lookahead_hops, lookback_hops)
 
         memories = []
         for chunk in temporal_chunks:
@@ -316,7 +316,7 @@ class LTMSystem:
 
         return memories
 
-    def _timestamp_search(self, origin_timestamp: float, temporal_hops: int):
+    def _timestamp_search(self, origin_timestamp: float, lookahead_hops: int, lookback_hops: int):
 
         mem: DefaultTextMemory = self.semantic_memory
 
@@ -333,9 +333,14 @@ class LTMSystem:
 
         # Search both backward, and forward
         for direction in [-1, 1]:
+
+            if direction == -1:
+                hops_to_complete = lookback_hops
+            else:
+                hops_to_complete = lookahead_hops
+
             current_index = search_index + direction
             current_timestamp = chunks[search_index].timestamp
-            hops_to_complete = temporal_hops
 
             while hops_to_complete > 0 and 0 <= current_index < len(chunks):
                 if chunks[current_index].timestamp != current_timestamp:
