@@ -69,7 +69,7 @@ class AutoTextMemory:
             if _default_tokenizer_wr:
                 tokenizer = _default_tokenizer_wr()
             if tokenizer is None:
-                tokenizer = AutoTokenizer.from_pretrained('distilroberta-base')
+                tokenizer = AutoTokenizer.from_pretrained("avsolatorio/GIST-Embedding-v0")
                 # Suppress length warning
                 tokenizer.model_max_length = sys.maxsize
                 _default_tokenizer_wr = weakref.ref(tokenizer)
