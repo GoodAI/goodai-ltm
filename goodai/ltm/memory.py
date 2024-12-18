@@ -14,9 +14,9 @@ from goodai.ltm.mem.config import TextMemoryConfig
 from goodai.ltm.mem.base import RetrievedMemory, PassageInfo
 from multiprocessing import Queue, Process
 
+from transformers import AutoTokenizer
 
-DEFAULT_EMBEDDING_MODEL = "avsolatorio/GIST-Embedding-v0"
-
+DEFAULT_MODEL = "avsolatorio/GIST-Embedding-v0"
 
 def build_metadata(
     keywords: list[str] = None, metadata: dict[str, Any] = None,
@@ -208,11 +208,14 @@ class LTMSystem:
         embedding_model_name: str = None,  **other_params,
     ):
         if embedding_model is None:
-            model_name = embedding_model_name or DEFAULT_EMBEDDING_MODEL
+            model_name = embedding_model_name or DEFAULT_MODEL
             embedding_model = SentenceTransformerEmbeddingModel(model_name)
+
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
 
         self.semantic_memory = AutoTextMemory.create(
             emb_model=embedding_model,
+            tokenizer=tokenizer,
             config=TextMemoryConfig(
                 chunk_capacity=chunk_capacity,
                 chunk_overlap_fraction=chunk_overlap_fraction,
