@@ -137,7 +137,7 @@ class RealTimeLTMSystem:
             self.processed_queue = Queue()
 
         if embedding_model is None:
-            model_name = embedding_model_name or DEFAULT_EMBEDDING_MODEL
+            model_name = embedding_model_name or DEFAULT_MODEL
             logging.warning("A remote embedding model was not given. Instantiating "
                             f"one based on {model_name}.")
             embedding_model = RemoteEmbeddingModel()
