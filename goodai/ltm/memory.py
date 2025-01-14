@@ -354,3 +354,41 @@ class LTMSystem:
                 current_index += direction
 
         return return_chunks
+
+    # Replace a memory by timestamp
+    def replace_content(self, target_timestamp: float, content: str,
+                        timestamp: float = None, keywords: list[str] = None,
+                        metadata: dict[str, Any] = None):
+
+        # Get textkeys that are associated with the timestamp
+        old_text_keys = []
+        mem: DefaultTextMemory = self.semantic_memory
+        seen = False
+
+        for chunk in reversed(mem.get_all_chunks()):
+            if chunk.timestamp == target_timestamp:
+                old_text_keys.extend(chunk.associated_keys)
+                seen = True
+            elif seen:
+                break
+
+        # There should only be one key after doing the chunks
+        if len(set(old_text_keys)) > 1:
+            raise ValueError(f"Trying to replace a memory with some chunks that span"
+                             f" multiple textkeys {old_text_keys}. Are the memories properly seperated?")
+        old_text_key = old_text_keys[0]
+
+        # Replace the textkeyed memory
+        new_text_key = self.semantic_memory.replace_text(
+           old_text_key, content, timestamp=timestamp, metadata=build_metadata(keywords, metadata),
+        )
+        self.semantic_memory.add_separator()
+
+        # Remove textkey from all keywords
+        for kw in self.keyword_index.keys():
+            self.keyword_index[kw].remove(old_text_key)
+
+        # Add textkey to keyword index
+        for kw in keywords or []:
+            self.keyword_index[kw].append(new_text_key)
+        return new_text_key
