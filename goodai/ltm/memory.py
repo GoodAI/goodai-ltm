@@ -386,7 +386,8 @@ class LTMSystem:
 
         # Remove textkey from all keywords
         for kw in self.keyword_index.keys():
-            self.keyword_index[kw].remove(old_text_key)
+            if old_text_key in self.keyword_index[kw]:
+                self.keyword_index[kw].remove(old_text_key)
 
         # Add textkey to keyword index
         for kw in keywords or []:
