@@ -373,17 +373,22 @@ class LTMSystem:
                 break
 
         # There should only be one key after doing the chunks
-        key = old_text_keys[0]
-        for k in old_text_keys:
-            if key != k:
-                print(f"LTM: TextKeys are incosistient. Replacement will not go ahead.")
-                return
+        if len(set(old_text_keys)) > 1:
+            raise ValueError(f"Trying to replace a memory with some chunks that span"
+                             f" multiple textkeys {old_text_keys}. Are the memories properly seperated?")
+        old_text_key = old_text_keys[0]
 
         # Replace the textkeyed memory
         new_text_key = self.semantic_memory.replace_text(
-           old_text_keys[0], content, timestamp=timestamp, metadata=build_metadata(keywords, metadata),
+           old_text_key, content, timestamp=timestamp, metadata=build_metadata(keywords, metadata),
         )
         self.semantic_memory.add_separator()
+
+        # Remove textkey from all keywords
+        for kw in self.keyword_index.keys():
+            self.keyword_index[kw].remove(old_text_key)
+
+        # Add textkey to keyword index
         for kw in keywords or []:
             self.keyword_index[kw].append(new_text_key)
         return new_text_key
