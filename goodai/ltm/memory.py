@@ -207,6 +207,7 @@ class LTMSystem:
         embedding_model: BaseTextEmbeddingModel = None,
         embedding_model_name: str = None,  **other_params,
     ):
+        model_name = DEFAULT_MODEL
         if embedding_model is None:
             model_name = embedding_model_name or DEFAULT_MODEL
             embedding_model = SentenceTransformerEmbeddingModel(model_name)
